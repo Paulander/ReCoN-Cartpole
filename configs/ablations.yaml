@@ -1,0 +1,12 @@
+env: cartpole_n
+n_poles: 1
+episodes: 20
+modes:
+  - baseline_random
+  - baseline_heuristic
+  - static_recon
+  - recon_fast
+  - recon_bandit
+  - recon_fast_bandit
+  - recon_slow
+

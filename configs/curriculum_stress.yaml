@@ -1,0 +1,8 @@
+stages:
+  - name: nlink_3_stress
+    env: cartpole_n
+    mode: recon_fast_bandit
+    n_poles: 3
+    episodes: 50
+    horizon: 500
+

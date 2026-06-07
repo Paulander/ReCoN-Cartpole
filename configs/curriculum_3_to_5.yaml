@@ -1,0 +1,75 @@
+name: nlink_3_to_5_no_cheat_curriculum
+mode: recon_fast_bandit
+horizon: 500
+seed_split:
+  train_start: 30000
+  validation_start: 130000
+  test_start: 230000
+promotion:
+  require_held_out_improvement: true
+  save_best_only: true
+stages:
+  - name: nlink_3_warm
+    env: cartpole_n
+    n_poles: 3
+    train_episodes: 500
+    eval_episodes: 50
+    initial_angle_range: 0.025
+    force_noise: 0.0
+    pass:
+      mean_survival_steps: 200
+  - name: nlink_3_stable
+    env: cartpole_n
+    n_poles: 3
+    train_episodes: 2000
+    eval_episodes: 100
+    initial_angle_range: 0.05
+    force_noise: 0.0
+    pass:
+      mean_survival_steps: 400
+  - name: nlink_3_robust
+    env: cartpole_n
+    n_poles: 3
+    train_episodes: 5000
+    eval_episodes: 100
+    initial_angle_range: 0.08
+    force_noise: 0.05
+    pass:
+      mean_survival_steps: 475
+      p10_survival_steps: 350
+  - name: nlink_4_warm
+    env: cartpole_n
+    n_poles: 4
+    train_episodes: 2000
+    eval_episodes: 50
+    initial_angle_range: 0.02
+    force_noise: 0.0
+    pass:
+      mean_survival_steps: 175
+  - name: nlink_4_stable
+    env: cartpole_n
+    n_poles: 4
+    train_episodes: 8000
+    eval_episodes: 100
+    initial_angle_range: 0.05
+    force_noise: 0.02
+    pass:
+      mean_survival_steps: 350
+  - name: nlink_5_warm
+    env: cartpole_n
+    n_poles: 5
+    train_episodes: 4000
+    eval_episodes: 50
+    initial_angle_range: 0.015
+    force_noise: 0.0
+    pass:
+      mean_survival_steps: 150
+  - name: nlink_5_stable
+    env: cartpole_n
+    n_poles: 5
+    train_episodes: 12000
+    eval_episodes: 100
+    initial_angle_range: 0.04
+    force_noise: 0.02
+    pass:
+      mean_survival_steps: 300

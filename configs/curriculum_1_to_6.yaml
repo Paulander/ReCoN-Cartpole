@@ -1,0 +1,26 @@
+stages:
+  - name: cartpole_v1_static
+    env: gym_cartpole_v1
+    mode: static_recon
+    n_poles: 1
+    episodes: 10
+    horizon: 500
+    pass:
+      mean_survival_steps: 475
+  - name: nlink_1_static
+    env: cartpole_n
+    mode: static_recon
+    n_poles: 1
+    episodes: 10
+    horizon: 500
+    pass:
+      mean_survival_steps: 475
+  - name: nlink_2_fast_bandit
+    env: cartpole_n
+    mode: recon_fast_bandit
+    n_poles: 2
+    episodes: 20
+    horizon: 500
+    pass:
+      mean_survival_steps: 450
+

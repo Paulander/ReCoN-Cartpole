@@ -1,0 +1,44 @@
+[project]
+name = "recon-cartpole"
+version = "0.1.0"
+description = "ReCoN-lite controllers and visualization for CartPole and N-link cart-pole tasks."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "gymnasium>=1.0",
+  "pygame>=2.5",
+  "matplotlib>=3.8",
+  "pandas>=2.2",
+  "tqdm>=4.66",
+  "pyyaml>=6.0",
+  "imageio>=2.34",
+  "imageio-ffmpeg>=0.5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10"]
+viz = ["plotly>=5", "jinja2>=3"]
+rl = ["torch", "stable-baselines3"]
+
+[project.scripts]
+recon-cartpole = "recon_cartpole.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/recon_cartpole", "src/recon_lite"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"src/recon_lite/**" = ["E701", "F401", "F821"]
+

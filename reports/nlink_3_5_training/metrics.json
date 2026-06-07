@@ -1,0 +1,185 @@
+[
+  {
+    "n_links": 3,
+    "mode": "recon_fast_bandit",
+    "horizon": 500,
+    "train_episodes": 80,
+    "eval_episodes": 25,
+    "train_steps": {
+      "mean": 41.7875,
+      "median": 40.0,
+      "p10": 32.9,
+      "p90": 51.20000000000002,
+      "max": 87.0
+    },
+    "train_last_10_mean": 38.0,
+    "eval_steps": {
+      "mean": 41.28,
+      "median": 39.0,
+      "p10": 34.0,
+      "p90": 53.800000000000004,
+      "max": 68.0
+    },
+    "eval_success_rate_at_horizon": 0.0,
+    "trace_steps": 41,
+    "trace_return": 40.0,
+    "bandit": {
+      "select_control_regime": {
+        "avoid_rail": {
+          "pulls": 1163,
+          "mean_reward": -0.0152,
+          "last_reward": -0.0128
+        },
+        "damp_energy": {
+          "pulls": 974,
+          "mean_reward": -0.0284,
+          "last_reward": -0.0112
+        },
+        "recover_worst_pole": {
+          "pulls": 226,
+          "mean_reward": -0.2191,
+          "last_reward": -2.0445
+        },
+        "recover_base_pole": {
+          "pulls": 98,
+          "mean_reward": -0.4037,
+          "last_reward": -2.045
+        },
+        "stabilize_chain": {
+          "pulls": 90,
+          "mean_reward": -0.4456,
+          "last_reward": -2.0564
+        },
+        "center_cart": {
+          "pulls": 792,
+          "mean_reward": -0.0477,
+          "last_reward": -2.0399
+        }
+      }
+    },
+    "trace_json": "reports/nlink_3_5_training/nlink_3_trace.json",
+    "trace_html": "reports/nlink_3_5_training/nlink_3_replay.html"
+  },
+  {
+    "n_links": 4,
+    "mode": "recon_fast_bandit",
+    "horizon": 500,
+    "train_episodes": 80,
+    "eval_episodes": 25,
+    "train_steps": {
+      "mean": 35.325,
+      "median": 34.0,
+      "p10": 29.0,
+      "p90": 43.0,
+      "max": 57.0
+    },
+    "train_last_10_mean": 35.0,
+    "eval_steps": {
+      "mean": 37.8,
+      "median": 35.0,
+      "p10": 32.0,
+      "p90": 48.2,
+      "max": 55.0
+    },
+    "eval_success_rate_at_horizon": 0.0,
+    "trace_steps": 43,
+    "trace_return": 42.0,
+    "bandit": {
+      "select_control_regime": {
+        "avoid_rail": {
+          "pulls": 101,
+          "mean_reward": -0.3919,
+          "last_reward": -2.065
+        },
+        "damp_energy": {
+          "pulls": 999,
+          "mean_reward": -0.0203,
+          "last_reward": -0.0641
+        },
+        "recover_worst_pole": {
+          "pulls": 548,
+          "mean_reward": -0.0806,
+          "last_reward": -2.0536
+        },
+        "recover_base_pole": {
+          "pulls": 163,
+          "mean_reward": -0.2747,
+          "last_reward": -2.0595
+        },
+        "stabilize_chain": {
+          "pulls": 917,
+          "mean_reward": -0.0295,
+          "last_reward": -2.033
+        },
+        "center_cart": {
+          "pulls": 98,
+          "mean_reward": -0.3964,
+          "last_reward": -2.0677
+        }
+      }
+    },
+    "trace_json": "reports/nlink_3_5_training/nlink_4_trace.json",
+    "trace_html": "reports/nlink_3_5_training/nlink_4_replay.html"
+  },
+  {
+    "n_links": 5,
+    "mode": "recon_fast_bandit",
+    "horizon": 500,
+    "train_episodes": 80,
+    "eval_episodes": 25,
+    "train_steps": {
+      "mean": 33.975,
+      "median": 33.0,
+      "p10": 28.9,
+      "p90": 40.10000000000001,
+      "max": 47.0
+    },
+    "train_last_10_mean": 34.0,
+    "eval_steps": {
+      "mean": 34.84,
+      "median": 34.0,
+      "p10": 30.0,
+      "p90": 41.6,
+      "max": 47.0
+    },
+    "eval_success_rate_at_horizon": 0.0,
+    "trace_steps": 42,
+    "trace_return": 41.0,
+    "bandit": {
+      "select_control_regime": {
+        "avoid_rail": {
+          "pulls": 1045,
+          "mean_reward": -0.019,
+          "last_reward": -0.0413
+        },
+        "damp_energy": {
+          "pulls": 77,
+          "mean_reward": -0.4831,
+          "last_reward": -2.0797
+        },
+        "recover_worst_pole": {
+          "pulls": 223,
+          "mean_reward": -0.2138,
+          "last_reward": -2.0618
+        },
+        "recover_base_pole": {
+          "pulls": 375,
+          "mean_reward": -0.1335,
+          "last_reward": -2.0851
+        },
+        "stabilize_chain": {
+          "pulls": 923,
+          "mean_reward": -0.029,
+          "last_reward": -0.0747
+        },
+        "center_cart": {
+          "pulls": 75,
+          "mean_reward": -0.4908,
+          "last_reward": -2.0825
+        }
+      }
+    },
+    "trace_json": "reports/nlink_3_5_training/nlink_5_trace.json",
+    "trace_html": "reports/nlink_3_5_training/nlink_5_replay.html"
+  }
+]

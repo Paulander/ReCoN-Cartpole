@@ -1,0 +1,6 @@
+physics:
+  width: 900
+  height: 460
+graph:
+  max_nodes: 28
+
