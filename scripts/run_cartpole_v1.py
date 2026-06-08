@@ -23,7 +23,15 @@ def main() -> None:
         last = rollout(env, controller, seed=args.seed + idx, trace=bool(args.render_html))
         print(f"episode={idx} return={last['return']} steps={last['steps']}")
     if args.render_html and last:
-        trace = {"metadata": {"env": "CartPole-v1", "mode": args.mode, "graph": graph_to_trace(controller.graph)}, "steps": last["trace"]}
+        trace = {
+            "metadata": {
+                "env": "CartPole-v1",
+                "mode": args.mode,
+                "mechanisms": controller.learning_mechanisms(),
+                "graph": graph_to_trace(controller.graph),
+            },
+            "steps": last["trace"],
+        }
         save_trace(args.render_html.replace(".html", ".json"), trace["metadata"], trace["steps"])
         render_trace_html(trace, args.render_html, "Gymnasium CartPole-v1")
 

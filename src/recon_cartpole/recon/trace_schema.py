@@ -19,9 +19,14 @@ class StepTrace:
     goal_vector: dict[str, Any]
     selected_regime: str
     proposal: dict[str, Any]
+    proposals: list[dict[str, Any]] = field(default_factory=list)
+    suppressed_proposals: list[dict[str, Any]] = field(default_factory=list)
+    selection_mode: str = "soft_select"
     fired_edges: list[dict[str, str]] = field(default_factory=list)
     plasticity: dict[str, Any] = field(default_factory=dict)
+    fast_deltas: dict[str, float] = field(default_factory=dict)
     bandit: dict[str, Any] = field(default_factory=dict)
+    consolidation: dict[str, Any] = field(default_factory=dict)
     graph_nodes: dict[str, str] = field(default_factory=dict)
     graph_ticks: list[dict[str, Any]] = field(default_factory=list)
 

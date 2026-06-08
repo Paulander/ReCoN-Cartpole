@@ -267,7 +267,9 @@ function drawCurrent() {
   document.getElementById('stats').innerHTML = `env step ${s.step} / ${steps.length - 1} | graph tick ${tickLabel} (${item.tickIndex + 1}) | frame ${frame + 1} / ${timeline.length}<br>return ${s.return_so_far} | regime ${graphTick.selected_regime || s.selected_regime || ''}`;
   document.getElementById('details').textContent = JSON.stringify({
     metadata: currentTrace.metadata, graph_tick: graphTick, goal: s.goal_vector,
-    proposal: graphTick.proposal || s.proposal, bandit: s.bandit, plasticity: s.plasticity
+    proposal: graphTick.proposal || s.proposal, proposals: s.proposals || [],
+    suppressed_proposals: s.suppressed_proposals || [], bandit: s.bandit, plasticity: s.plasticity,
+    fast_deltas: s.fast_deltas || {}, consolidation: s.consolidation || {}
   }, null, 2);
 }
 function advanceTick(delta) {

@@ -31,6 +31,7 @@ def rollout(
     traces: list[dict[str, Any]] = []
     started = time.perf_counter()
     last_reward_tick = 0.0
+    reward_history: list[float] = []
     for step in range(horizon):
         controller.observe_reward(last_reward_tick)
         raw_before = info.get("raw_state")
@@ -46,6 +47,7 @@ def rollout(
             controller.config.n_poles,
             terminated,
         )
+        reward_history.append(float(last_reward_tick))
         if trace:
             traces.append(
                 StepTrace(
@@ -62,9 +64,14 @@ def rollout(
                     goal_vector=diagnostics.get("goal_vector", {}),
                     selected_regime=diagnostics.get("selected_regime", ""),
                     proposal=diagnostics.get("proposal", {}),
+                    proposals=diagnostics.get("proposals", []),
+                    suppressed_proposals=diagnostics.get("suppressed_proposals", []),
+                    selection_mode=diagnostics.get("selection_mode", "soft_select"),
                     fired_edges=diagnostics.get("fired_edges", []),
                     plasticity=diagnostics.get("plasticity", {}),
+                    fast_deltas=diagnostics.get("fast_deltas", {}),
                     bandit=diagnostics.get("bandit", {}),
+                    consolidation=diagnostics.get("consolidation", {}),
                     graph_nodes=diagnostics.get("graph_nodes", {}),
                     graph_ticks=diagnostics.get("graph_ticks", []),
                 ).to_dict()
@@ -73,12 +80,14 @@ def rollout(
         if terminated or truncated:
             break
     controller.observe_reward(last_reward_tick)
+    episode_learning = controller.end_episode(reward_history, total_return, horizon)
     elapsed = time.perf_counter() - started
     return {
         "return": total_return,
         "steps": step + 1,
         "success": step + 1 >= horizon and total_return >= horizon - 1,
         "seconds": elapsed,
+        "episode_learning": episode_learning,
         "trace": traces,
     }
 

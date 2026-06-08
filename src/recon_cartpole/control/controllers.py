@@ -13,6 +13,8 @@ ControllerMode = Literal[
     "recon_bandit",
     "recon_fast_bandit",
     "recon_slow",
+    "gain_search_only",
+    "gain_search_recon_fast_bandit",
 ]
 
 

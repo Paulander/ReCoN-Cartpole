@@ -131,11 +131,14 @@ def run_stage(
         horizon=horizon,
         trace=True,
     )
+    mechanisms = best_controller.learning_mechanisms()
+    mechanisms["gain_mutation"] = gain_trials > 1
     metadata = {
         "stage": stage.get("name", "stage"),
         "n_poles": n_poles,
         "mode": mode,
         "horizon": horizon,
+        "mechanisms": mechanisms,
         "gains": best_gains.to_dict(),
         "graph": graph_to_trace(best_controller.graph),
     }
@@ -161,6 +164,8 @@ def run_stage(
         "trace_steps": int(trace["steps"]),
         "trace_return": float(trace["return"]),
         "best_gains": best_gains.to_dict(),
+        "mechanisms": mechanisms,
+        "recon_learning_claim_allowed": bool(mechanisms["edge_plasticity"] or mechanisms["bandit_persistence"] or mechanisms["slow_consolidation"]),
         "trials": trials,
         "report_dir": str(out_dir),
     }
@@ -242,17 +247,18 @@ def write_curriculum_summary(results: list[dict[str, Any]], out_dir: Path) -> No
     lines = [
         "# Curriculum Run",
         "",
-        "This run trains shared proposal gains plus persistent bandit state per stage, then freezes learning for held-out evaluation.",
+        "This report separates ReCoN learning mechanisms from external gain mutation. A stage should only be described as ReCoN-learned when edge plasticity, bandit persistence, or slow consolidation is active.",
         "",
-        "| stage | N | trials | eval mean | eval p10 | eval max | passed | report |",
-        "|---|---:|---:|---:|---:|---:|---|---|",
+        "| stage | N | mechanisms | trials | eval mean | eval p10 | eval max | passed | report |",
+        "|---|---:|---|---:|---:|---:|---:|---|---|",
     ]
     for result in results:
         eval_steps = result["best_trial"]["eval_steps"]
         lines.append(
-            "| {stage} | {n} | {trials} | {mean:.1f} | {p10:.1f} | {maxv:.1f} | {passed} | [{label}]({href}/best_replay.html) |".format(
+            "| {stage} | {n} | {mechanisms} | {trials} | {mean:.1f} | {p10:.1f} | {maxv:.1f} | {passed} | [{label}]({href}/best_replay.html) |".format(
                 stage=result["stage"],
                 n=result["n_poles"],
+                mechanisms=", ".join(key for key, active in result.get("mechanisms", {}).items() if active) or "none",
                 trials=result["gain_trials"],
                 mean=eval_steps["mean"],
                 p10=eval_steps["p10"],

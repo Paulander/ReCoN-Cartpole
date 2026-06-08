@@ -14,6 +14,24 @@ class ForceProposal:
     confidence: float
     urgency: float
     reason: str
+    score: float = 0.0
+    raw_confidence: float = 0.0
+    raw_urgency: float = 0.0
+    select_edge_weight: float = 1.0
+    proposal_edge_weight: float = 1.0
+    bandit_score: float = 1.0
+    selection_multiplier: float = 1.0
+    selected: bool = True
+    suppressed: bool = False
+    selection_mode: str = "soft_select"
+
+    def __post_init__(self) -> None:
+        if self.raw_confidence == 0.0:
+            self.raw_confidence = self.confidence
+        if self.raw_urgency == 0.0:
+            self.raw_urgency = self.urgency
+        if self.score == 0.0 and not self.suppressed:
+            self.score = max(0.01, self.confidence) * (1.0 + self.urgency)
 
 
 @dataclass

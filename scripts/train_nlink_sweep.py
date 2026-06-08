@@ -59,6 +59,8 @@ def run_for_link_count(
         eval_results.append(result)
 
     trace_result = rollout(env, controller, seed=eval_seed + eval_episodes, horizon=horizon, trace=True)
+    mechanisms = controller.learning_mechanisms()
+    mechanisms["gain_mutation"] = False
     metadata = {
         "env": "CartPoleN",
         "n_poles": n_links,
@@ -66,6 +68,7 @@ def run_for_link_count(
         "horizon": horizon,
         "train_episodes": train_episodes,
         "eval_episodes": eval_episodes,
+        "mechanisms": mechanisms,
         "graph": graph_to_trace(controller.graph),
     }
     trace_path = out_dir / f"nlink_{n_links}_trace.json"
@@ -92,6 +95,7 @@ def run_for_link_count(
         "trace_steps": int(trace_result["steps"]),
         "trace_return": float(trace_result["return"]),
         "bandit": snapshot_bandit(controller.bandit_state),
+        "mechanisms": mechanisms,
         "trace_json": str(trace_path),
         "trace_html": str(html_path),
     }
@@ -102,17 +106,18 @@ def write_summary(results: list[dict[str, Any]], out_dir: Path) -> None:
     lines = [
         "# N-link 3/4/5 Training Sweep",
         "",
-        "This run carries bandit priors across training episodes, freezes learning for held-out evaluation, and exports one replay per link count.",
+        "This report separates active ReCoN mechanisms from external gain mutation and exports one replay per link count.",
         "The custom N-link dynamics are still a benchmark scaffold, so treat these as iteration metrics rather than solved-control claims.",
         "",
-        "| links | mode | train episodes | eval episodes | eval mean steps | eval p10 | eval max | success@horizon | replay |",
-        "|---:|---|---:|---:|---:|---:|---:|---:|---|",
+        "| links | mode | mechanisms | train episodes | eval episodes | eval mean steps | eval p10 | eval max | success@horizon | replay |",
+        "|---:|---|---|---:|---:|---:|---:|---:|---:|---|",
     ]
     for result in results:
         lines.append(
-            "| {n_links} | {mode} | {train_episodes} | {eval_episodes} | {mean:.1f} | {p10:.1f} | {maxv:.1f} | {success:.2f} | [{label}]({href}) |".format(
+            "| {n_links} | {mode} | {mechanisms} | {train_episodes} | {eval_episodes} | {mean:.1f} | {p10:.1f} | {maxv:.1f} | {success:.2f} | [{label}]({href}) |".format(
                 n_links=result["n_links"],
                 mode=result["mode"],
+                mechanisms=", ".join(key for key, active in result.get("mechanisms", {}).items() if active) or "none",
                 train_episodes=result["train_episodes"],
                 eval_episodes=result["eval_episodes"],
                 mean=result["eval_steps"]["mean"],

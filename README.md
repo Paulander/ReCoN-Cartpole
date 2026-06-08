@@ -10,7 +10,7 @@ The first milestone is intentionally honest:
 - `ReConCartPoleController` runs a generated ReCoN graph, a heuristic baseline,
   UCB sibling selection, fast edge plasticity, and goal-aware modulation.
 - Replay traces can be exported as JSON and rendered as standalone HTML.
-- Slow consolidation is implemented but disabled by default.
+- `recon_slow` enables slow consolidation; other modes keep it disabled.
 
 ## Quick Start
 
@@ -30,6 +30,10 @@ The controller modes are:
 - `recon_bandit`
 - `recon_fast_bandit`
 - `recon_slow`
+- `gain_search_only`
+- `gain_search_recon_fast_bandit`
+
+Reports list active mechanisms separately: edge plasticity, bandit persistence, slow consolidation, and external gain mutation. Do not describe a gain-search-only improvement as "ReCoN learned" unless one of the ReCoN learning mechanisms was active on the held-out run.
 
 The custom N-link dynamics are a stable control benchmark scaffold, not yet a
 validated multibody physics paper. The docs call this out because the research

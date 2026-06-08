@@ -1,0 +1,218 @@
+[
+  {
+    "mode": "baseline_heuristic",
+    "n_poles": 1,
+    "horizon": 50,
+    "seeds": [
+      240000,
+      240001,
+      240002
+    ],
+    "env_params": {
+      "initial_angle_range": 0.05,
+      "force_noise": 0.0,
+      "link_coupling": 0.35
+    },
+    "train_episodes": 0,
+    "mechanisms": {
+      "edge_plasticity": false,
+      "bandit_persistence": false,
+      "slow_consolidation": false,
+      "gain_mutation": false
+    },
+    "steps": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "returns": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "mean_survival": 50.0,
+    "p10_survival": 50.0,
+    "success_rate": 1.0,
+    "max_survival": 50.0
+  },
+  {
+    "mode": "static_recon",
+    "n_poles": 1,
+    "horizon": 50,
+    "seeds": [
+      240000,
+      240001,
+      240002
+    ],
+    "env_params": {
+      "initial_angle_range": 0.05,
+      "force_noise": 0.0,
+      "link_coupling": 0.35
+    },
+    "train_episodes": 0,
+    "mechanisms": {
+      "edge_plasticity": false,
+      "bandit_persistence": false,
+      "slow_consolidation": false,
+      "gain_mutation": false
+    },
+    "steps": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "returns": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "mean_survival": 50.0,
+    "p10_survival": 50.0,
+    "success_rate": 1.0,
+    "max_survival": 50.0
+  },
+  {
+    "mode": "recon_fast",
+    "n_poles": 1,
+    "horizon": 50,
+    "seeds": [
+      240000,
+      240001,
+      240002
+    ],
+    "env_params": {
+      "initial_angle_range": 0.05,
+      "force_noise": 0.0,
+      "link_coupling": 0.35
+    },
+    "train_episodes": 0,
+    "mechanisms": {
+      "edge_plasticity": true,
+      "bandit_persistence": false,
+      "slow_consolidation": false,
+      "gain_mutation": false
+    },
+    "steps": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "returns": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "mean_survival": 50.0,
+    "p10_survival": 50.0,
+    "success_rate": 1.0,
+    "max_survival": 50.0
+  },
+  {
+    "mode": "recon_bandit",
+    "n_poles": 1,
+    "horizon": 50,
+    "seeds": [
+      240000,
+      240001,
+      240002
+    ],
+    "env_params": {
+      "initial_angle_range": 0.05,
+      "force_noise": 0.0,
+      "link_coupling": 0.35
+    },
+    "train_episodes": 0,
+    "mechanisms": {
+      "edge_plasticity": false,
+      "bandit_persistence": true,
+      "slow_consolidation": false,
+      "gain_mutation": false
+    },
+    "steps": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "returns": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "mean_survival": 50.0,
+    "p10_survival": 50.0,
+    "success_rate": 1.0,
+    "max_survival": 50.0
+  },
+  {
+    "mode": "recon_fast_bandit",
+    "n_poles": 1,
+    "horizon": 50,
+    "seeds": [
+      240000,
+      240001,
+      240002
+    ],
+    "env_params": {
+      "initial_angle_range": 0.05,
+      "force_noise": 0.0,
+      "link_coupling": 0.35
+    },
+    "train_episodes": 0,
+    "mechanisms": {
+      "edge_plasticity": true,
+      "bandit_persistence": true,
+      "slow_consolidation": false,
+      "gain_mutation": false
+    },
+    "steps": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "returns": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "mean_survival": 50.0,
+    "p10_survival": 50.0,
+    "success_rate": 1.0,
+    "max_survival": 50.0
+  },
+  {
+    "mode": "recon_slow",
+    "n_poles": 1,
+    "horizon": 50,
+    "seeds": [
+      240000,
+      240001,
+      240002
+    ],
+    "env_params": {
+      "initial_angle_range": 0.05,
+      "force_noise": 0.0,
+      "link_coupling": 0.35
+    },
+    "train_episodes": 0,
+    "mechanisms": {
+      "edge_plasticity": true,
+      "bandit_persistence": true,
+      "slow_consolidation": true,
+      "gain_mutation": false
+    },
+    "steps": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "returns": [
+      50.0,
+      50.0,
+      50.0
+    ],
+    "mean_survival": 50.0,
+    "p10_survival": 50.0,
+    "success_rate": 1.0,
+    "max_survival": 50.0
+  }
+]
