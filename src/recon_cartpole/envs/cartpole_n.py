@@ -21,6 +21,7 @@ class CartPoleNConfig:
     pole_lengths: list[float] = field(default_factory=list)
     damping: float = 0.01
     force_mag: float = 10.0
+    force_noise: float = 0.0
     x_threshold: float = 2.4
     theta_threshold_radians: float = 12.0 * 2.0 * math.pi / 360.0
     initial_angle_range: float = 0.05
@@ -83,6 +84,9 @@ class CartPoleNEnv(gym.Env):
 
     def step(self, action: Any):
         force = self._force_from_action(action)
+        if self.config.force_noise > 0.0:
+            noise = self.np_random.normal(0.0, self.config.force_noise * self.config.force_mag)
+            force = float(np.clip(force + noise, -self.config.force_mag, self.config.force_mag))
         self._integrate(force)
         self.steps += 1
         terminated = self._terminated()

@@ -25,7 +25,7 @@ from recon_cartpole.control.actuators import action_from_force
 from recon_cartpole.control.arbitration import arbitrate_force
 from recon_cartpole.control.controllers import ControllerMode, force_to_discrete, heuristic_force, random_action
 from recon_cartpole.control.goal_vector import compute_cartpole_goal_vector
-from recon_cartpole.control.scripts import REGIMES, ForceProposal, propose_force_for_regime
+from recon_cartpole.control.scripts import REGIMES, ForceProposal, ProposalGains, propose_force_for_regime
 from recon_cartpole.control.sensors import StateFeatures, features_from_state
 
 from .fired_edges import fired_edges_from_requests
@@ -45,6 +45,7 @@ class RunnerConfig:
     modulation: ModulationConfig = field(default_factory=ModulationConfig)
     reset_bandit_each_episode: bool = True
     learn: bool = True
+    proposal_gains: ProposalGains = field(default_factory=ProposalGains)
 
 
 class ReConCartPoleController:
@@ -157,7 +158,12 @@ class ReConCartPoleController:
     def _proposal(self, node, env):
         regime = node.meta["regime"]
         selected = env.get("selected_regime")
-        proposal = propose_force_for_regime(regime, env["features"], self.config.force_mag)
+        proposal = propose_force_for_regime(
+            regime,
+            env["features"],
+            self.config.force_mag,
+            self.config.proposal_gains,
+        )
         if regime != selected:
             proposal.confidence *= 0.08
             proposal.urgency *= 0.25
