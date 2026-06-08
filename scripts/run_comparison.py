@@ -15,6 +15,7 @@ def main() -> None:
     parser.add_argument("--train-episodes", type=int, default=0)
     parser.add_argument("--ppo-timesteps", type=int, default=50_000)
     parser.add_argument("--out", default="reports/recon_vs_ppo_comparison")
+    parser.add_argument("--ppo-device", default="cpu")
     parser.add_argument("--no-ppo", action="store_true")
     parser.add_argument("--initial-angle-range", type=float, default=0.05)
     parser.add_argument("--force-noise", type=float, default=0.02)
@@ -36,6 +37,7 @@ def main() -> None:
         train_episodes=args.train_episodes,
         ppo_timesteps=args.ppo_timesteps,
         out_dir=args.out,
+        ppo_device=args.ppo_device,
         env_params_by_n=env_params_by_n,
         include_ppo=not args.no_ppo,
     )

@@ -17,6 +17,7 @@ class PPOBaselineConfig:
     eval_seeds: list[int] = field(default_factory=list)
     env_params: dict[str, Any] = field(default_factory=dict)
     policy: str = "MlpPolicy"
+    device: str = "cpu"
 
 
 def ppo_dependency_status() -> dict[str, Any]:
@@ -76,6 +77,8 @@ def run_ppo_baseline(config: PPOBaselineConfig) -> dict[str, Any]:
         "seeds": config.eval_seeds,
         "env_params": dict(config.env_params),
         "train_timesteps": config.train_timesteps,
+        "policy": config.policy,
+        "device": config.device,
         "mechanisms": {"ppo_policy_gradient": True},
         "dependency_status": deps,
     }
@@ -96,7 +99,7 @@ def run_ppo_baseline(config: PPOBaselineConfig) -> dict[str, Any]:
     from stable_baselines3 import PPO  # pragma: no cover - optional dependency path
 
     env = make_ppo_env(config, seed=config.train_seed)
-    model = PPO(config.policy, env, seed=config.train_seed, verbose=0)
+    model = PPO(config.policy, env, seed=config.train_seed, verbose=0, device=config.device)
     model.learn(total_timesteps=config.train_timesteps)
     summary = evaluate_ppo_model(model, config)
     row.update(summary)

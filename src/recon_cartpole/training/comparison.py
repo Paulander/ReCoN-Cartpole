@@ -30,6 +30,7 @@ def run_nway_comparison(
     train_episodes: int,
     ppo_timesteps: int,
     out_dir: str | Path,
+    ppo_device: str = "cpu",
     env_params_by_n: dict[int, dict[str, Any]] | None = None,
     modes: list[str] | None = None,
     include_ppo: bool = True,
@@ -43,6 +44,7 @@ def run_nway_comparison(
         "seed_start": seed_start,
         "train_episodes": train_episodes,
         "ppo_timesteps": ppo_timesteps,
+        "ppo_device": ppo_device,
         "n_values": n_values,
         "runs": [],
     }
@@ -73,6 +75,7 @@ def run_nway_comparison(
                     train_seed=seed_start + n_poles * 20_000,
                     eval_seeds=seeds,
                     env_params=env_params,
+                    device=ppo_device,
                 )
             )
             ppo_row["family"] = "ppo"
@@ -97,6 +100,7 @@ def write_comparison_markdown(results: dict[str, Any], path: Path) -> None:
         f"Eval episodes per N: `{results['eval_episodes']}`",
         f"ReCoN train episodes per mode: `{results['train_episodes']}`",
         f"PPO train timesteps: `{results['ppo_timesteps']}`",
+        f"PPO device: `{results.get('ppo_device', 'cpu')}`",
         "",
         "| N | family | mode | status | mechanisms | mean | p10 | success | max |",
         "|---:|---|---|---|---|---:|---:|---:|---:|",
