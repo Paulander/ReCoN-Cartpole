@@ -1,0 +1,152 @@
+{
+  "stage": "nlink_3_stable",
+  "n_poles": 3,
+  "mode": "recon_fast_bandit",
+  "train_episodes_budget": 2000,
+  "gain_trials": 20,
+  "trial_train_episodes": 100,
+  "eval_episodes": 100,
+  "best_score": 675.0,
+  "best_trial": {
+    "trial": 1,
+    "score": 675.0,
+    "train_steps": {
+      "mean": 439.64,
+      "median": 500.0,
+      "p10": 279.2,
+      "p90": 500.0,
+      "max": 500.0
+    },
+    "eval_steps": {
+      "mean": 500.0,
+      "median": 500.0,
+      "p10": 500.0,
+      "p90": 500.0,
+      "max": 500.0
+    },
+    "gains": {
+      "angle_gain": 17.189750516135053,
+      "velocity_gain": 4.166426604187394,
+      "cart_position_gain": 0.720089778695599,
+      "cart_velocity_gain": 0.2362164632600696,
+      "worst_velocity_mix": 0.25375752888487496,
+      "base_velocity_mix": 0.3368166792809546,
+      "outer_link_weight": 0.30539500786711565,
+      "center_confidence": 0.48570137771688016,
+      "chain_confidence": 0.7833742859892516,
+      "recover_confidence": 0.888948088316412
+    }
+  },
+  "passed": true,
+  "bandit": {
+    "select_control_regime": {
+      "avoid_rail": {
+        "pulls": 7363,
+        "mean_reward": -0.0017,
+        "last_reward": -0.0527
+      },
+      "damp_energy": {
+        "pulls": 7386,
+        "mean_reward": -0.0016,
+        "last_reward": -0.0564
+      },
+      "recover_worst_pole": {
+        "pulls": 7381,
+        "mean_reward": -0.0017,
+        "last_reward": -0.0507
+      },
+      "recover_base_pole": {
+        "pulls": 7306,
+        "mean_reward": -0.0019,
+        "last_reward": -0.056
+      },
+      "stabilize_chain": {
+        "pulls": 7230,
+        "mean_reward": -0.0022,
+        "last_reward": 0.0416
+      },
+      "center_cart": {
+        "pulls": 7298,
+        "mean_reward": -0.002,
+        "last_reward": -0.057
+      }
+    }
+  },
+  "trace_steps": 500,
+  "trace_return": 500.0,
+  "best_gains": {
+    "angle_gain": 17.189750516135053,
+    "velocity_gain": 4.166426604187394,
+    "cart_position_gain": 0.720089778695599,
+    "cart_velocity_gain": 0.2362164632600696,
+    "worst_velocity_mix": 0.25375752888487496,
+    "base_velocity_mix": 0.3368166792809546,
+    "outer_link_weight": 0.30539500786711565,
+    "center_confidence": 0.48570137771688016,
+    "chain_confidence": 0.7833742859892516,
+    "recover_confidence": 0.888948088316412
+  },
+  "trials": [
+    {
+      "trial": 0,
+      "score": 267.795,
+      "train_steps": {
+        "mean": 433.06,
+        "median": 500.0,
+        "p10": 253.5,
+        "p90": 500.0,
+        "max": 500.0
+      },
+      "eval_steps": {
+        "mean": 226.57,
+        "median": 196.0,
+        "p10": 162.9,
+        "p90": 338.5000000000001,
+        "max": 500.0
+      },
+      "gains": {
+        "angle_gain": 18.0,
+        "velocity_gain": 3.8,
+        "cart_position_gain": 0.75,
+        "cart_velocity_gain": 0.25,
+        "worst_velocity_mix": 0.3,
+        "base_velocity_mix": 0.35,
+        "outer_link_weight": 0.25,
+        "center_confidence": 0.45,
+        "chain_confidence": 0.65,
+        "recover_confidence": 0.85
+      }
+    },
+    {
+      "trial": 1,
+      "score": 675.0,
+      "train_steps": {
+        "mean": 439.64,
+        "median": 500.0,
+        "p10": 279.2,
+        "p90": 500.0,
+        "max": 500.0
+      },
+      "eval_steps": {
+        "mean": 500.0,
+        "median": 500.0,
+        "p10": 500.0,
+        "p90": 500.0,
+        "max": 500.0
+      },
+      "gains": {
+        "angle_gain": 17.189750516135053,
+        "velocity_gain": 4.166426604187394,
+        "cart_position_gain": 0.720089778695599,
+        "cart_velocity_gain": 0.2362164632600696,
+        "worst_velocity_mix": 0.25375752888487496,
+        "base_velocity_mix": 0.3368166792809546,
+        "outer_link_weight": 0.30539500786711565,
+        "center_confidence": 0.48570137771688016,
+        "chain_confidence": 0.7833742859892516,
+        "recover_confidence": 0.888948088316412
+      }
+    }
+  ],
+  "report_dir": "reports/curriculum_n3_solved/01_nlink_3_stable"
+}

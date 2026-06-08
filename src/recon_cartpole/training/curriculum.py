@@ -120,6 +120,9 @@ def run_stage(
             best_controller = controller
             best_result = trial
 
+        if stage.get("early_stop_on_pass", True) and passes_gate(trial["eval_steps"], stage.get("pass", {})):
+            break
+
     assert best_controller is not None and best_result is not None
     trace = rollout(
         make_env(stage, horizon),
@@ -184,6 +187,7 @@ def make_env(stage: dict[str, Any], horizon: int) -> CartPoleNEnv:
             horizon=horizon,
             initial_angle_range=float(stage.get("initial_angle_range", 0.05)),
             force_noise=float(stage.get("force_noise", 0.0)),
+            link_coupling=float(stage.get("link_coupling", 0.35)),
             damping=float(stage.get("damping", 0.01)),
         ),
         render_mode="rgb_array",

@@ -1,0 +1,36 @@
+{
+  "env": "CartPoleN",
+  "n_poles": 3,
+  "mode": "recon_fast_bandit",
+  "horizon": 500,
+  "initial_angle_range": 0.08,
+  "force_noise": 0.05,
+  "link_coupling": 12.0,
+  "test_seed_start": 250000,
+  "test_episodes": 300,
+  "mean_survival_steps": 486.37666666666667,
+  "median_survival_steps": 500.0,
+  "p10_survival_steps": 436.1,
+  "p90_survival_steps": 500.0,
+  "min_survival_steps": 292,
+  "max_survival_steps": 500,
+  "success_rate_500": 0.8466666666666667,
+  "gate": {
+    "mean_survival_steps": 475,
+    "p10_survival_steps": 350
+  },
+  "passed_gate": true,
+  "gains": {
+    "angle_gain": 18.455673688524463,
+    "velocity_gain": 4.307757804880502,
+    "cart_position_gain": 0.5335136426077935,
+    "cart_velocity_gain": 0.2755292452234538,
+    "worst_velocity_mix": 0.2779742469861586,
+    "base_velocity_mix": 0.3684577499128183,
+    "outer_link_weight": 0.22523863205871322,
+    "center_confidence": 0.3548496308946019,
+    "chain_confidence": 0.6674602480544694,
+    "recover_confidence": 0.8171026837215034
+  },
+  "note": "Fresh recon_fast_bandit controller with no bandit priors; cold inference falls back to deterministic regime selection and uses trained robust-stage proposal gains."
+}

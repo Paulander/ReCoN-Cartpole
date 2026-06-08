@@ -34,6 +34,10 @@ The first implementation only lets bandit statistics persist during a sweep and 
 
 This is likely CPU-friendly. A 3090 helps only if we batch many environment rollouts, add a differentiable surrogate, or run optional RL/teacher baselines. Plain ReCoN graph ticking plus Python Gym steps will be CPU-bound unless we vectorize environments.
 
+## Environment Controllability
+
+The N-link environment must use actual linked-chain coupling for multi-link stages. The original default `link_coupling=0.35` behaves more like several identical independent poles driven by one cart, which creates near-uncontrollable relative modes. Curriculum stages for N=3 therefore set `link_coupling=12.0`; this is an explicit benchmark parameter, not a hidden controller shortcut.
+
 ## Curriculum
 
 Use phases for each N:

@@ -22,6 +22,7 @@ class CartPoleNConfig:
     damping: float = 0.01
     force_mag: float = 10.0
     force_noise: float = 0.0
+    link_coupling: float = 0.35
     x_threshold: float = 2.4
     theta_threshold_radians: float = 12.0 * 2.0 * math.pi / 360.0
     initial_angle_range: float = 0.05
@@ -153,7 +154,7 @@ class CartPoleNEnv(gym.Env):
             theta_acc[i] = (
                 cfg.gravity * math.sin(theta[i])
                 - math.cos(theta[i]) * base_acc
-                + 0.35 * neighbor
+                + cfg.link_coupling * neighbor
                 - cfg.damping * theta_dot[i] / max(masses[i] * lengths[i], 1e-9)
             ) / (lengths[i] * 4.0 / 3.0)
         x_acc = (

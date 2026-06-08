@@ -1,0 +1,21 @@
+{
+  "env": "CartPoleN",
+  "n_poles": 3,
+  "mode": "static_recon",
+  "horizon": 500,
+  "initial_angle_range": 0.08,
+  "force_noise": 0.05,
+  "link_coupling": 12.0,
+  "test_seed_start": 230000,
+  "test_episodes": 300,
+  "mean_survival_steps": 490.7733333333333,
+  "p10_survival_steps": 481.40000000000003,
+  "min_survival_steps": 241,
+  "success_rate_500": 0.8766666666666667,
+  "gate": {
+    "mean_survival_steps": 475,
+    "p10_survival_steps": 350
+  },
+  "passed_gate": true,
+  "note": "Fresh static ReCoN controller using trained robust-stage proposal gains from reports/curriculum_n3_solved/02_nlink_3_robust/metrics.json."
+}

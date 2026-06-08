@@ -187,9 +187,12 @@ class ReConCartPoleController:
 
     def _select_regime(self, features: StateFeatures, goal_vector: dict[str, Any], c_explore_eff: float) -> str:
         if self.config.mode in ("recon_bandit", "recon_fast_bandit", "recon_slow"):
-            child = choose_child("select_control_regime", self.bandit_state, c_explore_eff, self.config.bandit)
-            if child:
-                return child
+            arms = self.bandit_state.get("select_control_regime", {})
+            has_priors = any(arm.pulls > 0 for arm in arms.values())
+            if self.config.learn or has_priors:
+                child = choose_child("select_control_regime", self.bandit_state, c_explore_eff, self.config.bandit)
+                if child:
+                    return child
         if abs(features.x) > 1.5:
             return "avoid_rail"
         if goal_vector.get("max_velocity_pressure", 0.0) > 0.65:
