@@ -14,6 +14,7 @@ class CartPoleNConfig:
     n_poles: int = 1
     action_mode: str = "discrete"
     discrete_action_bins: int = 2
+    dynamics_mode: str = "parallel"
     horizon: int = 500
     dt: float = 0.02
     gravity: float = 9.8
@@ -112,7 +113,10 @@ class CartPoleNEnv(gym.Env):
             x_acc, theta_acc = self._single_pole_accelerations(force)
             theta_accs = np.asarray([theta_acc])
         else:
-            x_acc, theta_accs = self._coupled_accelerations(force)
+            if self.config.dynamics_mode == "serial_lagrange":
+                x_acc, theta_accs = self._serial_lagrange_accelerations(force)
+            else:
+                x_acc, theta_accs = self._coupled_accelerations(force)
 
         dt = self.config.dt
         n = self.config.n_poles
@@ -170,6 +174,70 @@ class CartPoleNEnv(gym.Env):
             - cfg.damping * self.state[1]
         ) / total_mass
         return x_acc, theta_acc
+
+
+    def _serial_mass_matrix(self, theta: np.ndarray) -> np.ndarray:
+        n = self.config.n_poles
+        lengths = self.config.lengths()
+        masses = self.config.masses()
+        dim = n + 1
+        matrix = np.zeros((dim, dim), dtype=float)
+        matrix[0, 0] = self.config.cart_mass
+        for idx in range(n):
+            jacobian = np.zeros((2, dim), dtype=float)
+            jacobian[0, 0] = 1.0
+            for joint in range(idx + 1):
+                jacobian[0, joint + 1] = lengths[joint] * math.cos(theta[joint])
+                jacobian[1, joint + 1] = lengths[joint] * math.sin(theta[joint])
+            matrix += masses[idx] * (jacobian.T @ jacobian)
+        return matrix
+
+    def _serial_potential_gradient(self, theta: np.ndarray) -> np.ndarray:
+        n = self.config.n_poles
+        lengths = self.config.lengths()
+        masses = self.config.masses()
+        gradient = np.zeros(n + 1, dtype=float)
+        for joint in range(n):
+            downstream_mass = float(np.sum(masses[joint:]))
+            gradient[joint + 1] = -downstream_mass * self.config.gravity * lengths[joint] * math.sin(theta[joint])
+        return gradient
+
+    def _serial_lagrange_accelerations(self, force: float) -> tuple[float, np.ndarray]:
+        n = self.config.n_poles
+        theta = self.state[2 : 2 + n].copy()
+        q_dot = np.concatenate(([self.state[1]], self.state[2 + n :]))
+        dim = n + 1
+        mass_matrix = self._serial_mass_matrix(theta)
+        eps = 1e-6
+        mass_derivatives: list[np.ndarray] = [np.zeros_like(mass_matrix)]
+        for joint in range(n):
+            theta_plus = theta.copy()
+            theta_minus = theta.copy()
+            theta_plus[joint] += eps
+            theta_minus[joint] -= eps
+            mass_derivatives.append((self._serial_mass_matrix(theta_plus) - self._serial_mass_matrix(theta_minus)) / (2.0 * eps))
+
+        coriolis = np.zeros(dim, dtype=float)
+        for i in range(dim):
+            value = 0.0
+            for j in range(dim):
+                for k in range(dim):
+                    gamma = 0.5 * (
+                        mass_derivatives[k][i, j]
+                        + mass_derivatives[j][i, k]
+                        - mass_derivatives[i][j, k]
+                    )
+                    value += gamma * q_dot[j] * q_dot[k]
+            coriolis[i] = value
+
+        tau = np.zeros(dim, dtype=float)
+        tau[0] = force
+        damping = np.concatenate(([self.config.damping * self.state[1]], self.config.damping * self.state[2 + n :]))
+        q_ddot = np.linalg.solve(
+            mass_matrix,
+            tau - coriolis - self._serial_potential_gradient(theta) - damping,
+        )
+        return float(q_ddot[0]), q_ddot[1:]
 
     def _get_obs(self) -> np.ndarray:
         n = self.config.n_poles

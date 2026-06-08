@@ -30,3 +30,15 @@ def test_five_bin_discrete_action_space_maps_to_force_levels():
     assert env._force_from_action(0) == -env.config.force_mag
     assert env._force_from_action(2) == 0.0
     assert env._force_from_action(4) == env.config.force_mag
+
+
+def test_serial_lagrange_dynamics_is_finite_and_distinct():
+    parallel = CartPoleNEnv(CartPoleNConfig(n_poles=4, dynamics_mode="parallel"))
+    serial = CartPoleNEnv(CartPoleNConfig(n_poles=4, dynamics_mode="serial_lagrange"))
+    state = np.asarray([0.0, 0.0, 0.02, -0.03, 0.04, -0.01, 0.0, 0.0, 0.0, 0.0], dtype=float)
+    parallel.state = state.copy()
+    serial.state = state.copy()
+    parallel._integrate(5.0)
+    serial._integrate(5.0)
+    assert np.all(np.isfinite(serial.state))
+    assert not np.allclose(parallel.state, serial.state)

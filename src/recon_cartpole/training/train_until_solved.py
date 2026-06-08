@@ -44,6 +44,7 @@ class IterationConfig:
     link_coupling: float = 12.0
     force_mag: float = 10.0
     discrete_action_bins: int = 2
+    dynamics_mode: str = "parallel"
     out_dir: str = "reports/train_until_solved"
     target: str = "auto"
     selection_mode: str = "soft_select"
@@ -94,6 +95,7 @@ def make_env(config: IterationConfig) -> CartPoleNEnv:
             link_coupling=config.link_coupling,
             force_mag=config.force_mag,
             discrete_action_bins=config.discrete_action_bins,
+            dynamics_mode=config.dynamics_mode,
         ),
         render_mode="rgb_array",
     )

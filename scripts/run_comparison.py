@@ -24,6 +24,7 @@ def main() -> None:
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--force-mag", type=float, default=10.0)
     parser.add_argument("--discrete-action-bins", type=int, default=2)
+    parser.add_argument("--dynamics-mode", choices=["parallel", "serial_lagrange"], default="parallel")
     args = parser.parse_args()
     env_params_by_n = {
         n: {
@@ -33,6 +34,7 @@ def main() -> None:
             "link_coupling": args.link_coupling,
             "force_mag": args.force_mag,
             "discrete_action_bins": args.discrete_action_bins,
+            "dynamics_mode": args.dynamics_mode,
         }
         for n in args.n_values
     }

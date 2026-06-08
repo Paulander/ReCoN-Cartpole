@@ -119,6 +119,8 @@ def write_ablation_report(results: list[dict[str, Any]], out_dir: str | Path) ->
         "",
         "All rows use identical environment parameters and held-out seeds. Mechanisms are reported separately so gain-search performance is not mislabeled as ReCoN learning.",
         "",
+        f"Environment parameters: `{results[0].get('env_params', {}) if results else {}}`",
+        "",
         "| mode | mechanisms | mean survival | p10 survival | success rate | max survival |",
         "|---|---|---:|---:|---:|---:|",
     ]

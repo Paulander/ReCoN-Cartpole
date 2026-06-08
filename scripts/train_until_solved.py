@@ -11,6 +11,7 @@ def main() -> None:
     parser.add_argument("--n-poles", type=int, required=True)
     parser.add_argument("--target", default="auto")
     parser.add_argument("--mode", default="recon_learn_only")
+    parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="soft_select")
     parser.add_argument("--action-mode", choices=["discrete", "continuous"], default="discrete")
     parser.add_argument("--budget-episodes", type=int, default=50_000)
     parser.add_argument("--train-block-episodes", type=int, default=250)
@@ -23,6 +24,7 @@ def main() -> None:
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--force-mag", type=float, default=10.0)
     parser.add_argument("--discrete-action-bins", type=int, default=2)
+    parser.add_argument("--dynamics-mode", choices=["parallel", "serial_lagrange"], default="parallel")
     parser.add_argument("--mlp-eta", type=float, default=0.08)
     parser.add_argument("--mlp-eta-tick", type=float, default=0.01)
     parser.add_argument("--mlp-sigma", type=float, default=0.08)
@@ -36,6 +38,7 @@ def main() -> None:
         target=args.target,
         mode=args.mode,
         action_mode=args.action_mode,
+        selection_mode=args.selection_mode,
         budget_episodes=args.budget_episodes,
         train_block_episodes=args.train_block_episodes,
         eval_episodes=args.eval_episodes,
@@ -47,6 +50,7 @@ def main() -> None:
         link_coupling=args.link_coupling,
         force_mag=args.force_mag,
         discrete_action_bins=args.discrete_action_bins,
+        dynamics_mode=args.dynamics_mode,
         mlp_eta=args.mlp_eta,
         mlp_eta_tick=args.mlp_eta_tick,
         mlp_sigma=args.mlp_sigma,

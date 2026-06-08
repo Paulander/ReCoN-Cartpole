@@ -194,6 +194,7 @@ def make_env(stage: dict[str, Any], horizon: int) -> CartPoleNEnv:
             n_poles=int(stage.get("n_poles", 1)),
             action_mode=str(stage.get("action_mode", "discrete")),
             discrete_action_bins=int(stage.get("discrete_action_bins", 2)),
+            dynamics_mode=str(stage.get("dynamics_mode", "parallel")),
             horizon=horizon,
             initial_angle_range=float(stage.get("initial_angle_range", 0.05)),
             force_noise=float(stage.get("force_noise", 0.0)),
