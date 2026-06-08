@@ -90,12 +90,12 @@ def test_recon_slow_persists_baseline_changes_after_threshold_and_fast_resets(tm
 
     controller.plasticity_state[key].delta_sum = 1.0
     first = controller.end_episode([1.0], total_return=1.0, horizon=1)
-    assert first["applied"] == {}
+    assert first["applied"]["edges"] == {}
     assert controller.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB) == before
 
     controller.plasticity_state[key].delta_sum = 1.0
     second = controller.end_episode([1.0], total_return=1.0, horizon=1)
-    assert key in second["applied"]
+    assert key in second["applied"]["edges"]
     after = controller.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB)
     assert after > before
 
@@ -108,3 +108,37 @@ def test_recon_slow_persists_baseline_changes_after_threshold_and_fast_resets(tm
     loaded = ReConCartPoleController(cfg)
     loaded.load_consolidation_checkpoint(str(checkpoint))
     assert loaded.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB) == after
+
+
+def test_recon_learn_only_node_params_affect_force_and_trace():
+    raw = [0.0, 0.0, 0.10, 0.0]
+    controller = ReConCartPoleController(RunnerConfig(n_poles=1, mode="recon_learn_only"))
+    _, before = controller.act(raw, raw)
+    base_force = before["force"]
+    controller.node_param_state["recover_worst_pole"].current.force_bias = -8.0
+    _, after = controller.act(raw, raw)
+    assert after["force"] < base_force
+    proposal = next(item for item in after["proposals"] if item["source_node"] == "recover_worst_pole")
+    assert "node_params" in proposal["reason"]
+    assert after["node_params"]
+
+
+def test_recon_learn_only_updates_node_param_deltas_in_trace():
+    env = CartPoleNEnv(CartPoleNConfig(n_poles=1, horizon=5))
+    controller = ReConCartPoleController(RunnerConfig(n_poles=1, mode="recon_learn_only", learn=True))
+    result = rollout(env, controller, seed=5, horizon=5, trace=True)
+    assert any(step.get("node_param_deltas") for step in result["trace"])
+
+
+def test_controller_checkpoint_reloads_edge_and_node_params(tmp_path):
+    controller = ReConCartPoleController(RunnerConfig(n_poles=1, mode="recon_learn_only"))
+    controller.set_edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB, 2.5)
+    controller.node_param_state["recover_worst_pole"].base.force_bias = 1.25
+    controller.node_param_state["recover_worst_pole"].current.force_bias = 1.25
+    checkpoint = tmp_path / "controller.json"
+    controller.save_checkpoint(str(checkpoint))
+
+    loaded = ReConCartPoleController(RunnerConfig(n_poles=1, mode="recon_learn_only"))
+    loaded.load_consolidation_checkpoint(str(checkpoint))
+    assert loaded.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB) == 2.5
+    assert loaded.node_param_state["recover_worst_pole"].base.force_bias == 1.25

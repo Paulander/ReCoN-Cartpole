@@ -1,0 +1,362 @@
+{
+  "config": {
+    "n_poles": 4,
+    "mode": "recon_learn_only",
+    "stage": "train_until_solved_n4",
+    "selection_mode": "soft_select",
+    "force_mag": 10.0,
+    "proposal_gains": {
+      "angle_gain": 18.0,
+      "velocity_gain": 3.8,
+      "cart_position_gain": 0.75,
+      "cart_velocity_gain": 0.25,
+      "worst_velocity_mix": 0.3,
+      "base_velocity_mix": 0.35,
+      "outer_link_weight": 0.25,
+      "center_confidence": 0.45,
+      "chain_confidence": 0.65,
+      "recover_confidence": 0.85
+    },
+    "node_params_config": {
+      "enabled": true,
+      "eta_fast": 0.01,
+      "eta_consolidate": 0.02,
+      "lambda_decay": 0.85,
+      "min_episodes": 20,
+      "max_delta_episode": 0.35
+    },
+    "consolidation_config": {
+      "enabled": true,
+      "eta_consolidate": 0.02,
+      "min_episodes": 20,
+      "outcome_weight": 0.5,
+      "max_base_delta": 0.25,
+      "w_min": 0.05,
+      "w_max": 5.0
+    }
+  },
+  "edge_weights": {
+    "root_balance->observe_state:SUB": 1.0,
+    "root_balance->estimate_risk:SUB": 1.0,
+    "root_balance->select_control_regime:SUB": 1.0,
+    "root_balance->arbitrate_force:SUB": 1.0,
+    "root_balance->apply_force:SUB": 1.0,
+    "observe_state->estimate_risk:POR": 1.0,
+    "estimate_risk->select_control_regime:POR": 1.0,
+    "select_control_regime->arbitrate_force:POR": 0.997465443624112,
+    "arbitrate_force->apply_force:POR": 0.997465443624112,
+    "observe_state->observe_state_terminal:SUB": 1.0,
+    "estimate_risk->estimate_risk_terminal:SUB": 1.0,
+    "arbitrate_force->arbitrate_force_terminal:SUB": 0.997465443624112,
+    "apply_force->apply_force_terminal:SUB": 1.0,
+    "select_control_regime->avoid_rail:SUB": 0.997465443624112,
+    "avoid_rail->avoid_rail_proposal:SUB": 0.997465443624112,
+    "select_control_regime->damp_energy:SUB": 0.997465443624112,
+    "damp_energy->damp_energy_proposal:SUB": 0.997465443624112,
+    "select_control_regime->recover_worst_pole:SUB": 0.997465443624112,
+    "recover_worst_pole->recover_worst_pole_proposal:SUB": 0.997465443624112,
+    "select_control_regime->recover_base_pole:SUB": 0.997465443624112,
+    "recover_base_pole->recover_base_pole_proposal:SUB": 0.997465443624112,
+    "select_control_regime->stabilize_chain:SUB": 0.997465443624112,
+    "stabilize_chain->stabilize_chain_proposal:SUB": 0.997465443624112,
+    "select_control_regime->center_cart:SUB": 0.997465443624112,
+    "center_cart->center_cart_proposal:SUB": 0.997465443624112,
+    "observe_state->pole_0_monitor:SUB": 1.0,
+    "pole_0_monitor->pole_0_sensor:SUB": 1.0,
+    "observe_state->pole_1_monitor:SUB": 1.0,
+    "pole_1_monitor->pole_1_sensor:SUB": 1.0,
+    "observe_state->pole_2_monitor:SUB": 1.0,
+    "pole_2_monitor->pole_2_sensor:SUB": 1.0,
+    "observe_state->pole_3_monitor:SUB": 1.0,
+    "pole_3_monitor->pole_3_sensor:SUB": 1.0
+  },
+  "bandit": {
+    "select_control_regime": {
+      "avoid_rail": {
+        "pulls": 314,
+        "mean_reward": -0.0139,
+        "last_reward": 0.0266
+      },
+      "damp_energy": {
+        "pulls": 264,
+        "mean_reward": -0.0375,
+        "last_reward": 0.0066
+      },
+      "recover_worst_pole": {
+        "pulls": 315,
+        "mean_reward": -0.0133,
+        "last_reward": -0.0216
+      },
+      "recover_base_pole": {
+        "pulls": 151,
+        "mean_reward": -0.1485,
+        "last_reward": -2.1238
+      },
+      "stabilize_chain": {
+        "pulls": 306,
+        "mean_reward": -0.0175,
+        "last_reward": 0.0054
+      },
+      "center_cart": {
+        "pulls": 311,
+        "mean_reward": -0.0154,
+        "last_reward": -0.0313
+      }
+    }
+  },
+  "node_params": {
+    "avoid_rail": {
+      "base": {
+        "confidence_multiplier": 0.9999788505375912,
+        "urgency_multiplier": 0.9999894252687955,
+        "force_bias": -0.00012972512069412038,
+        "angle_weight": 0.9999947126343978,
+        "velocity_weight": 0.9999947126343978,
+        "pole_priority_weight": 0.9999968275806387,
+        "cart_centering_weight": 0.9999968275806387
+      },
+      "current": {
+        "confidence_multiplier": 0.9999788505375912,
+        "urgency_multiplier": 0.9999894252687955,
+        "force_bias": -0.00012972512069412038,
+        "angle_weight": 0.9999947126343978,
+        "velocity_weight": 0.9999947126343978,
+        "pole_priority_weight": 0.9999968275806387,
+        "cart_centering_weight": 0.9999968275806387
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "damp_energy": {
+      "base": {
+        "confidence_multiplier": 1.0000133649643155,
+        "urgency_multiplier": 1.0000066824821576,
+        "force_bias": -0.00015541521771076294,
+        "angle_weight": 1.000003341241079,
+        "velocity_weight": 1.000003341241079,
+        "pole_priority_weight": 1.0000020047446474,
+        "cart_centering_weight": 1.0000020047446474
+      },
+      "current": {
+        "confidence_multiplier": 1.0000133649643155,
+        "urgency_multiplier": 1.0000066824821576,
+        "force_bias": -0.00015541521771076294,
+        "angle_weight": 1.000003341241079,
+        "velocity_weight": 1.000003341241079,
+        "pole_priority_weight": 1.0000020047446474,
+        "cart_centering_weight": 1.0000020047446474
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "recover_worst_pole": {
+      "base": {
+        "confidence_multiplier": 0.9999459720950268,
+        "urgency_multiplier": 0.9999729860475134,
+        "force_bias": -2.9725899927076666e-05,
+        "angle_weight": 0.9999864930237568,
+        "velocity_weight": 0.9999864930237568,
+        "pole_priority_weight": 0.9999918958142541,
+        "cart_centering_weight": 0.9999918958142541
+      },
+      "current": {
+        "confidence_multiplier": 0.9999459720950268,
+        "urgency_multiplier": 0.9999729860475134,
+        "force_bias": -2.9725899927076666e-05,
+        "angle_weight": 0.9999864930237568,
+        "velocity_weight": 0.9999864930237568,
+        "pole_priority_weight": 0.9999918958142541,
+        "cart_centering_weight": 0.9999918958142541
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "recover_base_pole": {
+      "base": {
+        "confidence_multiplier": 0.9994389530070545,
+        "urgency_multiplier": 0.9997194765035272,
+        "force_bias": -0.0008312925374634803,
+        "angle_weight": 0.9998597382517637,
+        "velocity_weight": 0.9998597382517637,
+        "pole_priority_weight": 0.9999158429510582,
+        "cart_centering_weight": 0.9999158429510582
+      },
+      "current": {
+        "confidence_multiplier": 0.9994389530070545,
+        "urgency_multiplier": 0.9997194765035272,
+        "force_bias": -0.0008312925374634803,
+        "angle_weight": 0.9998597382517637,
+        "velocity_weight": 0.9998597382517637,
+        "pole_priority_weight": 0.9999158429510582,
+        "cart_centering_weight": 0.9999158429510582
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "stabilize_chain": {
+      "base": {
+        "confidence_multiplier": 0.999950634038821,
+        "urgency_multiplier": 0.9999753170194106,
+        "force_bias": -8.309968257902939e-05,
+        "angle_weight": 0.9999876585097053,
+        "velocity_weight": 0.9999876585097053,
+        "pole_priority_weight": 0.9999925951058232,
+        "cart_centering_weight": 0.9999925951058232
+      },
+      "current": {
+        "confidence_multiplier": 0.999950634038821,
+        "urgency_multiplier": 0.9999753170194106,
+        "force_bias": -8.309968257902939e-05,
+        "angle_weight": 0.9999876585097053,
+        "velocity_weight": 0.9999876585097053,
+        "pole_priority_weight": 0.9999925951058232,
+        "cart_centering_weight": 0.9999925951058232
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "center_cart": {
+      "base": {
+        "confidence_multiplier": 0.9999165603794595,
+        "urgency_multiplier": 0.9999582801897298,
+        "force_bias": -0.00012539211706837677,
+        "angle_weight": 0.9999791400948649,
+        "velocity_weight": 0.9999791400948649,
+        "pole_priority_weight": 0.999987484056919,
+        "cart_centering_weight": 0.999987484056919
+      },
+      "current": {
+        "confidence_multiplier": 0.9999165603794595,
+        "urgency_multiplier": 0.9999582801897298,
+        "force_bias": -0.00012539211706837677,
+        "angle_weight": 0.9999791400948649,
+        "velocity_weight": 0.9999791400948649,
+        "pole_priority_weight": 0.999987484056919,
+        "cart_centering_weight": 0.999987484056919
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    }
+  },
+  "consolidation": {
+    "config": {
+      "enabled": true,
+      "eta_consolidate": 0.02,
+      "min_episodes": 20,
+      "outcome_weight": 0.5,
+      "max_base_delta": 0.25,
+      "w_min": 0.05,
+      "w_max": 5.0
+    },
+    "total_episodes": 20,
+    "episodes_since_apply": 0,
+    "last_apply_time": "2026-06-08T18:11:23.886720",
+    "edge_states": {
+      "select_control_regime->arbitrate_force:POR": {
+        "edge_key": "select_control_regime->arbitrate_force:POR",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "arbitrate_force->apply_force:POR": {
+        "edge_key": "arbitrate_force->apply_force:POR",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "arbitrate_force->arbitrate_force_terminal:SUB": {
+        "edge_key": "arbitrate_force->arbitrate_force_terminal:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "select_control_regime->avoid_rail:SUB": {
+        "edge_key": "select_control_regime->avoid_rail:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "avoid_rail->avoid_rail_proposal:SUB": {
+        "edge_key": "avoid_rail->avoid_rail_proposal:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "select_control_regime->damp_energy:SUB": {
+        "edge_key": "select_control_regime->damp_energy:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "damp_energy->damp_energy_proposal:SUB": {
+        "edge_key": "damp_energy->damp_energy_proposal:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "select_control_regime->recover_worst_pole:SUB": {
+        "edge_key": "select_control_regime->recover_worst_pole:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "recover_worst_pole->recover_worst_pole_proposal:SUB": {
+        "edge_key": "recover_worst_pole->recover_worst_pole_proposal:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "select_control_regime->recover_base_pole:SUB": {
+        "edge_key": "select_control_regime->recover_base_pole:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "recover_base_pole->recover_base_pole_proposal:SUB": {
+        "edge_key": "recover_base_pole->recover_base_pole_proposal:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "select_control_regime->stabilize_chain:SUB": {
+        "edge_key": "select_control_regime->stabilize_chain:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "stabilize_chain->stabilize_chain_proposal:SUB": {
+        "edge_key": "stabilize_chain->stabilize_chain_proposal:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "select_control_regime->center_cart:SUB": {
+        "edge_key": "select_control_regime->center_cart:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      },
+      "center_cart->center_cart_proposal:SUB": {
+        "edge_key": "center_cart->center_cart_proposal:SUB",
+        "w_base": 0.997465443624112,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0,
+        "episode_count": 0
+      }
+    }
+  }
+}

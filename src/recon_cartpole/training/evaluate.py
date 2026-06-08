@@ -70,6 +70,8 @@ def rollout(
                     fired_edges=diagnostics.get("fired_edges", []),
                     plasticity=diagnostics.get("plasticity", {}),
                     fast_deltas=diagnostics.get("fast_deltas", {}),
+                    node_params=diagnostics.get("node_params", {}),
+                    node_param_deltas=diagnostics.get("node_param_deltas", {}),
                     bandit=diagnostics.get("bandit", {}),
                     consolidation=diagnostics.get("consolidation", {}),
                     graph_nodes=diagnostics.get("graph_nodes", {}),

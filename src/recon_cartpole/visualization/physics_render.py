@@ -269,7 +269,8 @@ function drawCurrent() {
     metadata: currentTrace.metadata, graph_tick: graphTick, goal: s.goal_vector,
     proposal: graphTick.proposal || s.proposal, proposals: s.proposals || [],
     suppressed_proposals: s.suppressed_proposals || [], bandit: s.bandit, plasticity: s.plasticity,
-    fast_deltas: s.fast_deltas || {}, consolidation: s.consolidation || {}
+    fast_deltas: s.fast_deltas || {}, node_param_deltas: s.node_param_deltas || {},
+    node_params: s.node_params || {}, consolidation: s.consolidation || {}
   }, null, 2);
 }
 function advanceTick(delta) {

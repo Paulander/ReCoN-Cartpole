@@ -34,6 +34,15 @@ from recon_cartpole.control.sensors import StateFeatures, features_from_state
 
 from .fired_edges import fired_edges_from_requests
 from .graph_factory import GraphConfig, build_cartpole_graph, trainable_edge_whitelist
+from .node_params import (
+    NodeParamConfig,
+    RegimeParamState,
+    apply_node_params,
+    consolidate_regime_params,
+    init_regime_param_state,
+    snapshot_regime_params,
+    update_regime_param_state,
+)
 
 
 @dataclass
@@ -52,6 +61,7 @@ class RunnerConfig:
     proposal_gains: ProposalGains = field(default_factory=ProposalGains)
     selection_mode: str = "soft_select"
     consolidation: ConsolidationConfig = field(default_factory=ConsolidationConfig)
+    node_params: NodeParamConfig = field(default_factory=NodeParamConfig)
 
 
 class ReConCartPoleController:
@@ -61,6 +71,9 @@ class ReConCartPoleController:
         self.engine = ReConEngine(self.graph)
         self.bandit_state = init_bandit_state({"select_control_regime": list(REGIMES)})
         self.plasticity_state = init_plasticity_state(self.graph, trainable_edge_whitelist(self.graph))
+        if self._uses_node_params() and not self.config.node_params.enabled:
+            self.config.node_params.enabled = True
+        self.node_param_state = init_regime_param_state()
         if self._uses_slow_consolidation() and not self.config.consolidation.enabled:
             self.config.consolidation.enabled = True
         self.consolidation = ConsolidationEngine(self.config.consolidation)
@@ -70,23 +83,45 @@ class ReConCartPoleController:
         self.last_modulators = compute_modulators({}, self.config.modulation)
         self.last_fired_edges: list[dict[str, str]] = []
         self.last_fast_deltas: dict[str, float] = {}
-        self.last_consolidation_applied: dict[str, float] = {}
+        self.last_node_param_deltas: dict[str, float] = {}
+        self.last_consolidation_applied: dict[str, Any] = {}
         self.last_proposal = ForceProposal("none", 0.0, 0.0, 0.0, "not run")
 
     def _uses_fast_plasticity(self) -> bool:
-        return self.config.mode in ("recon_fast", "recon_fast_bandit", "recon_slow", "gain_search_recon_fast_bandit")
+        return self.config.mode in (
+            "recon_fast",
+            "recon_fast_bandit",
+            "recon_slow",
+            "gain_search_recon_fast_bandit",
+            "recon_learn_only",
+            "recon_slow_no_gain_search",
+            "recon_mlp_terminal",
+        )
 
     def _uses_bandit(self) -> bool:
-        return self.config.mode in ("recon_bandit", "recon_fast_bandit", "recon_slow", "gain_search_recon_fast_bandit")
+        return self.config.mode in (
+            "recon_bandit",
+            "recon_fast_bandit",
+            "recon_slow",
+            "gain_search_recon_fast_bandit",
+            "recon_learn_only",
+            "recon_slow_no_gain_search",
+            "recon_mlp_terminal",
+        )
 
     def _uses_slow_consolidation(self) -> bool:
-        return self.config.mode == "recon_slow"
+        return self.config.mode in ("recon_slow", "recon_learn_only", "recon_slow_no_gain_search", "recon_mlp_terminal")
+
+    def _uses_node_params(self) -> bool:
+        return self.config.mode in ("recon_learn_only", "recon_slow_no_gain_search", "recon_mlp_terminal")
 
     def learning_mechanisms(self) -> dict[str, bool]:
         return {
             "edge_plasticity": self._uses_fast_plasticity(),
             "bandit_persistence": self._uses_bandit() and not self.config.reset_bandit_each_episode,
             "slow_consolidation": self._uses_slow_consolidation(),
+            "node_param_learning": self._uses_node_params(),
+            "mlp_terminal": self.config.mode == "recon_mlp_terminal",
             "gain_mutation": self.config.mode in ("gain_search_only", "gain_search_recon_fast_bandit"),
         }
 
@@ -98,6 +133,9 @@ class ReConCartPoleController:
         self.last_selected_regime = None
         self.last_fired_edges = []
         self.last_fast_deltas = {}
+        self.last_node_param_deltas = {}
+        for item in self.node_param_state.values():
+            item.reset_episode()
 
     def observe_reward(self, reward: float) -> None:
         if not self.config.learn:
@@ -112,6 +150,15 @@ class ReConCartPoleController:
                 reward,
                 self.last_modulators.eta_tick_eff,
                 self.config.plasticity,
+            )
+        if self._uses_node_params():
+            self.last_node_param_deltas = update_regime_param_state(
+                self.node_param_state,
+                self.last_selected_regime,
+                reward,
+                self.last_proposal.force,
+                self.config.force_mag,
+                self.config.node_params,
             )
 
     def act(self, observation: Any, raw_state: Any | None = None) -> tuple[Any, dict[str, Any]]:
@@ -164,6 +211,8 @@ class ReConCartPoleController:
             "fired_edges": list(self.last_fired_edges),
             "plasticity": snapshot_plasticity(self.plasticity_state),
             "fast_deltas": dict(self.last_fast_deltas),
+            "node_params": snapshot_regime_params(self.node_param_state) if self._uses_node_params() else {},
+            "node_param_deltas": dict(self.last_node_param_deltas),
             "consolidation": self.consolidation.to_dict() if self._uses_slow_consolidation() else {},
             "consolidation_applied": dict(self.last_consolidation_applied),
             "bandit": snapshot_bandit(self.bandit_state),
@@ -190,6 +239,9 @@ class ReConCartPoleController:
             return {}
         edge_delta_sums = {key: state.delta_sum for key, state in self.plasticity_state.items() if abs(state.delta_sum) > 1e-12}
         avg_reward_tick = sum(reward_history) / len(reward_history) if reward_history else 0.0
+        node_param_delta_sums = {
+            regime: dict(item.delta_sum) for regime, item in self.node_param_state.items() if item.delta_sum
+        }
         summary = EpisodeSummary(
             edge_delta_sums=edge_delta_sums,
             avg_reward_tick=avg_reward_tick,
@@ -198,33 +250,79 @@ class ReConCartPoleController:
                 "n_poles": self.config.n_poles,
                 "stage": self.config.stage,
                 "bandit": snapshot_bandit(self.bandit_state),
+                "node_param_delta_sums": node_param_delta_sums,
             },
         )
         self.consolidation.accumulate_episode(summary)
-        applied = self.consolidation.apply_to_graph(self.graph) if self.consolidation.should_apply() else {}
-        if applied:
+        edge_applied = self.consolidation.apply_to_graph(self.graph) if self.consolidation.should_apply() else {}
+        node_param_applied = {}
+        if self.consolidation.episodes_since_apply == 0 or self.config.node_params.min_episodes <= 1:
+            node_param_applied = consolidate_regime_params(
+                self.node_param_state,
+                summary.outcome_score,
+                self.config.node_params,
+            )
+        if edge_applied:
             self._sync_plasticity_base_weights()
+        applied = {"edges": edge_applied, "node_params": node_param_applied}
         self.last_consolidation_applied = applied
-        return {"summary": summary.__dict__, "applied": applied, "state": self.consolidation.to_dict()}
+        return {"summary": summary.__dict__, "applied": applied, "state": self.checkpoint_dict()}
+
+    def checkpoint_dict(self) -> dict[str, Any]:
+        return {
+            "config": {
+                "n_poles": self.config.n_poles,
+                "mode": self.config.mode,
+                "stage": self.config.stage,
+                "selection_mode": self.config.selection_mode,
+                "force_mag": self.config.force_mag,
+                "proposal_gains": self.config.proposal_gains.to_dict(),
+                "node_params_config": self.config.node_params.__dict__,
+                "consolidation_config": self.config.consolidation.__dict__,
+            },
+            "edge_weights": {
+                f"{edge.src}->{edge.dst}:{edge.ltype.name}": self.edge_weight(edge.src, edge.dst, edge.ltype)
+                for edge in self.graph.edges
+                if edge.ltype in (LinkType.SUB, LinkType.POR)
+            },
+            "bandit": snapshot_bandit(self.bandit_state),
+            "node_params": snapshot_regime_params(self.node_param_state),
+            "consolidation": self.consolidation.to_dict(),
+        }
+
+    def save_checkpoint(self, path: str) -> None:
+        import json
+        from pathlib import Path
+
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(self.checkpoint_dict(), indent=2), encoding="utf-8")
 
     def save_consolidation_checkpoint(self, path: str) -> None:
-        self.consolidation.save(path)
+        self.save_checkpoint(path)
 
     def load_consolidation_checkpoint(self, path: str) -> None:
         import json
         from pathlib import Path
 
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-        config = ConsolidationConfig(**data.get("config", {}))
+        payload = data.get("consolidation", data)
+        config = ConsolidationConfig(**payload.get("config", {}))
         self.consolidation = ConsolidationEngine(config)
-        self.consolidation.total_episodes = int(data.get("total_episodes", 0))
-        self.consolidation.episodes_since_apply = int(data.get("episodes_since_apply", 0))
-        self.consolidation.last_apply_time = data.get("last_apply_time")
-        for key, payload in data.get("edge_states", {}).items():
+        self.consolidation.total_episodes = int(payload.get("total_episodes", 0))
+        self.consolidation.episodes_since_apply = int(payload.get("episodes_since_apply", 0))
+        self.consolidation.last_apply_time = payload.get("last_apply_time")
+        for key, edge_payload in payload.get("edge_states", {}).items():
             from recon_lite.plasticity import EdgeConsolidationState
 
-            self.consolidation.edge_states[key] = EdgeConsolidationState(**payload)
-            self._apply_edge_key_weight(key, float(payload.get("w_base", 1.0)))
+            self.consolidation.edge_states[key] = EdgeConsolidationState(**edge_payload)
+            self._apply_edge_key_weight(key, float(edge_payload.get("w_base", 1.0)))
+        for key, weight in data.get("edge_weights", {}).items():
+            self._apply_edge_key_weight(key, float(weight))
+        self.node_param_state = {
+            regime: RegimeParamState.from_dict(item)
+            for regime, item in data.get("node_params", {}).items()
+        } or self.node_param_state
         self._sync_plasticity_base_weights()
 
     def _sync_plasticity_base_weights(self) -> None:
@@ -331,6 +429,13 @@ class ReConCartPoleController:
             self.config.force_mag,
             self.config.proposal_gains,
         )
+        if self._uses_node_params():
+            proposal = apply_node_params(
+                proposal,
+                self.node_param_state[regime].current,
+                env["features"],
+                self.config.force_mag,
+            )
         proposal.raw_confidence = proposal.confidence
         proposal.raw_urgency = proposal.urgency
         proposal = self._score_proposal(proposal, selected, env.get("modulators", self.last_modulators).c_explore_eff)

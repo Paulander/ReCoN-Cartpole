@@ -1,0 +1,112 @@
+{
+  "status": "budget_exhausted",
+  "threshold": {
+    "mean_survival": 475.0,
+    "p10_survival": 350.0,
+    "success_rate": 0.7,
+    "eval_episodes": 300,
+    "horizon": 120
+  },
+  "best_summary": {
+    "mean_survival": 89.83333333333333,
+    "p10_survival": 70.0,
+    "success_rate": 0.0,
+    "max_survival": 119.0,
+    "returns_mean": 88.83333333333333,
+    "episodes": 6
+  },
+  "train_episodes": 20,
+  "wall_clock_seconds": 3.3805974519927986,
+  "history": [
+    {
+      "iteration": 0,
+      "train_episodes_total": 10,
+      "train_steps_mean": 83.6,
+      "eval": {
+        "mean_survival": 89.5,
+        "p10_survival": 70.0,
+        "success_rate": 0.0,
+        "max_survival": 119.0,
+        "returns_mean": 88.5,
+        "episodes": 6
+      },
+      "failure_taxonomy": {
+        "pole_failed": {
+          "pole_0": 5,
+          "pole_3": 3
+        },
+        "rail_left": 0,
+        "rail_right": 0,
+        "high_angular_velocity": 0,
+        "bad_force_sign": 0,
+        "oscillatory_force": 4,
+        "insufficient_cart_recentering": 0,
+        "overfocus_on_one_pole": 0,
+        "solved_or_truncated": 0
+      },
+      "config_changes": {
+        "dampen_learning_rates": {
+          "node_eta": 0.008,
+          "plasticity_eta": 0.0255
+        }
+      },
+      "promoted": true,
+      "solved": false,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": true,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "checkpoint": "reports/train_until_solved_n4_smoke/best_checkpoint.json"
+    },
+    {
+      "iteration": 1,
+      "train_episodes_total": 20,
+      "train_steps_mean": 82.5,
+      "eval": {
+        "mean_survival": 89.83333333333333,
+        "p10_survival": 70.0,
+        "success_rate": 0.0,
+        "max_survival": 119.0,
+        "returns_mean": 88.83333333333333,
+        "episodes": 6
+      },
+      "failure_taxonomy": {
+        "pole_failed": {
+          "pole_0": 4,
+          "pole_3": 4
+        },
+        "rail_left": 0,
+        "rail_right": 0,
+        "high_angular_velocity": 0,
+        "bad_force_sign": 0,
+        "oscillatory_force": 4,
+        "insufficient_cart_recentering": 0,
+        "overfocus_on_one_pole": 0,
+        "solved_or_truncated": 0
+      },
+      "config_changes": {
+        "dampen_learning_rates": {
+          "node_eta": 0.0064,
+          "plasticity_eta": 0.021674999999999996
+        }
+      },
+      "promoted": true,
+      "solved": false,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": true,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "checkpoint": "reports/train_until_solved_n4_smoke/best_checkpoint.json"
+    }
+  ],
+  "final_trace": "reports/train_until_solved_n4_smoke/final_trace.json",
+  "final_replay": "reports/train_until_solved_n4_smoke/final_replay.html"
+}

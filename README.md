@@ -35,6 +35,17 @@ The controller modes are:
 
 Reports list active mechanisms separately: edge plasticity, bandit persistence, slow consolidation, and external gain mutation. Do not describe a gain-search-only improvement as "ReCoN learned" unless one of the ReCoN learning mechanisms was active on the held-out run.
 
+## Iterative ReCoN-Native Training
+
+Use `train_until_solved.py` for claim-disciplined training attempts that separate ReCoN-native learning from gain search:
+
+```bash
+uv run python scripts/train_until_solved.py --n-poles 3 --target solved_n3 --mode recon_learn_only --budget-episodes 50000 --out reports/train_until_solved_n3
+uv run python scripts/train_until_solved.py --n-poles 4 --target solved_n4 --mode recon_learn_only --budget-episodes 50000 --out reports/train_until_solved_n4
+```
+
+`recon_learn_only` freezes global proposal gains and allows only ReCoN-owned mechanisms: fast edge plasticity, bandit routing, slow consolidation, and learnable regime/node parameters. The runner writes checkpoints, traces, failure taxonomy, and a report. A run is not solved unless the report status is `solved` and the held-out threshold block passes with the required episode count.
+
 The custom N-link dynamics are a stable control benchmark scaffold, not yet a
 validated multibody physics paper. The docs call this out because the research
 claim should come from held-out metrics, not a cherry-picked animation.

@@ -1,0 +1,360 @@
+{
+  "config": {
+    "n_poles": 3,
+    "mode": "recon_learn_only",
+    "stage": "train_until_solved_n3",
+    "selection_mode": "soft_select",
+    "force_mag": 10.0,
+    "proposal_gains": {
+      "angle_gain": 18.0,
+      "velocity_gain": 3.8,
+      "cart_position_gain": 0.75,
+      "cart_velocity_gain": 0.25,
+      "worst_velocity_mix": 0.3,
+      "base_velocity_mix": 0.35,
+      "outer_link_weight": 0.25,
+      "center_confidence": 0.45,
+      "chain_confidence": 0.65,
+      "recover_confidence": 0.85
+    },
+    "node_params_config": {
+      "enabled": true,
+      "eta_fast": 0.01,
+      "eta_consolidate": 0.02,
+      "lambda_decay": 0.85,
+      "min_episodes": 20,
+      "max_delta_episode": 0.35
+    },
+    "consolidation_config": {
+      "enabled": true,
+      "eta_consolidate": 0.02,
+      "min_episodes": 20,
+      "outcome_weight": 0.5,
+      "max_base_delta": 0.25,
+      "w_min": 0.05,
+      "w_max": 5.0
+    }
+  },
+  "edge_weights": {
+    "root_balance->observe_state:SUB": 1.0,
+    "root_balance->estimate_risk:SUB": 1.0,
+    "root_balance->select_control_regime:SUB": 1.0,
+    "root_balance->arbitrate_force:SUB": 1.0,
+    "root_balance->apply_force:SUB": 1.0,
+    "observe_state->estimate_risk:POR": 1.0,
+    "estimate_risk->select_control_regime:POR": 1.0,
+    "select_control_regime->arbitrate_force:POR": 1.0,
+    "arbitrate_force->apply_force:POR": 1.0,
+    "observe_state->observe_state_terminal:SUB": 1.0,
+    "estimate_risk->estimate_risk_terminal:SUB": 1.0,
+    "arbitrate_force->arbitrate_force_terminal:SUB": 1.0,
+    "apply_force->apply_force_terminal:SUB": 1.0,
+    "select_control_regime->avoid_rail:SUB": 1.0,
+    "avoid_rail->avoid_rail_proposal:SUB": 1.0,
+    "select_control_regime->damp_energy:SUB": 1.0,
+    "damp_energy->damp_energy_proposal:SUB": 1.0,
+    "select_control_regime->recover_worst_pole:SUB": 1.0,
+    "recover_worst_pole->recover_worst_pole_proposal:SUB": 1.0,
+    "select_control_regime->recover_base_pole:SUB": 1.0,
+    "recover_base_pole->recover_base_pole_proposal:SUB": 1.0,
+    "select_control_regime->stabilize_chain:SUB": 1.0,
+    "stabilize_chain->stabilize_chain_proposal:SUB": 1.0,
+    "select_control_regime->center_cart:SUB": 1.0,
+    "center_cart->center_cart_proposal:SUB": 1.0,
+    "observe_state->pole_0_monitor:SUB": 1.0,
+    "pole_0_monitor->pole_0_sensor:SUB": 1.0,
+    "observe_state->pole_1_monitor:SUB": 1.0,
+    "pole_1_monitor->pole_1_sensor:SUB": 1.0,
+    "observe_state->pole_2_monitor:SUB": 1.0,
+    "pole_2_monitor->pole_2_sensor:SUB": 1.0
+  },
+  "bandit": {
+    "select_control_regime": {
+      "avoid_rail": {
+        "pulls": 201,
+        "mean_reward": 0.0009,
+        "last_reward": -0.0433
+      },
+      "damp_energy": {
+        "pulls": 199,
+        "mean_reward": -0.0004,
+        "last_reward": 0.0399
+      },
+      "recover_worst_pole": {
+        "pulls": 200,
+        "mean_reward": -0.0002,
+        "last_reward": -0.0196
+      },
+      "recover_base_pole": {
+        "pulls": 196,
+        "mean_reward": -0.0027,
+        "last_reward": -0.0576
+      },
+      "stabilize_chain": {
+        "pulls": 202,
+        "mean_reward": 0.0014,
+        "last_reward": 0.0251
+      },
+      "center_cart": {
+        "pulls": 202,
+        "mean_reward": 0.0013,
+        "last_reward": -0.0116
+      }
+    }
+  },
+  "node_params": {
+    "avoid_rail": {
+      "base": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "current": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "damp_energy": {
+      "base": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "current": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "recover_worst_pole": {
+      "base": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "current": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "recover_base_pole": {
+      "base": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "current": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "stabilize_chain": {
+      "base": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "current": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    },
+    "center_cart": {
+      "base": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "current": {
+        "confidence_multiplier": 1.0,
+        "urgency_multiplier": 1.0,
+        "force_bias": 0.0,
+        "angle_weight": 1.0,
+        "velocity_weight": 1.0,
+        "pole_priority_weight": 1.0,
+        "cart_centering_weight": 1.0
+      },
+      "eligibility": 0.0,
+      "delta_sum": {}
+    }
+  },
+  "consolidation": {
+    "config": {
+      "enabled": true,
+      "eta_consolidate": 0.02,
+      "min_episodes": 20,
+      "outcome_weight": 0.5,
+      "max_base_delta": 0.25,
+      "w_min": 0.05,
+      "w_max": 5.0
+    },
+    "total_episodes": 10,
+    "episodes_since_apply": 10,
+    "last_apply_time": null,
+    "edge_states": {
+      "select_control_regime->arbitrate_force:POR": {
+        "edge_key": "select_control_regime->arbitrate_force:POR",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "arbitrate_force->apply_force:POR": {
+        "edge_key": "arbitrate_force->apply_force:POR",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "arbitrate_force->arbitrate_force_terminal:SUB": {
+        "edge_key": "arbitrate_force->arbitrate_force_terminal:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "select_control_regime->avoid_rail:SUB": {
+        "edge_key": "select_control_regime->avoid_rail:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "avoid_rail->avoid_rail_proposal:SUB": {
+        "edge_key": "avoid_rail->avoid_rail_proposal:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "select_control_regime->damp_energy:SUB": {
+        "edge_key": "select_control_regime->damp_energy:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "damp_energy->damp_energy_proposal:SUB": {
+        "edge_key": "damp_energy->damp_energy_proposal:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "select_control_regime->recover_worst_pole:SUB": {
+        "edge_key": "select_control_regime->recover_worst_pole:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "recover_worst_pole->recover_worst_pole_proposal:SUB": {
+        "edge_key": "recover_worst_pole->recover_worst_pole_proposal:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "select_control_regime->recover_base_pole:SUB": {
+        "edge_key": "select_control_regime->recover_base_pole:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "recover_base_pole->recover_base_pole_proposal:SUB": {
+        "edge_key": "recover_base_pole->recover_base_pole_proposal:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "select_control_regime->stabilize_chain:SUB": {
+        "edge_key": "select_control_regime->stabilize_chain:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "stabilize_chain->stabilize_chain_proposal:SUB": {
+        "edge_key": "stabilize_chain->stabilize_chain_proposal:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "select_control_regime->center_cart:SUB": {
+        "edge_key": "select_control_regime->center_cart:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      },
+      "center_cart->center_cart_proposal:SUB": {
+        "edge_key": "center_cart->center_cart_proposal:SUB",
+        "w_base": 1.0,
+        "w_init": 1.0,
+        "accumulated_weighted_delta": 0.0277232790546162,
+        "episode_count": 10
+      }
+    }
+  }
+}
