@@ -1,0 +1,1503 @@
+{
+  "horizon": 120,
+  "eval_episodes": 5,
+  "seed_start": 500000,
+  "train_episodes": 5,
+  "ppo_timesteps": 1000,
+  "n_values": [
+    2,
+    3,
+    4
+  ],
+  "runs": [
+    {
+      "mode": "baseline_heuristic",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "static_recon",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_fast",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_bandit",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": true,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_fast_bandit",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_slow",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_learn_only",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": true,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_slow_no_gain_search",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": true,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "gain_search_only",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": true
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "gain_search_recon_fast_bandit",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": true
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "ppo",
+      "n_poles": 2,
+      "horizon": 120,
+      "seeds": [
+        520000,
+        520001,
+        520002,
+        520003,
+        520004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_timesteps": 1000,
+      "mechanisms": {
+        "ppo_policy_gradient": true
+      },
+      "dependency_status": {
+        "available": false,
+        "missing": [
+          "torch: ModuleNotFoundError: No module named 'torch'",
+          "stable_baselines3: ModuleNotFoundError: No module named 'stable_baselines3'"
+        ],
+        "versions": {}
+      },
+      "status": "unavailable",
+      "mean_survival": 0.0,
+      "p10_survival": 0.0,
+      "success_rate": 0.0,
+      "max_survival": 0.0,
+      "note": "Install optional RL dependencies with `uv sync --extra rl` to run PPO.",
+      "family": "ppo"
+    },
+    {
+      "mode": "baseline_heuristic",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "static_recon",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_fast",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_bandit",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": true,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_fast_bandit",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_slow",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_learn_only",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": true,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_slow_no_gain_search",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": true,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "gain_search_only",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": true
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "gain_search_recon_fast_bandit",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": true
+      },
+      "steps": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "returns": [
+        120.0,
+        120.0,
+        120.0,
+        120.0,
+        120.0
+      ],
+      "mean_survival": 120.0,
+      "p10_survival": 120.0,
+      "success_rate": 1.0,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "ppo",
+      "n_poles": 3,
+      "horizon": 120,
+      "seeds": [
+        530000,
+        530001,
+        530002,
+        530003,
+        530004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_timesteps": 1000,
+      "mechanisms": {
+        "ppo_policy_gradient": true
+      },
+      "dependency_status": {
+        "available": false,
+        "missing": [
+          "torch: ModuleNotFoundError: No module named 'torch'",
+          "stable_baselines3: ModuleNotFoundError: No module named 'stable_baselines3'"
+        ],
+        "versions": {}
+      },
+      "status": "unavailable",
+      "mean_survival": 0.0,
+      "p10_survival": 0.0,
+      "success_rate": 0.0,
+      "max_survival": 0.0,
+      "note": "Install optional RL dependencies with `uv sync --extra rl` to run PPO.",
+      "family": "ppo"
+    },
+    {
+      "mode": "baseline_heuristic",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        90.0,
+        76.0,
+        60.0,
+        106.0
+      ],
+      "returns": [
+        120.0,
+        89.0,
+        75.0,
+        59.0,
+        105.0
+      ],
+      "mean_survival": 90.4,
+      "p10_survival": 66.4,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "static_recon",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        92.0,
+        76.0,
+        61.0,
+        108.0
+      ],
+      "returns": [
+        120.0,
+        91.0,
+        75.0,
+        60.0,
+        107.0
+      ],
+      "mean_survival": 91.4,
+      "p10_survival": 67.0,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_fast",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        92.0,
+        76.0,
+        61.0,
+        108.0
+      ],
+      "returns": [
+        120.0,
+        91.0,
+        75.0,
+        60.0,
+        107.0
+      ],
+      "mean_survival": 91.4,
+      "p10_survival": 67.0,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_bandit",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": true,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        92.0,
+        76.0,
+        61.0,
+        109.0
+      ],
+      "returns": [
+        120.0,
+        91.0,
+        75.0,
+        60.0,
+        108.0
+      ],
+      "mean_survival": 91.6,
+      "p10_survival": 67.0,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_fast_bandit",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        92.0,
+        76.0,
+        61.0,
+        109.0
+      ],
+      "returns": [
+        120.0,
+        91.0,
+        75.0,
+        60.0,
+        108.0
+      ],
+      "mean_survival": 91.6,
+      "p10_survival": 67.0,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_slow",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        92.0,
+        76.0,
+        61.0,
+        109.0
+      ],
+      "returns": [
+        120.0,
+        91.0,
+        75.0,
+        60.0,
+        108.0
+      ],
+      "mean_survival": 91.6,
+      "p10_survival": 67.0,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_learn_only",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": true,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        92.0,
+        76.0,
+        61.0,
+        109.0
+      ],
+      "returns": [
+        120.0,
+        91.0,
+        75.0,
+        60.0,
+        108.0
+      ],
+      "mean_survival": 91.6,
+      "p10_survival": 67.0,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "recon_slow_no_gain_search",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": true,
+        "node_param_learning": true,
+        "mlp_terminal": false,
+        "gain_mutation": false
+      },
+      "steps": [
+        120.0,
+        92.0,
+        76.0,
+        61.0,
+        109.0
+      ],
+      "returns": [
+        120.0,
+        91.0,
+        75.0,
+        60.0,
+        108.0
+      ],
+      "mean_survival": 91.6,
+      "p10_survival": 67.0,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "gain_search_only",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": true
+      },
+      "steps": [
+        120.0,
+        92.0,
+        76.0,
+        61.0,
+        108.0
+      ],
+      "returns": [
+        120.0,
+        91.0,
+        75.0,
+        60.0,
+        107.0
+      ],
+      "mean_survival": 91.4,
+      "p10_survival": 67.0,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "gain_search_recon_fast_bandit",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_episodes": 5,
+      "mechanisms": {
+        "edge_plasticity": true,
+        "bandit_persistence": true,
+        "slow_consolidation": false,
+        "node_param_learning": false,
+        "mlp_terminal": false,
+        "gain_mutation": true
+      },
+      "steps": [
+        120.0,
+        92.0,
+        76.0,
+        61.0,
+        109.0
+      ],
+      "returns": [
+        120.0,
+        91.0,
+        75.0,
+        60.0,
+        108.0
+      ],
+      "mean_survival": 91.6,
+      "p10_survival": 67.0,
+      "success_rate": 0.2,
+      "max_survival": 120.0,
+      "family": "recon",
+      "status": "completed"
+    },
+    {
+      "mode": "ppo",
+      "n_poles": 4,
+      "horizon": 120,
+      "seeds": [
+        540000,
+        540001,
+        540002,
+        540003,
+        540004
+      ],
+      "env_params": {
+        "initial_angle_range": 0.05,
+        "force_noise": 0.02,
+        "link_coupling": 12.0
+      },
+      "train_timesteps": 1000,
+      "mechanisms": {
+        "ppo_policy_gradient": true
+      },
+      "dependency_status": {
+        "available": false,
+        "missing": [
+          "torch: ModuleNotFoundError: No module named 'torch'",
+          "stable_baselines3: ModuleNotFoundError: No module named 'stable_baselines3'"
+        ],
+        "versions": {}
+      },
+      "status": "unavailable",
+      "mean_survival": 0.0,
+      "p10_survival": 0.0,
+      "success_rate": 0.0,
+      "max_survival": 0.0,
+      "note": "Install optional RL dependencies with `uv sync --extra rl` to run PPO.",
+      "family": "ppo"
+    }
+  ],
+  "wall_clock_seconds": 24.18233776203124
+}

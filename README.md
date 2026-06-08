@@ -35,6 +35,16 @@ The controller modes are:
 
 Reports list active mechanisms separately: edge plasticity, bandit persistence, slow consolidation, and external gain mutation. Do not describe a gain-search-only improvement as "ReCoN learned" unless one of the ReCoN learning mechanisms was active on the held-out run.
 
+## ReCoN vs PPO Comparison
+
+Use `run_comparison.py` to produce same-seed N=2/3/4 comparison tables across ReCoN modes and an optional PPO baseline:
+
+```bash
+uv run python scripts/run_comparison.py --n-values 2 3 4 --horizon 500 --eval-episodes 300 --train-episodes 1000 --ppo-timesteps 200000 --out reports/recon_vs_ppo_full
+```
+
+PPO uses optional dependencies. If `torch`/`stable-baselines3` are missing, the report keeps an explicit `ppo` row with `status: unavailable`. Install with `uv sync --extra rl` before making PPO performance claims.
+
 ## Iterative ReCoN-Native Training
 
 Use `train_until_solved.py` for claim-disciplined training attempts that separate ReCoN-native learning from gain search:
