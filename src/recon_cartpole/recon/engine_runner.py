@@ -106,10 +106,13 @@ class ReConCartPoleController:
             "callbacks": self._callbacks(),
             "proposals": [],
         }
+        graph_ticks = [self._graph_tick_snapshot(context, [], "root_requested")]
         self.last_fired_edges = []
         for _ in range(self.config.max_engine_ticks):
             now_requested = self.engine.step(context)
-            self.last_fired_edges.extend(fired_edges_from_requests(self.graph, now_requested))
+            fired_edges = fired_edges_from_requests(self.graph, now_requested)
+            self.last_fired_edges.extend(fired_edges)
+            graph_ticks.append(self._graph_tick_snapshot(context, fired_edges, "engine_step"))
             if "action" in context:
                 break
 
@@ -128,8 +131,22 @@ class ReConCartPoleController:
             "plasticity": snapshot_plasticity(self.plasticity_state),
             "bandit": snapshot_bandit(self.bandit_state),
             "graph_nodes": {nid: node.state.name for nid, node in self.graph.nodes.items()},
+            "graph_ticks": graph_ticks,
         }
         return action, diagnostics
+
+    def _graph_tick_snapshot(self, context: dict[str, Any], fired_edges: list[dict[str, str]], phase: str) -> dict[str, Any]:
+        proposal = context.get("selected_proposal")
+        return {
+            "engine_tick": int(self.engine.tick),
+            "phase": phase,
+            "nodes": {nid: node.state.name for nid, node in self.graph.nodes.items()},
+            "fired_edges": list(fired_edges),
+            "selected_regime": context.get("selected_regime"),
+            "force": float(context.get("force", 0.0)),
+            "proposal": asdict(proposal) if proposal is not None else None,
+            "action_ready": "action" in context,
+        }
 
     def _callbacks(self):
         return {

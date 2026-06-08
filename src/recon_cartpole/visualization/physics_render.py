@@ -60,6 +60,16 @@ const stateColor = {{
   INACTIVE: '#e2e8f0', REQUESTED: '#38bdf8', ACTIVE: '#a78bfa', SUPPRESSED: '#94a3b8',
   WAITING: '#f59e0b', TRUE: '#84cc16', CONFIRMED: '#22c55e', FAILED: '#ef4444'
 }};
+const timeline = steps.flatMap((step, stepIndex) => {{
+  const ticks = Array.isArray(step.graph_ticks) && step.graph_ticks.length
+    ? step.graph_ticks
+    : [{{
+        engine_tick: 0, phase: 'settled', nodes: step.graph_nodes || {{}},
+        fired_edges: step.fired_edges || [], selected_regime: step.selected_regime,
+        force: step.force, proposal: step.proposal, action_ready: true
+      }}];
+  return ticks.map((graphTick, tickIndex) => ({{step, stepIndex, graphTick, tickIndex}}));
+}});
 function drawScene(s) {{
   ctx.clearRect(0,0,900,460);
   ctx.fillStyle = '#f8fafc'; ctx.fillRect(0,0,900,460);
@@ -128,12 +138,13 @@ function drawArrow(x1, y1, x2, y2, color, dashed, width) {{
   const dash = dashed ? 'stroke-dasharray="7 7"' : '';
   return `<line x1="${{startX}}" y1="${{startY}}" x2="${{endX}}" y2="${{endY}}" stroke="${{color}}" stroke-width="${{width}}" marker-end="url(#arrow)" ${{dash}} />`;
 }}
-function drawNode(id, state) {{
+function drawNode(id, state, selectedRegime) {{
   const p = layout.pos[id];
   const node = layout.byId[id] || {{type:'SCRIPT'}};
   if (!p) return '';
   const color = stateColor[state] || '#e2e8f0';
-  const stroke = id === (steps[frame % Math.max(1, steps.length)] || {{}}).selected_regime ? '#7c3aed' : '#334155';
+  const selected = id === selectedRegime || id === `${{selectedRegime}}_proposal`;
+  const stroke = selected ? '#7c3aed' : '#334155';
   const label = esc(id);
   if (node.type === 'TERMINAL') {{
     return `<polygon points="${{p.x}},${{p.y-25}} ${{p.x+31}},${{p.y}} ${{p.x}},${{p.y+25}} ${{p.x-31}},${{p.y}}" fill="${{color}}" stroke="${{stroke}}" stroke-width="2" />`
@@ -142,27 +153,35 @@ function drawNode(id, state) {{
   return `<circle cx="${{p.x}}" cy="${{p.y}}" r="28" fill="${{color}}" stroke="${{stroke}}" stroke-width="2" />`
     + `<text x="${{p.x}}" y="${{p.y+44}}" text-anchor="middle" font-size="12" fill="#0f172a">${{label}}</text>`;
 }}
-function drawGraph(s) {{
-  const states = s.graph_nodes || {{}};
+function drawGraph(s, graphTick) {{
+  const states = graphTick.nodes || s.graph_nodes || {{}};
+  const selectedRegime = graphTick.selected_regime || s.selected_regime;
+  const firedEdges = graphTick.fired_edges || [];
   let out = `<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0, 8 3.5, 0 7" fill="#475569" /></marker></defs>`;
   layout.edges.forEach(e => {{
     const a = layout.pos[e.src], b = layout.pos[e.dst];
     if (!a || !b) return;
-    const fired = (s.fired_edges || []).some(fe => fe.src === e.src && fe.dst === e.dst && fe.ltype === e.type);
+    const fired = firedEdges.some(fe => fe.src === e.src && fe.dst === e.dst && fe.ltype === e.type);
     if (e.type === 'SUB') out += drawArrow(a.x, a.y, b.x, b.y, fired ? '#7c3aed' : '#475569', false, fired ? 4 : 2);
-    if (e.type === 'POR') out += drawArrow(a.x, a.y, b.x, b.y, '#94a3b8', true, 1.5);
+    if (e.type === 'POR') out += drawArrow(a.x, a.y, b.x, b.y, fired ? '#7c3aed' : '#94a3b8', true, fired ? 3 : 1.5);
   }});
-  Object.keys(layout.pos).forEach(id => {{ out += drawNode(id, states[id] || 'INACTIVE'); }});
+  Object.keys(layout.pos).forEach(id => {{ out += drawNode(id, states[id] || 'INACTIVE', selectedRegime); }});
   graph.innerHTML = out;
 }}
 function tick() {{
-  if (!steps.length) return;
-  const s = steps[frame % steps.length];
-  drawScene(s); drawGraph(s);
-  document.getElementById('stats').innerHTML = `step ${{s.step}} | return ${{s.return_so_far}} | regime ${{s.selected_regime}}`;
-  document.getElementById('details').textContent = JSON.stringify({{goal:s.goal_vector, proposal:s.proposal, bandit:s.bandit, plasticity:s.plasticity}}, null, 2);
+  if (!timeline.length) return;
+  const item = timeline[frame % timeline.length];
+  const s = item.step;
+  const graphTick = item.graphTick;
+  const tickLabel = graphTick.engine_tick ?? item.tickIndex;
+  drawScene(s); drawGraph(s, graphTick);
+  document.getElementById('stats').innerHTML = `env step ${{s.step}} | graph tick ${{tickLabel}} | ${{graphTick.phase || 'tick'}} | return ${{s.return_so_far}} | regime ${{graphTick.selected_regime || s.selected_regime || ''}}`;
+  document.getElementById('details').textContent = JSON.stringify({{
+    graph_tick: graphTick, goal: s.goal_vector, proposal: graphTick.proposal || s.proposal,
+    bandit: s.bandit, plasticity: s.plasticity
+  }}, null, 2);
   frame += 1;
-  setTimeout(tick, 70);
+  setTimeout(tick, 90);
 }}
 tick();
 </script>

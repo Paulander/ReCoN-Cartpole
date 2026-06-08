@@ -23,6 +23,7 @@ class StepTrace:
     plasticity: dict[str, Any] = field(default_factory=dict)
     bandit: dict[str, Any] = field(default_factory=dict)
     graph_nodes: dict[str, str] = field(default_factory=dict)
+    graph_ticks: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -66,6 +66,7 @@ def rollout(
                     plasticity=diagnostics.get("plasticity", {}),
                     bandit=diagnostics.get("bandit", {}),
                     graph_nodes=diagnostics.get("graph_nodes", {}),
+                    graph_ticks=diagnostics.get("graph_ticks", []),
                 ).to_dict()
             )
         observation = next_observation
