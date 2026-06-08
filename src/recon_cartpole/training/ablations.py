@@ -43,6 +43,9 @@ def run_mode_on_seeds(
     train_episodes: int = 0,
 ) -> dict[str, Any]:
     env_params = dict(env_params or {})
+    discrete_action_bins = int(env_params.get("discrete_action_bins", 2))
+    force_mag = float(env_params.get("force_mag", 10.0))
+    action_mode = str(env_params.get("action_mode", "discrete"))
     controller = ReConCartPoleController(
         RunnerConfig(
             n_poles=n_poles,
@@ -50,6 +53,9 @@ def run_mode_on_seeds(
             learn=train_episodes > 0,
             reset_bandit_each_episode=False,
             stage=f"ablation_n{n_poles}",
+            discrete_action_bins=discrete_action_bins,
+            force_mag=force_mag,
+            action_mode=action_mode,
         )
     )
     if train_episodes > 0:

@@ -31,6 +31,7 @@ def run_nway_comparison(
     ppo_timesteps: int,
     out_dir: str | Path,
     ppo_device: str = "cpu",
+    ppo_n_envs: int = 1,
     env_params_by_n: dict[int, dict[str, Any]] | None = None,
     modes: list[str] | None = None,
     include_ppo: bool = True,
@@ -45,6 +46,7 @@ def run_nway_comparison(
         "train_episodes": train_episodes,
         "ppo_timesteps": ppo_timesteps,
         "ppo_device": ppo_device,
+        "ppo_n_envs": ppo_n_envs,
         "n_values": n_values,
         "runs": [],
     }
@@ -76,6 +78,7 @@ def run_nway_comparison(
                     eval_seeds=seeds,
                     env_params=env_params,
                     device=ppo_device,
+                    n_envs=ppo_n_envs,
                 )
             )
             ppo_row["family"] = "ppo"

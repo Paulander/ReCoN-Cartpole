@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+import numpy as np
+
 from recon_lite import LinkType, NodeState, ReConEngine
 from recon_lite.plasticity import (
     BanditConfig,
@@ -27,13 +29,14 @@ from recon_lite.plasticity import (
 
 from recon_cartpole.control.actuators import action_from_force
 from recon_cartpole.control.arbitration import arbitrate_force
-from recon_cartpole.control.controllers import ControllerMode, force_to_discrete, heuristic_force, random_action
+from recon_cartpole.control.controllers import ControllerMode, heuristic_force, random_action
 from recon_cartpole.control.goal_vector import compute_cartpole_goal_vector
 from recon_cartpole.control.scripts import REGIMES, ForceProposal, ProposalGains, propose_force_for_regime
 from recon_cartpole.control.sensors import StateFeatures, features_from_state
 
 from .fired_edges import fired_edges_from_requests
 from .graph_factory import GraphConfig, build_cartpole_graph, trainable_edge_whitelist
+from .mlp_terminal import MlpTerminalConfig, MlpTerminalState
 from .node_params import (
     NodeParamConfig,
     RegimeParamState,
@@ -51,6 +54,7 @@ class RunnerConfig:
     mode: ControllerMode = "static_recon"
     action_mode: str = "discrete"
     force_mag: float = 10.0
+    discrete_action_bins: int = 2
     max_engine_ticks: int = 32
     stage: str = "default"
     plasticity: PlasticityConfig = field(default_factory=PlasticityConfig)
@@ -62,6 +66,7 @@ class RunnerConfig:
     selection_mode: str = "soft_select"
     consolidation: ConsolidationConfig = field(default_factory=ConsolidationConfig)
     node_params: NodeParamConfig = field(default_factory=NodeParamConfig)
+    mlp_terminal: MlpTerminalConfig = field(default_factory=MlpTerminalConfig)
 
 
 class ReConCartPoleController:
@@ -76,6 +81,11 @@ class ReConCartPoleController:
         self.node_param_state = init_regime_param_state()
         if self._uses_slow_consolidation() and not self.config.consolidation.enabled:
             self.config.consolidation.enabled = True
+        if self._uses_mlp_terminal() and not self.config.mlp_terminal.enabled:
+            self.config.mlp_terminal.enabled = True
+        self.mlp_terminal_state = MlpTerminalState.create(self.config.n_poles, self.config.mlp_terminal.hidden_size)
+        self.mlp_rng = np.random.default_rng(1009 + self.config.n_poles)
+        self.last_mlp_terminal: dict[str, Any] = {}
         self.consolidation = ConsolidationEngine(self.config.consolidation)
         self.consolidation.init_from_graph(self.graph, list(self.plasticity_state))
         self.last_selected_regime: str | None = None
@@ -115,13 +125,16 @@ class ReConCartPoleController:
     def _uses_node_params(self) -> bool:
         return self.config.mode in ("recon_learn_only", "recon_slow_no_gain_search", "recon_mlp_terminal")
 
+    def _uses_mlp_terminal(self) -> bool:
+        return self.config.mode == "recon_mlp_terminal"
+
     def learning_mechanisms(self) -> dict[str, bool]:
         return {
             "edge_plasticity": self._uses_fast_plasticity(),
             "bandit_persistence": self._uses_bandit() and not self.config.reset_bandit_each_episode,
             "slow_consolidation": self._uses_slow_consolidation(),
             "node_param_learning": self._uses_node_params(),
-            "mlp_terminal": self.config.mode == "recon_mlp_terminal",
+            "mlp_terminal": self._uses_mlp_terminal(),
             "gain_mutation": self.config.mode in ("gain_search_only", "gain_search_recon_fast_bandit"),
         }
 
@@ -136,6 +149,7 @@ class ReConCartPoleController:
         self.last_node_param_deltas = {}
         for item in self.node_param_state.values():
             item.reset_episode()
+        self.mlp_terminal_state.start_episode(self.config.mlp_terminal, self.mlp_rng, self.config.learn and self._uses_mlp_terminal())
 
     def observe_reward(self, reward: float) -> None:
         if not self.config.learn:
@@ -151,6 +165,8 @@ class ReConCartPoleController:
                 self.last_modulators.eta_tick_eff,
                 self.config.plasticity,
             )
+        if self._uses_mlp_terminal():
+            self.last_mlp_terminal = {**self.last_mlp_terminal, **self.mlp_terminal_state.update_from_tick(reward, self.config.force_mag, self.config.mlp_terminal)}
         if self._uses_node_params():
             self.last_node_param_deltas = update_regime_param_state(
                 self.node_param_state,
@@ -163,13 +179,17 @@ class ReConCartPoleController:
 
     def act(self, observation: Any, raw_state: Any | None = None) -> tuple[Any, dict[str, Any]]:
         if self.config.mode == "baseline_random":
-            action = random_action()
-            return action, {"force": self.config.force_mag if action else -self.config.force_mag}
+            action = random_action(self.config.discrete_action_bins)
+            bins = max(2, int(self.config.discrete_action_bins))
+            force = self.config.force_mag if bins == 2 and action == 1 else -self.config.force_mag
+            if bins > 2:
+                force = -self.config.force_mag + action * (2.0 * self.config.force_mag / (bins - 1))
+            return action_from_force(force, self.config.action_mode, self.config.force_mag, self.config.discrete_action_bins), {"force": force}
 
         features = features_from_state(observation, raw_state, self.config.n_poles)
         if self.config.mode == "baseline_heuristic":
             force = heuristic_force(features, self.config.force_mag)
-            return force_to_discrete(force), {"force": force, "features": features}
+            return action_from_force(force, self.config.action_mode, self.config.force_mag, self.config.discrete_action_bins), {"force": force, "features": features}
 
         self.engine.reset_states()
         self.graph.nodes["root_balance"].state = NodeState.REQUESTED
@@ -215,6 +235,7 @@ class ReConCartPoleController:
             "node_param_deltas": dict(self.last_node_param_deltas),
             "consolidation": self.consolidation.to_dict() if self._uses_slow_consolidation() else {},
             "consolidation_applied": dict(self.last_consolidation_applied),
+            "mlp_terminal": dict(self.last_mlp_terminal),
             "bandit": snapshot_bandit(self.bandit_state),
             "graph_nodes": {nid: node.state.name for nid, node in self.graph.nodes.items()},
             "graph_ticks": graph_ticks,
@@ -262,9 +283,10 @@ class ReConCartPoleController:
                 summary.outcome_score,
                 self.config.node_params,
             )
+        mlp_applied = self.mlp_terminal_state.end_episode(total_return, horizon, self.config.mlp_terminal) if self._uses_mlp_terminal() else {}
         if edge_applied:
             self._sync_plasticity_base_weights()
-        applied = {"edges": edge_applied, "node_params": node_param_applied}
+        applied = {"edges": edge_applied, "node_params": node_param_applied, "mlp_terminal": mlp_applied}
         self.last_consolidation_applied = applied
         return {"summary": summary.__dict__, "applied": applied, "state": self.checkpoint_dict()}
 
@@ -275,10 +297,13 @@ class ReConCartPoleController:
                 "mode": self.config.mode,
                 "stage": self.config.stage,
                 "selection_mode": self.config.selection_mode,
+                "action_mode": self.config.action_mode,
                 "force_mag": self.config.force_mag,
+                "discrete_action_bins": self.config.discrete_action_bins,
                 "proposal_gains": self.config.proposal_gains.to_dict(),
                 "node_params_config": self.config.node_params.__dict__,
                 "consolidation_config": self.config.consolidation.__dict__,
+                "mlp_terminal_config": self.config.mlp_terminal.__dict__,
             },
             "edge_weights": {
                 f"{edge.src}->{edge.dst}:{edge.ltype.name}": self.edge_weight(edge.src, edge.dst, edge.ltype)
@@ -288,6 +313,7 @@ class ReConCartPoleController:
             "bandit": snapshot_bandit(self.bandit_state),
             "node_params": snapshot_regime_params(self.node_param_state),
             "consolidation": self.consolidation.to_dict(),
+            "mlp_terminal": self.mlp_terminal_state.to_dict(),
         }
 
     def save_checkpoint(self, path: str) -> None:
@@ -323,6 +349,10 @@ class ReConCartPoleController:
             regime: RegimeParamState.from_dict(item)
             for regime, item in data.get("node_params", {}).items()
         } or self.node_param_state
+        if data.get("mlp_terminal"):
+            loaded_mlp = MlpTerminalState.from_dict(data["mlp_terminal"])
+            if loaded_mlp.input_size == self.mlp_terminal_state.input_size:
+                self.mlp_terminal_state = loaded_mlp
         self._sync_plasticity_base_weights()
 
     def _sync_plasticity_base_weights(self) -> None:
@@ -436,6 +466,17 @@ class ReConCartPoleController:
                 env["features"],
                 self.config.force_mag,
             )
+        if self._uses_mlp_terminal() and regime == "stabilize_chain":
+            correction, mlp_info = self.mlp_terminal_state.force(env["features"], self.config.force_mag)
+            blend = max(0.0, min(1.0, self.config.mlp_terminal.blend))
+            base_force = proposal.force
+            proposal.force = max(-self.config.force_mag, min(self.config.force_mag, base_force + blend * correction))
+            self.mlp_terminal_state.last_force = proposal.force
+            proposal.reason = f"{proposal.reason}; mlp_terminal"
+            mlp_info["blend"] = blend
+            mlp_info["base_force"] = base_force
+            mlp_info["corrected_force"] = proposal.force
+            self.last_mlp_terminal = mlp_info
         proposal.raw_confidence = proposal.confidence
         proposal.raw_urgency = proposal.urgency
         proposal = self._score_proposal(proposal, selected, env.get("modulators", self.last_modulators).c_explore_eff)
@@ -452,7 +493,12 @@ class ReConCartPoleController:
         return True, True
 
     def _apply_force(self, _node, env):
-        env["action"] = action_from_force(float(env.get("force", 0.0)), self.config.action_mode)
+        env["action"] = action_from_force(
+            float(env.get("force", 0.0)),
+            self.config.action_mode,
+            self.config.force_mag,
+            self.config.discrete_action_bins,
+        )
         return True, True
 
     def _pole_sensor(self, node, env):

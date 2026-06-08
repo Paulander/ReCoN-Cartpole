@@ -29,10 +29,18 @@ def heuristic_force(features: StateFeatures, force_mag: float = 10.0) -> float:
     return max(-force_mag, min(force_mag, force))
 
 
-def random_action() -> int:
-    return random.choice([0, 1])
+def random_action(discrete_action_bins: int = 2) -> int:
+    return random.randrange(max(2, int(discrete_action_bins)))
 
 
-def force_to_discrete(force: float) -> int:
-    return 1 if force >= 0.0 else 0
+def force_to_discrete(force: float, force_mag: float = 10.0, discrete_action_bins: int = 2) -> int:
+    bins = max(2, int(discrete_action_bins))
+    if bins == 2:
+        return 1 if force >= 0.0 else 0
+    low = -float(force_mag)
+    high = float(force_mag)
+    if high <= low:
+        return 0
+    scaled = (float(force) - low) / (high - low)
+    return max(0, min(bins - 1, int(round(scaled * (bins - 1)))))
 

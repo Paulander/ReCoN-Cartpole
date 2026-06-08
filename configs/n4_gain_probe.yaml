@@ -1,0 +1,23 @@
+mode: gain_search_recon_fast_bandit
+horizon: 500
+seed: 17
+seed_split:
+  train_start: 850000
+  validation_start: 950000
+stages:
+  - name: n4_gain_probe_5bin
+    n_poles: 4
+    action_mode: discrete
+    discrete_action_bins: 5
+    force_mag: 10.0
+    initial_angle_range: 0.05
+    force_noise: 0.02
+    link_coupling: 12.0
+    train_episodes: 600
+    eval_episodes: 12
+    gain_trials: 30
+    gain_sigma: 0.35
+    early_stop_on_pass: false
+    pass:
+      mean_survival_steps: 475
+      p10_survival_steps: 350

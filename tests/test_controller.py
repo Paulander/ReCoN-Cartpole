@@ -142,3 +142,30 @@ def test_controller_checkpoint_reloads_edge_and_node_params(tmp_path):
     loaded.load_consolidation_checkpoint(str(checkpoint))
     assert loaded.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB) == 2.5
     assert loaded.node_param_state["recover_worst_pole"].base.force_bias == 1.25
+
+
+
+def test_controller_quantizes_force_to_five_discrete_bins():
+    controller = ReConCartPoleController(
+        RunnerConfig(n_poles=1, mode="static_recon", discrete_action_bins=5)
+    )
+    raw = [0.0, 0.0, 0.01, 0.0]
+    action, diagnostics = controller.act(raw, raw)
+    assert 0 <= action < 5
+    assert diagnostics["force"] != 0.0 or action == 2
+
+
+
+def test_recon_mlp_terminal_affects_chain_proposal_and_updates():
+    raw = [0.0, 0.0, 0.03, -0.02, 0.04, 0.01, 0.1, -0.2, 0.3, -0.1]
+    controller = ReConCartPoleController(RunnerConfig(n_poles=4, mode="recon_mlp_terminal"))
+    _, diagnostics = controller.act(raw, raw)
+    chain = next(item for item in diagnostics["proposals"] if item["source_node"] == "stabilize_chain")
+    assert "mlp_terminal" in chain["reason"]
+    assert diagnostics["mlp_terminal"]["hidden_size"] == controller.config.mlp_terminal.hidden_size
+
+    env = CartPoleNEnv(CartPoleNConfig(n_poles=4, horizon=5, discrete_action_bins=5))
+    result = rollout(env, controller, seed=12, horizon=5, trace=True)
+    update = result["episode_learning"]["applied"]["mlp_terminal"]
+    assert "update_norm" in update
+    assert any(step.get("mlp_terminal") for step in result["trace"])

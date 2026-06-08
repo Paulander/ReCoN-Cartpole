@@ -21,3 +21,12 @@ def test_step_shapes_for_three_poles():
     assert isinstance(truncated, bool)
     assert "raw_state" in info
 
+
+
+
+def test_five_bin_discrete_action_space_maps_to_force_levels():
+    env = CartPoleNEnv(CartPoleNConfig(n_poles=1, discrete_action_bins=5))
+    assert env.action_space.n == 5
+    assert env._force_from_action(0) == -env.config.force_mag
+    assert env._force_from_action(2) == 0.0
+    assert env._force_from_action(4) == env.config.force_mag

@@ -84,6 +84,9 @@ def run_stage(
                 learn=True,
                 stage=stage.get("name", "stage"),
                 proposal_gains=gains,
+                action_mode=str(stage.get("action_mode", "discrete")),
+                force_mag=float(stage.get("force_mag", 10.0)),
+                discrete_action_bins=int(stage.get("discrete_action_bins", 2)),
             )
         )
         train_results = run_episodes(
@@ -189,9 +192,12 @@ def make_env(stage: dict[str, Any], horizon: int) -> CartPoleNEnv:
     return CartPoleNEnv(
         CartPoleNConfig(
             n_poles=int(stage.get("n_poles", 1)),
+            action_mode=str(stage.get("action_mode", "discrete")),
+            discrete_action_bins=int(stage.get("discrete_action_bins", 2)),
             horizon=horizon,
             initial_angle_range=float(stage.get("initial_angle_range", 0.05)),
             force_noise=float(stage.get("force_noise", 0.0)),
+            force_mag=float(stage.get("force_mag", 10.0)),
             link_coupling=float(stage.get("link_coupling", 0.35)),
             damping=float(stage.get("damping", 0.01)),
         ),

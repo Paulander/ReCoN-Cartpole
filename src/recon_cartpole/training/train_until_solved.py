@@ -16,6 +16,7 @@ from recon_cartpole.recon.trace_db import graph_to_trace, save_trace
 from recon_cartpole.training.evaluate import rollout
 from recon_cartpole.visualization.physics_render import render_trace_html
 from recon_cartpole.recon.node_params import NodeParamConfig
+from recon_cartpole.recon.mlp_terminal import MlpTerminalConfig
 
 
 @dataclass
@@ -31,6 +32,7 @@ class SolveThreshold:
 class IterationConfig:
     n_poles: int
     mode: str = "recon_learn_only"
+    action_mode: str = "discrete"
     horizon: int = 500
     budget_episodes: int = 50_000
     train_block_episodes: int = 250
@@ -40,6 +42,8 @@ class IterationConfig:
     initial_angle_range: float = 0.05
     force_noise: float = 0.02
     link_coupling: float = 12.0
+    force_mag: float = 10.0
+    discrete_action_bins: int = 2
     out_dir: str = "reports/train_until_solved"
     target: str = "auto"
     selection_mode: str = "soft_select"
@@ -48,6 +52,11 @@ class IterationConfig:
     node_eta: float = 0.01
     consolidation_eta: float = 0.02
     consolidation_min_episodes: int = 20
+    mlp_eta: float = 0.08
+    mlp_eta_tick: float = 0.01
+    mlp_sigma: float = 0.08
+    mlp_blend: float = 0.35
+    mlp_hidden_size: int = 16
 
 
 @dataclass
@@ -78,10 +87,13 @@ def make_env(config: IterationConfig) -> CartPoleNEnv:
     return CartPoleNEnv(
         CartPoleNConfig(
             n_poles=config.n_poles,
+            action_mode=config.action_mode,
             horizon=config.horizon,
             initial_angle_range=config.initial_angle_range,
             force_noise=config.force_noise,
             link_coupling=config.link_coupling,
+            force_mag=config.force_mag,
+            discrete_action_bins=config.discrete_action_bins,
         ),
         render_mode="rgb_array",
     )
@@ -92,10 +104,13 @@ def make_controller(config: IterationConfig) -> ReConCartPoleController:
         RunnerConfig(
             n_poles=config.n_poles,
             mode=config.mode,
+            action_mode=config.action_mode,
             learn=True,
             reset_bandit_each_episode=False,
             stage=f"train_until_solved_n{config.n_poles}",
             selection_mode=config.selection_mode,
+            force_mag=config.force_mag,
+            discrete_action_bins=config.discrete_action_bins,
             plasticity=PlasticityConfig(eta_tick=config.plasticity_eta),
             node_params=NodeParamConfig(
                 enabled=config.mode in ("recon_learn_only", "recon_slow_no_gain_search", "recon_mlp_terminal"),
@@ -107,6 +122,14 @@ def make_controller(config: IterationConfig) -> ReConCartPoleController:
                 enabled=config.mode in ("recon_slow", "recon_learn_only", "recon_slow_no_gain_search", "recon_mlp_terminal"),
                 eta_consolidate=config.consolidation_eta,
                 min_episodes=config.consolidation_min_episodes,
+            ),
+            mlp_terminal=MlpTerminalConfig(
+                enabled=config.mode == "recon_mlp_terminal",
+                hidden_size=config.mlp_hidden_size,
+                eta=config.mlp_eta,
+                eta_tick=config.mlp_eta_tick,
+                sigma=config.mlp_sigma,
+                blend=config.mlp_blend,
             ),
         )
     )

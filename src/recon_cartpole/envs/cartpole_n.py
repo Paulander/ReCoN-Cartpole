@@ -13,6 +13,7 @@ from gymnasium import spaces
 class CartPoleNConfig:
     n_poles: int = 1
     action_mode: str = "discrete"
+    discrete_action_bins: int = 2
     horizon: int = 500
     dt: float = 0.02
     gravity: float = 9.8
@@ -63,7 +64,9 @@ class CartPoleNEnv(gym.Env):
                 dtype=np.float32,
             )
         else:
-            self.action_space = spaces.Discrete(2)
+            if config.discrete_action_bins < 2:
+                raise ValueError("discrete_action_bins must be >= 2")
+            self.action_space = spaces.Discrete(config.discrete_action_bins)
         self.steps = 0
         self._screen = None
         self._clock = None
@@ -98,7 +101,11 @@ class CartPoleNEnv(gym.Env):
     def _force_from_action(self, action: Any) -> float:
         if self.config.action_mode == "continuous":
             return float(np.clip(np.asarray(action, dtype=float).reshape(-1)[0], -self.config.force_mag, self.config.force_mag))
-        return self.config.force_mag if int(action) == 1 else -self.config.force_mag
+        bins = self.config.discrete_action_bins
+        idx = int(np.clip(int(action), 0, bins - 1))
+        if bins == 2:
+            return self.config.force_mag if idx == 1 else -self.config.force_mag
+        return float(np.linspace(-self.config.force_mag, self.config.force_mag, bins)[idx])
 
     def _integrate(self, force: float) -> None:
         if self.config.n_poles == 1:
