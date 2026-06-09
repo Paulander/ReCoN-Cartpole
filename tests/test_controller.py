@@ -1,3 +1,5 @@
+import numpy as np
+
 from recon_lite import LinkType
 from recon_lite.plasticity import ConsolidationConfig, assign_reward
 
@@ -15,17 +17,20 @@ def test_recon_controller_returns_discrete_action():
     assert diagnostics["selected_regime"]
 
 
-
 def test_trainable_edge_weight_changes_proposal_score_and_action():
     raw = [2.0, 0.0, 0.10, 0.0]
     obs = raw
-    controller = ReConCartPoleController(RunnerConfig(n_poles=1, mode="static_recon", selection_mode="soft_select"))
+    controller = ReConCartPoleController(
+        RunnerConfig(n_poles=1, mode="static_recon", selection_mode="soft_select")
+    )
     action_low, diagnostics_low = controller.act(obs, raw)
 
     controller.set_edge_weight("select_control_regime", "avoid_rail", LinkType.SUB, 0.01)
     controller.set_edge_weight("avoid_rail", "avoid_rail_proposal", LinkType.SUB, 0.01)
     controller.set_edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB, 10.0)
-    controller.set_edge_weight("recover_worst_pole", "recover_worst_pole_proposal", LinkType.SUB, 10.0)
+    controller.set_edge_weight(
+        "recover_worst_pole", "recover_worst_pole_proposal", LinkType.SUB, 10.0
+    )
     action_high, diagnostics_high = controller.act(obs, raw)
 
     low_scores = {item["source_node"]: item["score"] for item in diagnostics_low["proposals"]}
@@ -37,16 +42,22 @@ def test_trainable_edge_weight_changes_proposal_score_and_action():
 
 def test_hard_select_suppresses_non_selected_proposals():
     raw = [2.0, 0.0, 0.10, 0.0]
-    controller = ReConCartPoleController(RunnerConfig(n_poles=1, mode="static_recon", selection_mode="hard_select"))
+    controller = ReConCartPoleController(
+        RunnerConfig(n_poles=1, mode="static_recon", selection_mode="hard_select")
+    )
     _, diagnostics = controller.act(raw, raw)
     assert diagnostics["selected_regime"] == "avoid_rail"
     assert {item["source_node"] for item in diagnostics["proposals"]} == {"avoid_rail"}
-    assert any(item["source_node"] == "recover_worst_pole" for item in diagnostics["suppressed_proposals"])
+    assert any(
+        item["source_node"] == "recover_worst_pole" for item in diagnostics["suppressed_proposals"]
+    )
 
 
 def test_soft_select_includes_all_proposals_with_weight_fields():
     raw = [0.0, 0.0, 0.10, 0.0]
-    controller = ReConCartPoleController(RunnerConfig(n_poles=1, mode="static_recon", selection_mode="soft_select"))
+    controller = ReConCartPoleController(
+        RunnerConfig(n_poles=1, mode="static_recon", selection_mode="soft_select")
+    )
     controller.set_edge_weight("select_control_regime", "center_cart", LinkType.SUB, 0.2)
     _, diagnostics = controller.act(raw, raw)
     sources = {item["source_node"] for item in diagnostics["proposals"]}
@@ -69,7 +80,14 @@ def test_bandit_rewards_affect_later_regime_choice_when_persistent():
     controller = ReConCartPoleController(
         RunnerConfig(n_poles=1, mode="recon_bandit", reset_bandit_each_episode=False, learn=True)
     )
-    for regime in ["avoid_rail", "damp_energy", "recover_worst_pole", "recover_base_pole", "stabilize_chain", "center_cart"]:
+    for regime in [
+        "avoid_rail",
+        "damp_energy",
+        "recover_worst_pole",
+        "recover_base_pole",
+        "stabilize_chain",
+        "center_cart",
+    ]:
         assign_reward("select_control_regime", regime, -1.0, controller.bandit_state)
     assign_reward("select_control_regime", "center_cart", 5.0, controller.bandit_state)
     raw = [0.0, 0.0, 0.01, 0.0]
@@ -82,7 +100,9 @@ def test_recon_slow_persists_baseline_changes_after_threshold_and_fast_resets(tm
         n_poles=1,
         mode="recon_slow",
         learn=True,
-        consolidation=ConsolidationConfig(enabled=True, min_episodes=2, eta_consolidate=1.0, outcome_weight=1.0),
+        consolidation=ConsolidationConfig(
+            enabled=True, min_episodes=2, eta_consolidate=1.0, outcome_weight=1.0
+        ),
     )
     controller = ReConCartPoleController(cfg)
     key = "select_control_regime->recover_worst_pole:SUB"
@@ -91,7 +111,10 @@ def test_recon_slow_persists_baseline_changes_after_threshold_and_fast_resets(tm
     controller.plasticity_state[key].delta_sum = 1.0
     first = controller.end_episode([1.0], total_return=1.0, horizon=1)
     assert first["applied"]["edges"] == {}
-    assert controller.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB) == before
+    assert (
+        controller.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB)
+        == before
+    )
 
     controller.plasticity_state[key].delta_sum = 1.0
     second = controller.end_episode([1.0], total_return=1.0, horizon=1)
@@ -99,9 +122,13 @@ def test_recon_slow_persists_baseline_changes_after_threshold_and_fast_resets(tm
     after = controller.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB)
     assert after > before
 
-    controller.set_edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB, after + 0.5)
+    controller.set_edge_weight(
+        "select_control_regime", "recover_worst_pole", LinkType.SUB, after + 0.5
+    )
     controller.start_episode()
-    assert controller.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB) == after
+    assert (
+        controller.edge_weight("select_control_regime", "recover_worst_pole", LinkType.SUB) == after
+    )
 
     checkpoint = tmp_path / "slow.json"
     controller.save_consolidation_checkpoint(str(checkpoint))
@@ -118,14 +145,18 @@ def test_recon_learn_only_node_params_affect_force_and_trace():
     controller.node_param_state["recover_worst_pole"].current.force_bias = -8.0
     _, after = controller.act(raw, raw)
     assert after["force"] < base_force
-    proposal = next(item for item in after["proposals"] if item["source_node"] == "recover_worst_pole")
+    proposal = next(
+        item for item in after["proposals"] if item["source_node"] == "recover_worst_pole"
+    )
     assert "node_params" in proposal["reason"]
     assert after["node_params"]
 
 
 def test_recon_learn_only_updates_node_param_deltas_in_trace():
     env = CartPoleNEnv(CartPoleNConfig(n_poles=1, horizon=5))
-    controller = ReConCartPoleController(RunnerConfig(n_poles=1, mode="recon_learn_only", learn=True))
+    controller = ReConCartPoleController(
+        RunnerConfig(n_poles=1, mode="recon_learn_only", learn=True)
+    )
     result = rollout(env, controller, seed=5, horizon=5, trace=True)
     assert any(step.get("node_param_deltas") for step in result["trace"])
 
@@ -144,7 +175,6 @@ def test_controller_checkpoint_reloads_edge_and_node_params(tmp_path):
     assert loaded.node_param_state["recover_worst_pole"].base.force_bias == 1.25
 
 
-
 def test_controller_quantizes_force_to_five_discrete_bins():
     controller = ReConCartPoleController(
         RunnerConfig(n_poles=1, mode="static_recon", discrete_action_bins=5)
@@ -155,12 +185,13 @@ def test_controller_quantizes_force_to_five_discrete_bins():
     assert diagnostics["force"] != 0.0 or action == 2
 
 
-
 def test_recon_mlp_terminal_affects_chain_proposal_and_updates():
     raw = [0.0, 0.0, 0.03, -0.02, 0.04, 0.01, 0.1, -0.2, 0.3, -0.1]
     controller = ReConCartPoleController(RunnerConfig(n_poles=4, mode="recon_mlp_terminal"))
     _, diagnostics = controller.act(raw, raw)
-    chain = next(item for item in diagnostics["proposals"] if item["source_node"] == "stabilize_chain")
+    chain = next(
+        item for item in diagnostics["proposals"] if item["source_node"] == "stabilize_chain"
+    )
     assert "mlp_terminal" in chain["reason"]
     assert diagnostics["mlp_terminal"]["hidden_size"] == controller.config.mlp_terminal.hidden_size
 
@@ -198,6 +229,52 @@ def test_recon_policy_terminal_can_drive_stabilize_chain_proposal():
     assert diagnostics["policy_terminal"]["blend"] == 1.0
 
 
+def test_recon_policy_terminal_frame_stack_feeds_policy_and_resets():
+    class FakePolicy:
+        def __init__(self):
+            self.observations = []
+
+        def predict(self, observation, deterministic=True):
+            assert deterministic is True
+            self.observations.append(np.asarray(observation, dtype=np.float32).copy())
+            return 4, None
+
+    raw = [0.0, 0.0, 0.01, 0.04, 0.12, -0.03, 0.0, 0.0, 0.0, 0.0]
+    obs1 = np.arange(14, dtype=np.float32)
+    obs2 = obs1 + 100.0
+    policy = FakePolicy()
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=4,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_frame_stack=3,
+        )
+    )
+    controller.policy_terminal_model = policy
+
+    controller.act(obs1, raw)
+    _, diagnostics = controller.act(obs2, raw)
+
+    assert policy.observations[0].shape == (42,)
+    np.testing.assert_array_equal(
+        policy.observations[0].reshape(3, 14), np.stack([obs1, obs1, obs1])
+    )
+    np.testing.assert_array_equal(
+        policy.observations[1].reshape(3, 14), np.stack([obs1, obs1, obs2])
+    )
+    assert diagnostics["policy_terminal"]["frame_stack"] == 3
+    assert diagnostics["policy_terminal"]["observation_size"] == 42
+
+    controller.start_episode()
+    controller.act(obs2, raw)
+    np.testing.assert_array_equal(
+        policy.observations[-1].reshape(3, 14), np.stack([obs2, obs2, obs2])
+    )
+
+
 def test_recon_policy_terminal_blend_can_preserve_base_force():
     class FakePolicy:
         def predict(self, observation, deterministic=True):
@@ -220,4 +297,3 @@ def test_recon_policy_terminal_blend_can_preserve_base_force():
     assert info["blend"] == 0.0
     assert diagnostics["force"] == info["base_force"]
     assert info["policy_force"] == controller.config.force_mag
-

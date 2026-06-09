@@ -13,9 +13,19 @@ from train_policy_terminal import train_policy_terminal
 
 def n4_solve_threshold(args: argparse.Namespace) -> dict[str, float]:
     if args.n_poles == 3:
-        return {"mean_survival": 475.0, "p10_survival": 400.0, "success_rate": 0.80, "episodes": 300}
+        return {
+            "mean_survival": 475.0,
+            "p10_survival": 400.0,
+            "success_rate": 0.80,
+            "episodes": 300,
+        }
     if args.n_poles == 4:
-        return {"mean_survival": 475.0, "p10_survival": 350.0, "success_rate": 0.70, "episodes": 300}
+        return {
+            "mean_survival": 475.0,
+            "p10_survival": 350.0,
+            "success_rate": 0.70,
+            "episodes": 300,
+        }
     return {"mean_survival": 475.0, "p10_survival": 350.0, "success_rate": 0.80, "episodes": 300}
 
 
@@ -36,7 +46,9 @@ def passes(summary: dict[str, Any], threshold: dict[str, float]) -> bool:
     )
 
 
-def candidate_args(args: argparse.Namespace, seed: int, out: Path, model_path: str = "") -> Namespace:
+def candidate_args(
+    args: argparse.Namespace, seed: int, out: Path, model_path: str = ""
+) -> Namespace:
     return Namespace(
         n_poles=args.n_poles,
         horizon=args.horizon,
@@ -74,6 +86,7 @@ def candidate_args(args: argparse.Namespace, seed: int, out: Path, model_path: s
         reward_mode=args.reward_mode,
         selection_mode=args.selection_mode,
         policy_terminal_blend=args.policy_terminal_blend,
+        frame_stack=args.frame_stack,
         verbose=args.verbose,
         out=str(out),
     )
@@ -114,8 +127,13 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
         if row["score"] > best_score:
             best_score = float(row["score"])
             best = row
-        (out / "summary.json").write_text(json.dumps({"candidates": candidates, "best": best}, indent=2), encoding="utf-8")
-        write_markdown({"status": "running", "threshold": threshold, "candidates": candidates, "best": best}, out / "summary.md")
+        (out / "summary.json").write_text(
+            json.dumps({"candidates": candidates, "best": best}, indent=2), encoding="utf-8"
+        )
+        write_markdown(
+            {"status": "running", "threshold": threshold, "candidates": candidates, "best": best},
+            out / "summary.md",
+        )
 
     final_report = None
     if best is not None and args.final_eval_episodes > 0:
@@ -127,7 +145,9 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
 
     final_recon = final_report["recon_policy_terminal_eval"] if final_report else None
     result = {
-        "status": "solved" if final_recon and passes(final_recon, threshold) else "completed_not_solved",
+        "status": "solved"
+        if final_recon and passes(final_recon, threshold)
+        else "completed_not_solved",
         "threshold": threshold,
         "env": {
             "n_poles": args.n_poles,
@@ -144,6 +164,7 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
         "reward_mode": args.reward_mode,
         "selection_mode": args.selection_mode,
         "policy_terminal_blend": args.policy_terminal_blend,
+        "frame_stack": args.frame_stack,
         "ppo_config": {
             "policy": args.policy,
             "net_arch": args.net_arch,
@@ -158,6 +179,7 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
             "ent_coef": args.ent_coef,
             "vf_coef": args.vf_coef,
             "max_grad_norm": args.max_grad_norm,
+            "frame_stack": args.frame_stack,
         },
         "timesteps_per_candidate": args.timesteps,
         "validation_episodes": args.validation_episodes,
@@ -180,6 +202,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Reward mode: `{result.get('reward_mode', '')}`",
         f"Selection mode: `{result.get('selection_mode', '')}`",
         f"Policy terminal blend: `{result.get('policy_terminal_blend', '')}`",
+        f"Frame stack: `{result.get('frame_stack', 1)}`",
         "",
         "| candidate | train seed | score | mean | p10 | success | pure PPO mean | report |",
         "|---:|---:|---:|---:|---:|---:|---:|---|",
@@ -228,7 +251,9 @@ def main() -> None:
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--dt", type=float, default=0.02)
-    parser.add_argument("--dynamics-mode", choices=["parallel", "serial_lagrange"], default="parallel")
+    parser.add_argument(
+        "--dynamics-mode", choices=["parallel", "serial_lagrange"], default="parallel"
+    )
     parser.add_argument("--action-mode", choices=["discrete", "continuous"], default="discrete")
     parser.add_argument("--discrete-action-bins", type=int, default=5)
     parser.add_argument("--force-mag", type=float, default=10.0)
@@ -255,14 +280,28 @@ def main() -> None:
     parser.add_argument("--ent-coef", type=float, default=0.0)
     parser.add_argument("--vf-coef", type=float, default=0.5)
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
-    parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping")
-    parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
+    parser.add_argument(
+        "--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping"
+    )
+    parser.add_argument(
+        "--selection-mode", choices=["soft_select", "hard_select"], default="hard_select"
+    )
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/policy_terminal_sweep")
     args = parser.parse_args()
     result = run_sweep(args)
-    print(json.dumps({"out": args.out, "status": result["status"], "wall_clock_seconds": result["wall_clock_seconds"]}, indent=2))
+    print(
+        json.dumps(
+            {
+                "out": args.out,
+                "status": result["status"],
+                "wall_clock_seconds": result["wall_clock_seconds"],
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

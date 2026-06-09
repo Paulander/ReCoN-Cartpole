@@ -24,7 +24,12 @@ class UprightShapingWrapper(gym.Wrapper):
             x = float(raw[0]) / max(self.env.config.x_threshold, 1e-9)
             theta = raw[2 : 2 + n] / max(self.env.config.theta_threshold_radians, 1e-9)
             theta_dot = raw[2 + n : 2 + 2 * n] / 5.0
-            shaped = 1.0 - 0.35 * float(np.mean(theta * theta)) - 0.05 * x * x - 0.02 * float(np.mean(theta_dot * theta_dot))
+            shaped = (
+                1.0
+                - 0.35 * float(np.mean(theta * theta))
+                - 0.05 * x * x
+                - 0.02 * float(np.mean(theta_dot * theta_dot))
+            )
             reward = max(-1.0, shaped)
         if terminated:
             reward = -1.0
@@ -48,6 +53,32 @@ class HardSeedResetWrapper(gym.Wrapper):
             self.index += 1
             return self.env.reset(seed=chosen, options=options)
         return self.env.reset(seed=seed, options=options)
+
+
+class FrameStackObservationWrapper(gym.ObservationWrapper):
+    def __init__(self, env: gym.Env, frame_stack: int):
+        super().__init__(env)
+        self.frame_stack = max(1, int(frame_stack))
+        self.frames: list[np.ndarray] = []
+        self.config = getattr(env, "config", None)
+        base_space = env.observation_space
+        if not isinstance(base_space, gym.spaces.Box):
+            raise TypeError("FrameStackObservationWrapper requires a Box observation space")
+        low = np.tile(np.asarray(base_space.low, dtype=np.float32), self.frame_stack)
+        high = np.tile(np.asarray(base_space.high, dtype=np.float32), self.frame_stack)
+        self.observation_space = gym.spaces.Box(low=low, high=high, dtype=np.float32)
+
+    def observation(self, observation: Any):
+        obs = np.asarray(observation, dtype=np.float32).reshape(-1)
+        self.frames.append(obs)
+        self.frames = self.frames[-self.frame_stack :]
+        pad_count = self.frame_stack - len(self.frames)
+        frames = [self.frames[0]] * pad_count + self.frames
+        return np.concatenate(frames).astype(np.float32, copy=False)
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+        self.frames = []
+        return super().reset(seed=seed, options=options)
 
 
 def parse_seed_list(value: Any) -> list[int]:
@@ -77,7 +108,12 @@ def hard_train_seeds(args: argparse.Namespace) -> list[int]:
     return parse_seed_list(_arg(args, "hard_train_seeds", ""))
 
 
-def make_env(args: argparse.Namespace, reward_mode: str = "survival", use_hard_seeds: bool = False):
+def make_env(
+    args: argparse.Namespace,
+    reward_mode: str = "survival",
+    use_hard_seeds: bool = False,
+    use_frame_stack: bool = True,
+):
     env = CartPoleNEnv(
         CartPoleNConfig(
             n_poles=args.n_poles,
@@ -97,10 +133,10 @@ def make_env(args: argparse.Namespace, reward_mode: str = "survival", use_hard_s
         if seeds:
             env = HardSeedResetWrapper(env, seeds, _arg(args, "hard_train_seed_probability", 1.0))
     if reward_mode == "upright_shaping":
-        return UprightShapingWrapper(env)
+        env = UprightShapingWrapper(env)
+    if use_frame_stack and int(_arg(args, "frame_stack", 1)) > 1:
+        env = FrameStackObservationWrapper(env, int(_arg(args, "frame_stack", 1)))
     return env
-
-
 
 
 def _arg(args: argparse.Namespace, name: str, default: Any) -> Any:
@@ -132,11 +168,12 @@ def ppo_kwargs(args: argparse.Namespace) -> dict[str, Any]:
         "policy_kwargs": policy_kwargs(args),
     }
 
+
 def evaluate_model(model: Any, args: argparse.Namespace, seeds: list[int]) -> dict[str, Any]:
     steps: list[float] = []
     returns: list[float] = []
     for seed in seeds:
-        env = make_env(args, reward_mode="survival")
+        env = make_env(args, reward_mode="survival", use_frame_stack=True)
         obs, _info = env.reset(seed=seed)
         total = 0.0
         for step in range(args.horizon):
@@ -151,11 +188,19 @@ def evaluate_model(model: Any, args: argparse.Namespace, seeds: list[int]) -> di
             steps.append(float(args.horizon))
             returns.append(total)
     summary = summarize_steps(steps, args.horizon)
-    summary.update({"returns_mean": float(np.mean(returns)) if returns else 0.0, "episodes": len(seeds)})
+    summary.update(
+        {"returns_mean": float(np.mean(returns)) if returns else 0.0, "episodes": len(seeds)}
+    )
     return summary
 
 
-def evaluate_recon_terminal(model_path: Path, args: argparse.Namespace, seeds: list[int], trace_seed: int | None = None, out_dir: Path | None = None) -> dict[str, Any]:
+def evaluate_recon_terminal(
+    model_path: Path,
+    args: argparse.Namespace,
+    seeds: list[int],
+    trace_seed: int | None = None,
+    out_dir: Path | None = None,
+) -> dict[str, Any]:
     controller = ReConCartPoleController(
         RunnerConfig(
             n_poles=args.n_poles,
@@ -168,19 +213,36 @@ def evaluate_recon_terminal(model_path: Path, args: argparse.Namespace, seeds: l
             reset_bandit_each_episode=False,
             policy_terminal_path=str(model_path),
             policy_terminal_blend=args.policy_terminal_blend,
+            policy_terminal_frame_stack=int(_arg(args, "frame_stack", 1)),
         )
     )
     steps: list[float] = []
     returns: list[float] = []
     for seed in seeds:
-        result = rollout(make_env(args, reward_mode="survival"), controller, seed=seed, horizon=args.horizon, trace=False)
+        result = rollout(
+            make_env(args, reward_mode="survival", use_frame_stack=False),
+            controller,
+            seed=seed,
+            horizon=args.horizon,
+            trace=False,
+        )
         steps.append(float(result["steps"]))
         returns.append(float(result["return"]))
     summary = summarize_steps(steps, args.horizon)
-    summary.update({"returns_mean": float(np.mean(returns)) if returns else 0.0, "episodes": len(seeds)})
+    summary.update(
+        {"returns_mean": float(np.mean(returns)) if returns else 0.0, "episodes": len(seeds)}
+    )
     if trace_seed is not None and out_dir is not None:
-        trace_result = rollout(make_env(args, reward_mode="survival"), controller, seed=trace_seed, horizon=args.horizon, trace=True)
-        (out_dir / "recon_policy_terminal_trace.json").write_text(json.dumps({"steps": trace_result["trace"]}, indent=2), encoding="utf-8")
+        trace_result = rollout(
+            make_env(args, reward_mode="survival", use_frame_stack=False),
+            controller,
+            seed=trace_seed,
+            horizon=args.horizon,
+            trace=True,
+        )
+        (out_dir / "recon_policy_terminal_trace.json").write_text(
+            json.dumps({"steps": trace_result["trace"]}, indent=2), encoding="utf-8"
+        )
     return summary
 
 
@@ -192,7 +254,9 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
         from stable_baselines3 import PPO
         from stable_baselines3.common.env_util import make_vec_env
     except Exception as exc:  # pragma: no cover - optional dependency path
-        raise RuntimeError("Install RL extras with `uv sync --extra rl` to train policy terminals") from exc
+        raise RuntimeError(
+            "Install RL extras with `uv sync --extra rl` to train policy terminals"
+        ) from exc
 
     if args.model_path:
         model_path = Path(args.model_path)
@@ -200,22 +264,37 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
         train_timesteps = 0
         status = "evaluated"
     else:
-        train_env = make_vec_env(lambda: make_env(args, reward_mode=args.reward_mode, use_hard_seeds=True), n_envs=args.n_envs, seed=args.train_seed)
+        train_env = make_vec_env(
+            lambda: make_env(args, reward_mode=args.reward_mode, use_hard_seeds=True),
+            n_envs=args.n_envs,
+            seed=args.train_seed,
+        )
         if args.resume_model_path:
             model = PPO.load(str(args.resume_model_path), env=train_env, device=args.device)
             model.set_random_seed(args.train_seed)
             status = "resumed"
         else:
-            model = PPO(args.policy, train_env, seed=args.train_seed, verbose=args.verbose, device=args.device, **ppo_kwargs(args))
+            model = PPO(
+                args.policy,
+                train_env,
+                seed=args.train_seed,
+                verbose=args.verbose,
+                device=args.device,
+                **ppo_kwargs(args),
+            )
             status = "completed"
-        model.learn(total_timesteps=args.timesteps, reset_num_timesteps=not bool(args.resume_model_path))
+        model.learn(
+            total_timesteps=args.timesteps, reset_num_timesteps=not bool(args.resume_model_path)
+        )
         model_path = out / "ppo_policy_terminal.zip"
         model.save(str(model_path))
         train_timesteps = args.timesteps
 
     seeds = [args.eval_seed_start + i for i in range(args.eval_episodes)]
     ppo_eval = evaluate_model(model, args, seeds)
-    recon_eval = evaluate_recon_terminal(model_path, args, seeds, trace_seed=args.eval_seed_start + 999_999, out_dir=out)
+    recon_eval = evaluate_recon_terminal(
+        model_path, args, seeds, trace_seed=args.eval_seed_start + 999_999, out_dir=out
+    )
     report = {
         "status": status,
         "model_path": str(model_path),
@@ -233,6 +312,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "initial_angle_range": args.initial_angle_range,
             "force_noise": args.force_noise,
             "link_coupling": args.link_coupling,
+            "frame_stack": int(_arg(args, "frame_stack", 1)),
         },
         "reward_mode": args.reward_mode,
         "hard_train_seeds": hard_train_seeds(args),
@@ -253,6 +333,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "ent_coef": _arg(args, "ent_coef", 0.0),
             "vf_coef": _arg(args, "vf_coef", 0.5),
             "max_grad_norm": _arg(args, "max_grad_norm", 0.5),
+            "frame_stack": int(_arg(args, "frame_stack", 1)),
         },
         "pure_ppo_eval": ppo_eval,
         "recon_policy_terminal_eval": recon_eval,
@@ -280,6 +361,7 @@ def write_report_md(report: dict[str, Any], path: Path) -> None:
         f"Model: `{report['model_path']}`",
         f"Train timesteps: `{report['train_timesteps']}`",
         f"PPO config: `{report.get('ppo_config', {})}`",
+        f"Frame stack: `{report.get('ppo_config', {}).get('frame_stack', 1)}`",
         f"Wall-clock seconds: `{report['wall_clock_seconds']:.2f}`",
         "",
         "| evaluator | mean | p10 | success | max | episodes |",
@@ -299,7 +381,9 @@ def main() -> None:
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--dt", type=float, default=0.02)
-    parser.add_argument("--dynamics-mode", choices=["parallel", "serial_lagrange"], default="parallel")
+    parser.add_argument(
+        "--dynamics-mode", choices=["parallel", "serial_lagrange"], default="parallel"
+    )
     parser.add_argument("--action-mode", choices=["discrete", "continuous"], default="discrete")
     parser.add_argument("--discrete-action-bins", type=int, default=5)
     parser.add_argument("--force-mag", type=float, default=10.0)
@@ -307,10 +391,22 @@ def main() -> None:
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--timesteps", type=int, default=50_000)
-    parser.add_argument("--model-path", default="", help="Evaluate an existing PPO policy zip instead of training a new one.")
-    parser.add_argument("--resume-model-path", default="", help="Continue training an existing PPO policy zip, then save a new terminal policy.")
+    parser.add_argument(
+        "--model-path",
+        default="",
+        help="Evaluate an existing PPO policy zip instead of training a new one.",
+    )
+    parser.add_argument(
+        "--resume-model-path",
+        default="",
+        help="Continue training an existing PPO policy zip, then save a new terminal policy.",
+    )
     parser.add_argument("--train-seed", type=int, default=510_000)
-    parser.add_argument("--hard-train-seeds", default="", help="Comma-separated seeds or JSON/text file of seeds to cycle through during training resets.")
+    parser.add_argument(
+        "--hard-train-seeds",
+        default="",
+        help="Comma-separated seeds or JSON/text file of seeds to cycle through during training resets.",
+    )
     parser.add_argument("--hard-train-seed-probability", type=float, default=1.0)
     parser.add_argument("--eval-seed-start", type=int, default=620_000)
     parser.add_argument("--eval-episodes", type=int, default=60)
@@ -329,14 +425,33 @@ def main() -> None:
     parser.add_argument("--ent-coef", type=float, default=0.0)
     parser.add_argument("--vf-coef", type=float, default=0.5)
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
-    parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="survival")
-    parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
+    parser.add_argument(
+        "--reward-mode", choices=["survival", "upright_shaping"], default="survival"
+    )
+    parser.add_argument(
+        "--selection-mode", choices=["soft_select", "hard_select"], default="hard_select"
+    )
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument(
+        "--frame-stack",
+        type=int,
+        default=1,
+        help="Concatenate this many recent observations for the learned PPO terminal.",
+    )
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/policy_terminal_train")
     args = parser.parse_args()
     result = train_policy_terminal(args)
-    print(json.dumps({"out": args.out, "model_path": result["model_path"], "wall_clock_seconds": result["wall_clock_seconds"]}, indent=2))
+    print(
+        json.dumps(
+            {
+                "out": args.out,
+                "model_path": result["model_path"],
+                "wall_clock_seconds": result["wall_clock_seconds"],
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -13,9 +13,19 @@ from train_policy_terminal import train_policy_terminal
 
 def solve_threshold(n_poles: int) -> dict[str, float]:
     if n_poles == 3:
-        return {"mean_survival": 475.0, "p10_survival": 400.0, "success_rate": 0.80, "episodes": 300}
+        return {
+            "mean_survival": 475.0,
+            "p10_survival": 400.0,
+            "success_rate": 0.80,
+            "episodes": 300,
+        }
     if n_poles == 4:
-        return {"mean_survival": 475.0, "p10_survival": 350.0, "success_rate": 0.70, "episodes": 300}
+        return {
+            "mean_survival": 475.0,
+            "p10_survival": 350.0,
+            "success_rate": 0.70,
+            "episodes": 300,
+        }
     return {"mean_survival": 475.0, "p10_survival": 350.0, "success_rate": 0.80, "episodes": 300}
 
 
@@ -55,7 +65,9 @@ def stage_args(
         train_seed=args.train_seed + index * args.seed_stride,
         hard_train_seeds=args.hard_train_seeds,
         hard_train_seed_probability=args.hard_train_seed_probability,
-        eval_seed_start=args.validation_seed_start + index * args.seed_stride if eval_seed_start is None else eval_seed_start,
+        eval_seed_start=args.validation_seed_start + index * args.seed_stride
+        if eval_seed_start is None
+        else eval_seed_start,
         eval_episodes=args.validation_episodes if eval_episodes is None else eval_episodes,
         n_envs=args.n_envs,
         device=args.device,
@@ -75,6 +87,7 @@ def stage_args(
         reward_mode=args.reward_mode,
         selection_mode=args.selection_mode,
         policy_terminal_blend=args.policy_terminal_blend,
+        frame_stack=args.frame_stack,
         verbose=args.verbose,
         out=str(out),
     )
@@ -90,7 +103,9 @@ def run_curriculum(args: argparse.Namespace) -> dict[str, Any]:
 
     for index, dt in enumerate(args.dt_values):
         stage_out = out / f"{index:02d}_dt_{dt:g}"
-        report = train_policy_terminal(stage_args(args, dt, index, stage_out, resume_model_path=resume_model_path))
+        report = train_policy_terminal(
+            stage_args(args, dt, index, stage_out, resume_model_path=resume_model_path)
+        )
         model_path = report["model_path"]
         resume_model_path = model_path
         row = {
@@ -105,10 +120,19 @@ def run_curriculum(args: argparse.Namespace) -> dict[str, Any]:
             "train_seed": report["train_seed"],
         }
         stages.append(row)
-        partial = {"status": "running", "threshold": threshold, "stages": stages, "current_model_path": resume_model_path}
+        partial = {
+            "status": "running",
+            "threshold": threshold,
+            "stages": stages,
+            "current_model_path": resume_model_path,
+            "frame_stack": args.frame_stack,
+        }
         (out / "summary.json").write_text(json.dumps(partial, indent=2), encoding="utf-8")
         write_markdown(partial, out / "summary.md")
-        if args.stop_on_unsolved and not passes(report["recon_policy_terminal_eval"], {**threshold, "episodes": args.validation_episodes}):
+        if args.stop_on_unsolved and not passes(
+            report["recon_policy_terminal_eval"],
+            {**threshold, "episodes": args.validation_episodes},
+        ):
             break
 
     final_report = None
@@ -130,13 +154,16 @@ def run_curriculum(args: argparse.Namespace) -> dict[str, Any]:
 
     final_recon = final_report["recon_policy_terminal_eval"] if final_report else None
     result = {
-        "status": "solved" if final_recon and passes(final_recon, threshold) else "completed_not_solved",
+        "status": "solved"
+        if final_recon and passes(final_recon, threshold)
+        else "completed_not_solved",
         "threshold": threshold,
         "dt_values": args.dt_values,
         "target_dt": args.dt_values[-1],
         "reward_mode": args.reward_mode,
         "selection_mode": args.selection_mode,
         "policy_terminal_blend": args.policy_terminal_blend,
+        "frame_stack": args.frame_stack,
         "timesteps_per_stage": args.timesteps,
         "validation_episodes": args.validation_episodes,
         "final_eval_episodes": args.final_eval_episodes,
@@ -157,6 +184,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Reward mode: `{result.get('reward_mode', '')}`",
         f"Selection mode: `{result.get('selection_mode', '')}`",
         f"Policy terminal blend: `{result.get('policy_terminal_blend', '')}`",
+        f"Frame stack: `{result.get('frame_stack', 1)}`",
         "",
         "| stage | dt | mean | p10 | success | pure PPO mean | model |",
         "|---:|---:|---:|---:|---:|---:|---|",
@@ -200,7 +228,9 @@ def main() -> None:
     parser.add_argument("--resume-model-path", default="")
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)
-    parser.add_argument("--dynamics-mode", choices=["parallel", "serial_lagrange"], default="serial_lagrange")
+    parser.add_argument(
+        "--dynamics-mode", choices=["parallel", "serial_lagrange"], default="serial_lagrange"
+    )
     parser.add_argument("--action-mode", choices=["discrete", "continuous"], default="discrete")
     parser.add_argument("--discrete-action-bins", type=int, default=5)
     parser.add_argument("--force-mag", type=float, default=10.0)
@@ -231,15 +261,29 @@ def main() -> None:
     parser.add_argument("--ent-coef", type=float, default=0.0)
     parser.add_argument("--vf-coef", type=float, default=0.5)
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
-    parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping")
-    parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
+    parser.add_argument(
+        "--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping"
+    )
+    parser.add_argument(
+        "--selection-mode", choices=["soft_select", "hard_select"], default="hard_select"
+    )
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--stop-on-unsolved", action="store_true")
     parser.add_argument("--out", default="reports/policy_terminal_dt_curriculum")
     args = parser.parse_args()
     result = run_curriculum(args)
-    print(json.dumps({"out": args.out, "status": result["status"], "wall_clock_seconds": result["wall_clock_seconds"]}, indent=2))
+    print(
+        json.dumps(
+            {
+                "out": args.out,
+                "status": result["status"],
+                "wall_clock_seconds": result["wall_clock_seconds"],
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

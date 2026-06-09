@@ -57,7 +57,7 @@ uv run python scripts/train_policy_terminal.py --n-poles 4 --dynamics-mode seria
 uv run python scripts/train_policy_terminal.py --model-path reports/policy_terminal_n4/ppo_policy_terminal.zip --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --eval-episodes 300 --policy-terminal-blend 1.0 --out reports/policy_terminal_n4_eval300
 ```
 
-The PPO terminal trainer exposes policy/network and optimizer knobs (`--net-arch`, `--activation`, `--learning-rate`, `--n-steps`, `--batch-size`, `--gamma`, `--gae-lambda`, `--ent-coef`, and related PPO settings) so terminal learning experiments can be reproduced without editing code.
+The PPO terminal trainer exposes policy/network and optimizer knobs (`--net-arch`, `--activation`, `--learning-rate`, `--n-steps`, `--batch-size`, `--gamma`, `--gae-lambda`, `--ent-coef`, and related PPO settings) so terminal learning experiments can be reproduced without editing code. Use `--frame-stack N` to train/evaluate a PPO terminal on concatenated recent observations; ReCoN replay traces then show the terminal frame stack and observation size used per tick.
 
 Reports compare pure PPO against the same policy routed through ReCoN and list the active mechanisms separately.
 

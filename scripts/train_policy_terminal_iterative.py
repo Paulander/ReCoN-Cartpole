@@ -13,9 +13,19 @@ from train_policy_terminal import evaluate_model, evaluate_recon_terminal, make_
 
 def solve_threshold(n_poles: int) -> dict[str, float]:
     if n_poles == 3:
-        return {"mean_survival": 475.0, "p10_survival": 400.0, "success_rate": 0.80, "episodes": 300}
+        return {
+            "mean_survival": 475.0,
+            "p10_survival": 400.0,
+            "success_rate": 0.80,
+            "episodes": 300,
+        }
     if n_poles == 4:
-        return {"mean_survival": 475.0, "p10_survival": 350.0, "success_rate": 0.70, "episodes": 300}
+        return {
+            "mean_survival": 475.0,
+            "p10_survival": 350.0,
+            "success_rate": 0.70,
+            "episodes": 300,
+        }
     return {"mean_survival": 475.0, "p10_survival": 350.0, "success_rate": 0.80, "episodes": 300}
 
 
@@ -50,6 +60,7 @@ def eval_args(args: argparse.Namespace, eval_seed_start: int, eval_episodes: int
         link_coupling=args.link_coupling,
         selection_mode=args.selection_mode,
         policy_terminal_blend=args.policy_terminal_blend,
+        frame_stack=args.frame_stack,
         reward_mode=args.reward_mode,
         eval_seed_start=eval_seed_start,
         eval_episodes=eval_episodes,
@@ -92,6 +103,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Reward mode: `{result.get('reward_mode', '')}`",
         f"Selection mode: `{result.get('selection_mode', '')}`",
         f"Policy terminal blend: `{result.get('policy_terminal_blend', '')}`",
+        f"Frame stack: `{result.get('frame_stack', 1)}`",
         "",
         "| checkpoint | timesteps | score | mean | p10 | success |",
         "|---|---:|---:|---:|---:|---:|",
@@ -144,9 +156,15 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
         from stable_baselines3 import PPO
         from stable_baselines3.common.env_util import make_vec_env
     except Exception as exc:  # pragma: no cover - optional dependency path
-        raise RuntimeError("Install RL extras with `uv sync --extra rl` to train policy terminals") from exc
+        raise RuntimeError(
+            "Install RL extras with `uv sync --extra rl` to train policy terminals"
+        ) from exc
 
-    train_env = make_vec_env(lambda: make_env(args, reward_mode=args.reward_mode), n_envs=args.n_envs, seed=args.train_seed)
+    train_env = make_vec_env(
+        lambda: make_env(args, reward_mode=args.reward_mode),
+        n_envs=args.n_envs,
+        seed=args.train_seed,
+    )
     history: list[dict[str, Any]] = []
     best: dict[str, Any] | None = None
     best_score = float("-inf")
@@ -162,7 +180,14 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
         best = row
         best_score = float(row["score"])
     else:
-        model = PPO(args.policy, train_env, seed=args.train_seed, verbose=args.verbose, device=args.device, **ppo_kwargs(args))
+        model = PPO(
+            args.policy,
+            train_env,
+            seed=args.train_seed,
+            verbose=args.verbose,
+            device=args.device,
+            **ppo_kwargs(args),
+        )
 
     result: dict[str, Any] = {
         "status": "running",
@@ -170,6 +195,7 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
         "reward_mode": args.reward_mode,
         "selection_mode": args.selection_mode,
         "policy_terminal_blend": args.policy_terminal_blend,
+        "frame_stack": args.frame_stack,
         "ppo_config": {
             "policy": args.policy,
             "net_arch": args.net_arch,
@@ -184,8 +210,10 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
             "ent_coef": args.ent_coef,
             "vf_coef": args.vf_coef,
             "max_grad_norm": args.max_grad_norm,
+            "frame_stack": args.frame_stack,
         },
-        "chunk_timesteps": args.chunk_timesteps,        "chunks": args.chunks,
+        "chunk_timesteps": args.chunk_timesteps,
+        "chunks": args.chunks,
         "validation_episodes": args.validation_episodes,
         "final_eval_episodes": args.final_eval_episodes,
         "history": history,
@@ -194,7 +222,10 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
     save_summary(out, result)
 
     for chunk in range(1, args.chunks + 1):
-        model.learn(total_timesteps=args.chunk_timesteps, reset_num_timesteps=(chunk == 1 and not args.start_model_path))
+        model.learn(
+            total_timesteps=args.chunk_timesteps,
+            reset_num_timesteps=(chunk == 1 and not args.start_model_path),
+        )
         total_timesteps += args.chunk_timesteps
         checkpoint = out / f"checkpoint_{total_timesteps:06d}.zip"
         model.save(str(checkpoint))
@@ -228,7 +259,9 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
     final_recon = final_eval["recon_policy_terminal_eval"] if final_eval else None
     result.update(
         {
-            "status": "solved" if final_recon and passes(final_recon, threshold) else "completed_not_solved",
+            "status": "solved"
+            if final_recon and passes(final_recon, threshold)
+            else "completed_not_solved",
             "history": history,
             "best": best,
             "final_eval": final_eval,
@@ -245,7 +278,9 @@ def main() -> None:
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--dt", type=float, default=0.02)
-    parser.add_argument("--dynamics-mode", choices=["parallel", "serial_lagrange"], default="parallel")
+    parser.add_argument(
+        "--dynamics-mode", choices=["parallel", "serial_lagrange"], default="parallel"
+    )
     parser.add_argument("--action-mode", choices=["discrete", "continuous"], default="discrete")
     parser.add_argument("--discrete-action-bins", type=int, default=5)
     parser.add_argument("--force-mag", type=float, default=10.0)
@@ -276,14 +311,28 @@ def main() -> None:
     parser.add_argument("--ent-coef", type=float, default=0.0)
     parser.add_argument("--vf-coef", type=float, default=0.5)
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
-    parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping")
-    parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
+    parser.add_argument(
+        "--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping"
+    )
+    parser.add_argument(
+        "--selection-mode", choices=["soft_select", "hard_select"], default="hard_select"
+    )
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/policy_terminal_iterative")
     args = parser.parse_args()
     result = run_iterative(args)
-    print(json.dumps({"out": args.out, "status": result["status"], "wall_clock_seconds": result["wall_clock_seconds"]}, indent=2))
+    print(
+        json.dumps(
+            {
+                "out": args.out,
+                "status": result["status"],
+                "wall_clock_seconds": result["wall_clock_seconds"],
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":
