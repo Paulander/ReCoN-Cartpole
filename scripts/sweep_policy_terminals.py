@@ -57,6 +57,18 @@ def candidate_args(args: argparse.Namespace, seed: int, out: Path, model_path: s
         n_envs=args.n_envs,
         device=args.device,
         policy=args.policy,
+        net_arch=args.net_arch,
+        activation=args.activation,
+        learning_rate=args.learning_rate,
+        n_steps=args.n_steps,
+        batch_size=args.batch_size,
+        n_epochs=args.n_epochs,
+        gamma=args.gamma,
+        gae_lambda=args.gae_lambda,
+        clip_range=args.clip_range,
+        ent_coef=args.ent_coef,
+        vf_coef=args.vf_coef,
+        max_grad_norm=args.max_grad_norm,
         reward_mode=args.reward_mode,
         selection_mode=args.selection_mode,
         policy_terminal_blend=args.policy_terminal_blend,
@@ -130,6 +142,21 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
         "reward_mode": args.reward_mode,
         "selection_mode": args.selection_mode,
         "policy_terminal_blend": args.policy_terminal_blend,
+        "ppo_config": {
+            "policy": args.policy,
+            "net_arch": args.net_arch,
+            "activation": args.activation,
+            "learning_rate": args.learning_rate,
+            "n_steps": args.n_steps,
+            "batch_size": args.batch_size,
+            "n_epochs": args.n_epochs,
+            "gamma": args.gamma,
+            "gae_lambda": args.gae_lambda,
+            "clip_range": args.clip_range,
+            "ent_coef": args.ent_coef,
+            "vf_coef": args.vf_coef,
+            "max_grad_norm": args.max_grad_norm,
+        },
         "timesteps_per_candidate": args.timesteps,
         "validation_episodes": args.validation_episodes,
         "final_eval_episodes": args.final_eval_episodes,
@@ -212,6 +239,18 @@ def main() -> None:
     parser.add_argument("--n-envs", type=int, default=16)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--policy", default="MlpPolicy")
+    parser.add_argument("--net-arch", default="64,64")
+    parser.add_argument("--activation", choices=["tanh", "relu"], default="tanh")
+    parser.add_argument("--learning-rate", type=float, default=3e-4)
+    parser.add_argument("--n-steps", type=int, default=2048)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--n-epochs", type=int, default=10)
+    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--gae-lambda", type=float, default=0.95)
+    parser.add_argument("--clip-range", type=float, default=0.2)
+    parser.add_argument("--ent-coef", type=float, default=0.0)
+    parser.add_argument("--vf-coef", type=float, default=0.5)
+    parser.add_argument("--max-grad-norm", type=float, default=0.5)
     parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping")
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)

@@ -51,6 +51,37 @@ def make_env(args: argparse.Namespace, reward_mode: str = "survival"):
     return env
 
 
+
+
+def _arg(args: argparse.Namespace, name: str, default: Any) -> Any:
+    return getattr(args, name, default)
+
+
+def policy_kwargs(args: argparse.Namespace) -> dict[str, Any]:
+    import torch as th
+
+    arch_text = str(_arg(args, "net_arch", "64,64")).strip()
+    arch = [int(item) for item in arch_text.split(",") if item.strip()]
+    activation_name = str(_arg(args, "activation", "tanh")).lower()
+    activation_fn = th.nn.ReLU if activation_name == "relu" else th.nn.Tanh
+    return {"net_arch": arch, "activation_fn": activation_fn}
+
+
+def ppo_kwargs(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "learning_rate": float(_arg(args, "learning_rate", 3e-4)),
+        "n_steps": int(_arg(args, "n_steps", 2048)),
+        "batch_size": int(_arg(args, "batch_size", 64)),
+        "n_epochs": int(_arg(args, "n_epochs", 10)),
+        "gamma": float(_arg(args, "gamma", 0.99)),
+        "gae_lambda": float(_arg(args, "gae_lambda", 0.95)),
+        "clip_range": float(_arg(args, "clip_range", 0.2)),
+        "ent_coef": float(_arg(args, "ent_coef", 0.0)),
+        "vf_coef": float(_arg(args, "vf_coef", 0.5)),
+        "max_grad_norm": float(_arg(args, "max_grad_norm", 0.5)),
+        "policy_kwargs": policy_kwargs(args),
+    }
+
 def evaluate_model(model: Any, args: argparse.Namespace, seeds: list[int]) -> dict[str, Any]:
     steps: list[float] = []
     returns: list[float] = []
@@ -125,7 +156,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             model.set_random_seed(args.train_seed)
             status = "resumed"
         else:
-            model = PPO(args.policy, train_env, seed=args.train_seed, verbose=args.verbose, device=args.device)
+            model = PPO(args.policy, train_env, seed=args.train_seed, verbose=args.verbose, device=args.device, **ppo_kwargs(args))
             status = "completed"
         model.learn(total_timesteps=args.timesteps, reset_num_timesteps=not bool(args.resume_model_path))
         model_path = out / "ppo_policy_terminal.zip"
@@ -156,6 +187,21 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
         "reward_mode": args.reward_mode,
         "selection_mode": args.selection_mode,
         "policy_terminal_blend": args.policy_terminal_blend,
+        "ppo_config": {
+            "policy": args.policy,
+            "net_arch": _arg(args, "net_arch", "64,64"),
+            "activation": _arg(args, "activation", "tanh"),
+            "learning_rate": _arg(args, "learning_rate", 3e-4),
+            "n_steps": _arg(args, "n_steps", 2048),
+            "batch_size": _arg(args, "batch_size", 64),
+            "n_epochs": _arg(args, "n_epochs", 10),
+            "gamma": _arg(args, "gamma", 0.99),
+            "gae_lambda": _arg(args, "gae_lambda", 0.95),
+            "clip_range": _arg(args, "clip_range", 0.2),
+            "ent_coef": _arg(args, "ent_coef", 0.0),
+            "vf_coef": _arg(args, "vf_coef", 0.5),
+            "max_grad_norm": _arg(args, "max_grad_norm", 0.5),
+        },
         "pure_ppo_eval": ppo_eval,
         "recon_policy_terminal_eval": recon_eval,
         "mechanisms": {
@@ -181,6 +227,7 @@ def write_report_md(report: dict[str, Any], path: Path) -> None:
         f"Reward mode: `{report['reward_mode']}`",
         f"Model: `{report['model_path']}`",
         f"Train timesteps: `{report['train_timesteps']}`",
+        f"PPO config: `{report.get('ppo_config', {})}`",
         f"Wall-clock seconds: `{report['wall_clock_seconds']:.2f}`",
         "",
         "| evaluator | mean | p10 | success | max | episodes |",
@@ -216,6 +263,18 @@ def main() -> None:
     parser.add_argument("--n-envs", type=int, default=16)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--policy", default="MlpPolicy")
+    parser.add_argument("--net-arch", default="64,64")
+    parser.add_argument("--activation", choices=["tanh", "relu"], default="tanh")
+    parser.add_argument("--learning-rate", type=float, default=3e-4)
+    parser.add_argument("--n-steps", type=int, default=2048)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--n-epochs", type=int, default=10)
+    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--gae-lambda", type=float, default=0.95)
+    parser.add_argument("--clip-range", type=float, default=0.2)
+    parser.add_argument("--ent-coef", type=float, default=0.0)
+    parser.add_argument("--vf-coef", type=float, default=0.5)
+    parser.add_argument("--max-grad-norm", type=float, default=0.5)
     parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="survival")
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)

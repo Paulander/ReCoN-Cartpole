@@ -53,9 +53,11 @@ PPO uses optional dependencies. If `torch`/`stable-baselines3` are missing, the 
 
 ```bash
 uv sync --extra rl
-uv run python scripts/train_policy_terminal.py --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --reward-mode upright_shaping --timesteps 50000 --out reports/policy_terminal_n4
+uv run python scripts/train_policy_terminal.py --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --reward-mode upright_shaping --timesteps 50000 --net-arch 64,64 --gamma 0.995 --n-steps 512 --batch-size 256 --out reports/policy_terminal_n4
 uv run python scripts/train_policy_terminal.py --model-path reports/policy_terminal_n4/ppo_policy_terminal.zip --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --eval-episodes 300 --policy-terminal-blend 1.0 --out reports/policy_terminal_n4_eval300
 ```
+
+The PPO terminal trainer exposes policy/network and optimizer knobs (`--net-arch`, `--activation`, `--learning-rate`, `--n-steps`, `--batch-size`, `--gamma`, `--gae-lambda`, `--ent-coef`, and related PPO settings) so terminal learning experiments can be reproduced without editing code.
 
 Reports compare pure PPO against the same policy routed through ReCoN and list the active mechanisms separately.
 
