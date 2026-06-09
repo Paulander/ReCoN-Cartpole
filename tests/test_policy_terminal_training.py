@@ -68,6 +68,36 @@ def test_success_bonus_is_training_only():
     assert "success_bonus" not in info
 
 
+def test_hard_seed_wrapper_offsets_sampling_by_worker_seed():
+    import gymnasium as gym
+    import numpy as np
+
+    class SeedRecordingEnv(gym.Env):
+        observation_space = gym.spaces.Box(-1.0, 1.0, shape=(1,), dtype=np.float32)
+        action_space = gym.spaces.Discrete(1)
+
+        def __init__(self):
+            self.reset_seeds = []
+
+        def reset(self, *, seed=None, options=None):
+            self.reset_seeds.append(seed)
+            return np.zeros(1, dtype=np.float32), {}
+
+        def step(self, action):
+            return np.zeros(1, dtype=np.float32), 0.0, False, True, {}
+
+    env_a = SeedRecordingEnv()
+    env_b = SeedRecordingEnv()
+    wrapper_a = trainer.HardSeedResetWrapper(env_a, [100, 200, 300], probability=1.0)
+    wrapper_b = trainer.HardSeedResetWrapper(env_b, [100, 200, 300], probability=1.0)
+
+    wrapper_a.reset(seed=1)
+    wrapper_b.reset(seed=2)
+
+    assert env_a.reset_seeds == [200]
+    assert env_b.reset_seeds == [300]
+
+
 def test_failure_penalty_subtracts_only_on_termination():
     import gymnasium as gym
     import numpy as np

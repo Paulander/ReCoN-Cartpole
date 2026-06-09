@@ -89,7 +89,14 @@ class HardSeedResetWrapper(gym.Wrapper):
         self.rng = np.random.default_rng(99173)
         self.config = _env_config(env)
 
+    def _apply_worker_seed(self, seed: int) -> None:
+        seed_int = int(seed)
+        self.rng = np.random.default_rng(99173 + seed_int)
+        self.index = seed_int % len(self.seeds)
+
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+        if seed is not None:
+            self._apply_worker_seed(seed)
         if self.rng.random() < self.probability:
             chosen = self.seeds[self.index % len(self.seeds)]
             self.index += 1
