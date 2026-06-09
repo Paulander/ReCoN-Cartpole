@@ -67,6 +67,12 @@ For model selection across train seeds:
 uv run python scripts/sweep_policy_terminals.py --train-seeds 550000 560000 570000 --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --timesteps 50000 --validation-episodes 100 --final-eval-episodes 300 --out reports/policy_terminal_n4_sweep
 ```
 
+For dt curriculum of the learned terminal:
+
+```bash
+uv run python scripts/train_policy_terminal_dt_curriculum.py --dt-values 0.0003 0.0004 0.0005 --n-poles 4 --dynamics-mode serial_lagrange --action-mode discrete --discrete-action-bins 5 --timesteps 25000 --validation-episodes 80 --final-eval-episodes 300 --out reports/policy_terminal_n4_dt_curriculum
+```
+
 For validation-aware continuation and a static-vs-terminal oracle bound:
 
 ```bash
