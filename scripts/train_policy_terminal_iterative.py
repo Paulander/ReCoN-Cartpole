@@ -63,6 +63,7 @@ def eval_args(args: argparse.Namespace, eval_seed_start: int, eval_episodes: int
         policy_terminal_scope=args.policy_terminal_scope,
         frame_stack=args.frame_stack,
         policy_observation_mode=args.policy_observation_mode,
+        success_bonus=args.success_bonus,
         reward_mode=args.reward_mode,
         eval_seed_start=eval_seed_start,
         eval_episodes=eval_episodes,
@@ -108,6 +109,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Policy terminal scope: `{result.get('policy_terminal_scope', 'stabilize_chain')}`",
         f"Frame stack: `{result.get('frame_stack', 1)}`",
         f"Policy observation mode: `{result.get('policy_observation_mode', 'env')}`",
+        f"Success bonus: `{result.get('success_bonus', 0.0)}`",
         "",
         "| checkpoint | timesteps | score | mean | p10 | success |",
         "|---|---:|---:|---:|---:|---:|",
@@ -206,6 +208,7 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
         "policy_terminal_scope": args.policy_terminal_scope,
         "frame_stack": args.frame_stack,
         "policy_observation_mode": args.policy_observation_mode,
+        "success_bonus": args.success_bonus,
         "ppo_config": {
             "policy": args.policy,
             "net_arch": args.net_arch,
@@ -222,6 +225,7 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
             "max_grad_norm": args.max_grad_norm,
             "frame_stack": args.frame_stack,
             "policy_observation_mode": args.policy_observation_mode,
+            "success_bonus": args.success_bonus,
             "vec_env": args.vec_env,
         },
         "chunk_timesteps": args.chunk_timesteps,
@@ -305,6 +309,7 @@ def main() -> None:
     parser.add_argument("--hard-train-seeds", default="")
     parser.add_argument("--hard-train-seed-probability", type=float, default=1.0)
     parser.add_argument("--validation-seed-start", type=int, default=970_000)
+    parser.add_argument("--success-bonus", type=float, default=0.0)
     parser.add_argument("--validation-episodes", type=int, default=100)
     parser.add_argument("--final-seed-start", type=int, default=980_000)
     parser.add_argument("--final-eval-episodes", type=int, default=300)

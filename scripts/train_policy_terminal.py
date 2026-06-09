@@ -50,6 +50,20 @@ class UprightShapingWrapper(gym.Wrapper):
         return obs, float(reward), terminated, truncated, info
 
 
+class SuccessBonusWrapper(gym.Wrapper):
+    def __init__(self, env: gym.Env, bonus: float):
+        super().__init__(env)
+        self.bonus = max(0.0, float(bonus))
+        self.config = _env_config(env)
+
+    def step(self, action: Any):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        if truncated and not terminated and self.bonus > 0.0:
+            reward = float(reward) + self.bonus
+            info = {**info, "success_bonus": self.bonus}
+        return obs, float(reward), terminated, truncated, info
+
+
 class HardSeedResetWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env, seeds: list[int], probability: float = 1.0):
         super().__init__(env)
@@ -165,6 +179,7 @@ def make_env(
     reward_mode: str = "survival",
     use_hard_seeds: bool = False,
     use_frame_stack: bool = True,
+    use_success_bonus: bool = True,
 ):
     env = CartPoleNEnv(
         CartPoleNConfig(
@@ -186,6 +201,9 @@ def make_env(
             env = HardSeedResetWrapper(env, seeds, _arg(args, "hard_train_seed_probability", 1.0))
     if reward_mode == "upright_shaping":
         env = UprightShapingWrapper(env)
+    success_bonus = float(_arg(args, "success_bonus", 0.0))
+    if use_success_bonus and success_bonus > 0.0:
+        env = SuccessBonusWrapper(env, success_bonus)
     obs_mode = str(_arg(args, "policy_observation_mode", "env"))
     if obs_mode != "env":
         env = PolicyObservationWrapper(env, obs_mode)
@@ -228,7 +246,7 @@ def evaluate_model(model: Any, args: argparse.Namespace, seeds: list[int]) -> di
     steps: list[float] = []
     returns: list[float] = []
     for seed in seeds:
-        env = make_env(args, reward_mode="survival", use_frame_stack=True)
+        env = make_env(args, reward_mode="survival", use_frame_stack=True, use_success_bonus=False)
         obs, _info = env.reset(seed=seed)
         total = 0.0
         for step in range(args.horizon):
@@ -277,7 +295,7 @@ def evaluate_recon_terminal(
     returns: list[float] = []
     for seed in seeds:
         result = rollout(
-            make_env(args, reward_mode="survival", use_frame_stack=False),
+            make_env(args, reward_mode="survival", use_frame_stack=False, use_success_bonus=False),
             controller,
             seed=seed,
             horizon=args.horizon,
@@ -291,7 +309,7 @@ def evaluate_recon_terminal(
     )
     if trace_seed is not None and out_dir is not None:
         trace_result = rollout(
-            make_env(args, reward_mode="survival", use_frame_stack=False),
+            make_env(args, reward_mode="survival", use_frame_stack=False, use_success_bonus=False),
             controller,
             seed=trace_seed,
             horizon=args.horizon,
@@ -375,6 +393,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "link_coupling": args.link_coupling,
             "frame_stack": int(_arg(args, "frame_stack", 1)),
             "policy_observation_mode": str(_arg(args, "policy_observation_mode", "env")),
+            "success_bonus": float(_arg(args, "success_bonus", 0.0)),
             "vec_env": str(_arg(args, "vec_env", "dummy")),
         },
         "reward_mode": args.reward_mode,
@@ -399,6 +418,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "max_grad_norm": _arg(args, "max_grad_norm", 0.5),
             "frame_stack": int(_arg(args, "frame_stack", 1)),
             "policy_observation_mode": str(_arg(args, "policy_observation_mode", "env")),
+            "success_bonus": float(_arg(args, "success_bonus", 0.0)),
             "vec_env": str(_arg(args, "vec_env", "dummy")),
         },
         "pure_ppo_eval": ppo_eval,
@@ -430,6 +450,7 @@ def write_report_md(report: dict[str, Any], path: Path) -> None:
         f"Policy terminal scope: `{report.get('policy_terminal_scope', 'stabilize_chain')}`",
         f"Frame stack: `{report.get('ppo_config', {}).get('frame_stack', 1)}`",
         f"Policy observation mode: `{report.get('ppo_config', {}).get('policy_observation_mode', 'env')}`",
+        f"Success bonus: `{report.get('ppo_config', {}).get('success_bonus', 0.0)}`",
         f"Vec env: `{report.get('ppo_config', {}).get('vec_env', 'dummy')}`",
         f"Wall-clock seconds: `{report['wall_clock_seconds']:.2f}`",
         "",
@@ -479,6 +500,12 @@ def main() -> None:
     parser.add_argument("--hard-train-seed-probability", type=float, default=1.0)
     parser.add_argument("--eval-seed-start", type=int, default=620_000)
     parser.add_argument("--eval-episodes", type=int, default=60)
+    parser.add_argument(
+        "--success-bonus",
+        type=float,
+        default=0.0,
+        help="Training-only bonus when an episode reaches the horizon.",
+    )
     parser.add_argument("--n-envs", type=int, default=16)
     parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="dummy")
     parser.add_argument("--device", default="cpu")

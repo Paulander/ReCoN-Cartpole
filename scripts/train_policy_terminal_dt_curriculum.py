@@ -91,6 +91,7 @@ def stage_args(
         policy_terminal_scope=args.policy_terminal_scope,
         frame_stack=args.frame_stack,
         policy_observation_mode=args.policy_observation_mode,
+        success_bonus=args.success_bonus,
         verbose=args.verbose,
         out=str(out),
     )
@@ -191,6 +192,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Policy terminal scope: `{result.get('policy_terminal_scope', 'stabilize_chain')}`",
         f"Frame stack: `{result.get('frame_stack', 1)}`",
         f"Policy observation mode: `{result.get('policy_observation_mode', 'env')}`",
+        f"Success bonus: `{result.get('success_bonus', 0.0)}`",
         "",
         "| stage | dt | mean | p10 | success | pure PPO mean | model |",
         "|---:|---:|---:|---:|---:|---:|---|",
@@ -249,6 +251,7 @@ def main() -> None:
     parser.add_argument("--hard-train-seed-probability", type=float, default=1.0)
     parser.add_argument("--seed-stride", type=int, default=100_000)
     parser.add_argument("--validation-seed-start", type=int, default=720_000)
+    parser.add_argument("--success-bonus", type=float, default=0.0)
     parser.add_argument("--validation-episodes", type=int, default=80)
     parser.add_argument("--final-seed-start", type=int, default=980_000)
     parser.add_argument("--final-eval-episodes", type=int, default=300)
