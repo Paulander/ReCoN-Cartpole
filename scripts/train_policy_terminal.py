@@ -9,10 +9,24 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
+from recon_cartpole.control.policy_observation import (
+    policy_observation_from_state,
+    policy_observation_size,
+)
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
 from recon_cartpole.training.ablations import summarize_steps
 from recon_cartpole.training.evaluate import rollout
+
+
+def _env_config(env: gym.Env):
+    current: Any = env
+    while current is not None:
+        config = getattr(current, "config", None)
+        if config is not None:
+            return config
+        current = getattr(current, "env", None)
+    return None
 
 
 class UprightShapingWrapper(gym.Wrapper):
@@ -45,7 +59,7 @@ class HardSeedResetWrapper(gym.Wrapper):
         self.probability = max(0.0, min(1.0, float(probability)))
         self.index = 0
         self.rng = np.random.default_rng(99173)
-        self.config = getattr(env, "config", None)
+        self.config = _env_config(env)
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         if self.rng.random() < self.probability:
@@ -55,12 +69,50 @@ class HardSeedResetWrapper(gym.Wrapper):
         return self.env.reset(seed=seed, options=options)
 
 
+class PolicyObservationWrapper(gym.Wrapper):
+    def __init__(self, env: gym.Env, mode: str):
+        super().__init__(env)
+        self.mode = mode
+        self.config = _env_config(env)
+        if mode == "env":
+            self.observation_space = env.observation_space
+        else:
+            if self.config is None:
+                raise ValueError("PolicyObservationWrapper requires env.config")
+            size = policy_observation_size(self.config.n_poles, mode)
+            self.observation_space = gym.spaces.Box(
+                -np.inf, np.inf, shape=(size,), dtype=np.float32
+            )
+
+    def _transform(self, observation: Any, info: dict[str, Any]):
+        if self.mode == "env":
+            return observation
+        if self.config is None:
+            raise ValueError("PolicyObservationWrapper requires env.config")
+        return policy_observation_from_state(
+            observation,
+            info.get("raw_state"),
+            self.config.n_poles,
+            self.mode,
+            x_threshold=self.config.x_threshold,
+            theta_threshold=self.config.theta_threshold_radians,
+        )
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+        observation, info = self.env.reset(seed=seed, options=options)
+        return self._transform(observation, info), info
+
+    def step(self, action: Any):
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        return self._transform(observation, info), reward, terminated, truncated, info
+
+
 class FrameStackObservationWrapper(gym.ObservationWrapper):
     def __init__(self, env: gym.Env, frame_stack: int):
         super().__init__(env)
         self.frame_stack = max(1, int(frame_stack))
         self.frames: list[np.ndarray] = []
-        self.config = getattr(env, "config", None)
+        self.config = _env_config(env)
         base_space = env.observation_space
         if not isinstance(base_space, gym.spaces.Box):
             raise TypeError("FrameStackObservationWrapper requires a Box observation space")
@@ -134,6 +186,9 @@ def make_env(
             env = HardSeedResetWrapper(env, seeds, _arg(args, "hard_train_seed_probability", 1.0))
     if reward_mode == "upright_shaping":
         env = UprightShapingWrapper(env)
+    obs_mode = str(_arg(args, "policy_observation_mode", "env"))
+    if obs_mode != "env":
+        env = PolicyObservationWrapper(env, obs_mode)
     if use_frame_stack and int(_arg(args, "frame_stack", 1)) > 1:
         env = FrameStackObservationWrapper(env, int(_arg(args, "frame_stack", 1)))
     return env
@@ -215,6 +270,7 @@ def evaluate_recon_terminal(
             policy_terminal_blend=args.policy_terminal_blend,
             policy_terminal_frame_stack=int(_arg(args, "frame_stack", 1)),
             policy_terminal_scope=str(_arg(args, "policy_terminal_scope", "stabilize_chain")),
+            policy_terminal_observation_mode=str(_arg(args, "policy_observation_mode", "env")),
         )
     )
     steps: list[float] = []
@@ -318,6 +374,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "force_noise": args.force_noise,
             "link_coupling": args.link_coupling,
             "frame_stack": int(_arg(args, "frame_stack", 1)),
+            "policy_observation_mode": str(_arg(args, "policy_observation_mode", "env")),
             "vec_env": str(_arg(args, "vec_env", "dummy")),
         },
         "reward_mode": args.reward_mode,
@@ -341,6 +398,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "vf_coef": _arg(args, "vf_coef", 0.5),
             "max_grad_norm": _arg(args, "max_grad_norm", 0.5),
             "frame_stack": int(_arg(args, "frame_stack", 1)),
+            "policy_observation_mode": str(_arg(args, "policy_observation_mode", "env")),
             "vec_env": str(_arg(args, "vec_env", "dummy")),
         },
         "pure_ppo_eval": ppo_eval,
@@ -371,6 +429,7 @@ def write_report_md(report: dict[str, Any], path: Path) -> None:
         f"PPO config: `{report.get('ppo_config', {})}`",
         f"Policy terminal scope: `{report.get('policy_terminal_scope', 'stabilize_chain')}`",
         f"Frame stack: `{report.get('ppo_config', {}).get('frame_stack', 1)}`",
+        f"Policy observation mode: `{report.get('ppo_config', {}).get('policy_observation_mode', 'env')}`",
         f"Vec env: `{report.get('ppo_config', {}).get('vec_env', 'dummy')}`",
         f"Wall-clock seconds: `{report['wall_clock_seconds']:.2f}`",
         "",
@@ -448,6 +507,12 @@ def main() -> None:
         choices=["stabilize_chain", "selected", "all"],
         default="stabilize_chain",
         help="Which ReCoN proposals can be force-blended with the PPO terminal.",
+    )
+    parser.add_argument(
+        "--policy-observation-mode",
+        choices=["env", "normalized_raw"],
+        default="env",
+        help="Observation representation used by the learned PPO terminal.",
     )
     parser.add_argument(
         "--frame-stack",

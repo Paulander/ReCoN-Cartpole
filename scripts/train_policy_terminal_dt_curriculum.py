@@ -90,6 +90,7 @@ def stage_args(
         policy_terminal_blend=args.policy_terminal_blend,
         policy_terminal_scope=args.policy_terminal_scope,
         frame_stack=args.frame_stack,
+        policy_observation_mode=args.policy_observation_mode,
         verbose=args.verbose,
         out=str(out),
     )
@@ -189,6 +190,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Policy terminal blend: `{result.get('policy_terminal_blend', '')}`",
         f"Policy terminal scope: `{result.get('policy_terminal_scope', 'stabilize_chain')}`",
         f"Frame stack: `{result.get('frame_stack', 1)}`",
+        f"Policy observation mode: `{result.get('policy_observation_mode', 'env')}`",
         "",
         "| stage | dt | mean | p10 | success | pure PPO mean | model |",
         "|---:|---:|---:|---:|---:|---:|---|",
@@ -278,6 +280,9 @@ def main() -> None:
         choices=["stabilize_chain", "selected", "all"],
         default="stabilize_chain",
         help="Which ReCoN proposals can be force-blended with the PPO terminal.",
+    )
+    parser.add_argument(
+        "--policy-observation-mode", choices=["env", "normalized_raw"], default="env"
     )
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)

@@ -31,6 +31,7 @@ from recon_cartpole.control.actuators import action_from_force
 from recon_cartpole.control.arbitration import arbitrate_force
 from recon_cartpole.control.controllers import ControllerMode, heuristic_force, random_action
 from recon_cartpole.control.goal_vector import compute_cartpole_goal_vector
+from recon_cartpole.control.policy_observation import policy_observation_from_state
 from recon_cartpole.control.scripts import (
     REGIMES,
     ForceProposal,
@@ -76,6 +77,7 @@ class RunnerConfig:
     policy_terminal_blend: float = 1.0
     policy_terminal_frame_stack: int = 1
     policy_terminal_scope: str = "stabilize_chain"
+    policy_terminal_observation_mode: str = "env"
 
 
 class ReConCartPoleController:
@@ -399,6 +401,7 @@ class ReConCartPoleController:
                 "policy_terminal_blend": self.config.policy_terminal_blend,
                 "policy_terminal_frame_stack": self.config.policy_terminal_frame_stack,
                 "policy_terminal_scope": self.config.policy_terminal_scope,
+                "policy_terminal_observation_mode": self.config.policy_terminal_observation_mode,
             },
             "edge_weights": {
                 f"{edge.src}->{edge.dst}:{edge.ltype.name}": self.edge_weight(
@@ -483,8 +486,15 @@ class ReConCartPoleController:
             return self.config.force_mag if idx == 1 else -self.config.force_mag
         return float(np.linspace(-self.config.force_mag, self.config.force_mag, bins)[idx])
 
-    def _policy_terminal_observation(self, observation: Any) -> np.ndarray:
-        obs = np.asarray(observation, dtype=np.float32).reshape(-1)
+    def _policy_terminal_observation(
+        self, observation: Any, raw_state: Any | None = None
+    ) -> np.ndarray:
+        obs = policy_observation_from_state(
+            observation,
+            raw_state,
+            self.config.n_poles,
+            self.config.policy_terminal_observation_mode,
+        )
         frame_stack = max(1, int(self.config.policy_terminal_frame_stack))
         if frame_stack <= 1:
             return obs
@@ -505,14 +515,14 @@ class ReConCartPoleController:
         return regime == "stabilize_chain"
 
     def _policy_terminal_force(
-        self, observation: Any, context: dict[str, Any] | None = None
+        self, observation: Any, raw_state: Any | None = None, context: dict[str, Any] | None = None
     ) -> tuple[float | None, dict[str, Any]]:
         if self.policy_terminal_model is None:
             return None, {"available": False, "reason": "no_model"}
         if context is not None and "_policy_terminal_cache" in context:
             cached = context["_policy_terminal_cache"]
             return cached["force"], dict(cached["info"])
-        policy_observation = self._policy_terminal_observation(observation)
+        policy_observation = self._policy_terminal_observation(observation, raw_state)
         action, _state = self.policy_terminal_model.predict(policy_observation, deterministic=True)
         force = self._force_from_policy_action(action)
         info = {
@@ -521,6 +531,7 @@ class ReConCartPoleController:
             "frame_stack": max(1, int(self.config.policy_terminal_frame_stack)),
             "observation_size": int(policy_observation.size),
             "scope": self.config.policy_terminal_scope,
+            "observation_mode": self.config.policy_terminal_observation_mode,
             "action": np.asarray(action).reshape(-1).tolist(),
             "force": force,
         }
@@ -663,7 +674,9 @@ class ReConCartPoleController:
             mlp_info["corrected_force"] = proposal.force
             self.last_mlp_terminal = mlp_info
         if self._uses_policy_terminal() and self._policy_terminal_applies(regime, selected):
-            policy_force, policy_info = self._policy_terminal_force(env["observation"], env)
+            policy_force, policy_info = self._policy_terminal_force(
+                env["observation"], env.get("raw_state"), env
+            )
             if policy_force is not None:
                 base_force = proposal.force
                 blend = max(0.0, min(1.0, self.config.policy_terminal_blend))

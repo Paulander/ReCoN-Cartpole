@@ -275,6 +275,39 @@ def test_recon_policy_terminal_frame_stack_feeds_policy_and_resets():
     )
 
 
+def test_recon_policy_terminal_normalized_raw_observation_mode():
+    class FakePolicy:
+        def __init__(self):
+            self.observation = None
+
+        def predict(self, observation, deterministic=True):
+            self.observation = np.asarray(observation, dtype=np.float32).copy()
+            return 4, None
+
+    raw = np.asarray([0.24, 0.5, 0.01, -0.02, 0.03, -0.04, 0.1, -0.2, 0.3, -0.4], dtype=np.float32)
+    env_obs = np.arange(14, dtype=np.float32)
+    policy = FakePolicy()
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=4,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_observation_mode="normalized_raw",
+        )
+    )
+    controller.policy_terminal_model = policy
+
+    _, diagnostics = controller.act(env_obs, raw)
+
+    assert policy.observation.shape == (10,)
+    assert np.isclose(policy.observation[0], 0.1)
+    assert np.isclose(policy.observation[1], 0.1)
+    assert diagnostics["policy_terminal"]["observation_mode"] == "normalized_raw"
+    assert diagnostics["policy_terminal"]["observation_size"] == 10
+
+
 def test_recon_policy_terminal_scope_all_uses_one_cached_policy_call_for_all_regimes():
     class FakePolicy:
         def __init__(self):
