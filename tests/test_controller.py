@@ -275,6 +275,49 @@ def test_recon_policy_terminal_frame_stack_feeds_policy_and_resets():
     )
 
 
+def test_recon_policy_terminal_scope_all_uses_one_cached_policy_call_for_all_regimes():
+    class FakePolicy:
+        def __init__(self):
+            self.observations = []
+
+        def predict(self, observation, deterministic=True):
+            self.observations.append(np.asarray(observation, dtype=np.float32).copy())
+            return 4, None
+
+    raw = [0.0, 0.0, 0.02, 0.0]
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=1,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="soft_select",
+            learn=False,
+            policy_terminal_scope="all",
+        )
+    )
+    policy = FakePolicy()
+    controller.policy_terminal_model = policy
+
+    _, diagnostics = controller.act(raw, raw)
+
+    assert len(policy.observations) == 1
+    policy_regimes = {
+        item["source_node"]
+        for item in diagnostics["proposals"]
+        if "policy_terminal" in item["reason"]
+    }
+    assert policy_regimes == {
+        "avoid_rail",
+        "damp_energy",
+        "recover_worst_pole",
+        "recover_base_pole",
+        "stabilize_chain",
+        "center_cart",
+    }
+    assert diagnostics["policy_terminal"]["scope"] == "all"
+    assert set(diagnostics["policy_terminal"]["applied_regimes"]) == policy_regimes
+
+
 def test_recon_policy_terminal_blend_can_preserve_base_force():
     class FakePolicy:
         def predict(self, observation, deterministic=True):

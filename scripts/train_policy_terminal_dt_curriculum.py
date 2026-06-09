@@ -70,6 +70,7 @@ def stage_args(
         else eval_seed_start,
         eval_episodes=args.validation_episodes if eval_episodes is None else eval_episodes,
         n_envs=args.n_envs,
+        vec_env=args.vec_env,
         device=args.device,
         policy=args.policy,
         net_arch=args.net_arch,
@@ -87,6 +88,7 @@ def stage_args(
         reward_mode=args.reward_mode,
         selection_mode=args.selection_mode,
         policy_terminal_blend=args.policy_terminal_blend,
+        policy_terminal_scope=args.policy_terminal_scope,
         frame_stack=args.frame_stack,
         verbose=args.verbose,
         out=str(out),
@@ -163,6 +165,7 @@ def run_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         "reward_mode": args.reward_mode,
         "selection_mode": args.selection_mode,
         "policy_terminal_blend": args.policy_terminal_blend,
+        "policy_terminal_scope": args.policy_terminal_scope,
         "frame_stack": args.frame_stack,
         "timesteps_per_stage": args.timesteps,
         "validation_episodes": args.validation_episodes,
@@ -184,6 +187,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Reward mode: `{result.get('reward_mode', '')}`",
         f"Selection mode: `{result.get('selection_mode', '')}`",
         f"Policy terminal blend: `{result.get('policy_terminal_blend', '')}`",
+        f"Policy terminal scope: `{result.get('policy_terminal_scope', 'stabilize_chain')}`",
         f"Frame stack: `{result.get('frame_stack', 1)}`",
         "",
         "| stage | dt | mean | p10 | success | pure PPO mean | model |",
@@ -247,6 +251,7 @@ def main() -> None:
     parser.add_argument("--final-seed-start", type=int, default=980_000)
     parser.add_argument("--final-eval-episodes", type=int, default=300)
     parser.add_argument("--n-envs", type=int, default=16)
+    parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="dummy")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--policy", default="MlpPolicy")
     parser.add_argument("--net-arch", default="64,64")
@@ -268,6 +273,12 @@ def main() -> None:
         "--selection-mode", choices=["soft_select", "hard_select"], default="hard_select"
     )
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument(
+        "--policy-terminal-scope",
+        choices=["stabilize_chain", "selected", "all"],
+        default="stabilize_chain",
+        help="Which ReCoN proposals can be force-blended with the PPO terminal.",
+    )
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--stop-on-unsolved", action="store_true")

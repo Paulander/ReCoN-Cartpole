@@ -60,6 +60,7 @@ def eval_args(args: argparse.Namespace, eval_seed_start: int, eval_episodes: int
         link_coupling=args.link_coupling,
         selection_mode=args.selection_mode,
         policy_terminal_blend=args.policy_terminal_blend,
+        policy_terminal_scope=args.policy_terminal_scope,
         frame_stack=args.frame_stack,
         reward_mode=args.reward_mode,
         eval_seed_start=eval_seed_start,
@@ -103,6 +104,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Reward mode: `{result.get('reward_mode', '')}`",
         f"Selection mode: `{result.get('selection_mode', '')}`",
         f"Policy terminal blend: `{result.get('policy_terminal_blend', '')}`",
+        f"Policy terminal scope: `{result.get('policy_terminal_scope', 'stabilize_chain')}`",
         f"Frame stack: `{result.get('frame_stack', 1)}`",
         "",
         "| checkpoint | timesteps | score | mean | p10 | success |",
@@ -155,15 +157,19 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
     try:
         from stable_baselines3 import PPO
         from stable_baselines3.common.env_util import make_vec_env
+        from stable_baselines3.common.vec_env import SubprocVecEnv
     except Exception as exc:  # pragma: no cover - optional dependency path
         raise RuntimeError(
             "Install RL extras with `uv sync --extra rl` to train policy terminals"
         ) from exc
 
+    vec_env_cls = SubprocVecEnv if args.vec_env == "subproc" else None
     train_env = make_vec_env(
         lambda: make_env(args, reward_mode=args.reward_mode),
         n_envs=args.n_envs,
         seed=args.train_seed,
+        vec_env_cls=vec_env_cls,
+        vec_env_kwargs={"start_method": "fork"} if vec_env_cls is SubprocVecEnv else None,
     )
     history: list[dict[str, Any]] = []
     best: dict[str, Any] | None = None
@@ -195,6 +201,7 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
         "reward_mode": args.reward_mode,
         "selection_mode": args.selection_mode,
         "policy_terminal_blend": args.policy_terminal_blend,
+        "policy_terminal_scope": args.policy_terminal_scope,
         "frame_stack": args.frame_stack,
         "ppo_config": {
             "policy": args.policy,
@@ -211,6 +218,7 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
             "vf_coef": args.vf_coef,
             "max_grad_norm": args.max_grad_norm,
             "frame_stack": args.frame_stack,
+            "vec_env": args.vec_env,
         },
         "chunk_timesteps": args.chunk_timesteps,
         "chunks": args.chunks,
@@ -297,6 +305,7 @@ def main() -> None:
     parser.add_argument("--final-seed-start", type=int, default=980_000)
     parser.add_argument("--final-eval-episodes", type=int, default=300)
     parser.add_argument("--n-envs", type=int, default=16)
+    parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="dummy")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--policy", default="MlpPolicy")
     parser.add_argument("--net-arch", default="64,64")
@@ -318,6 +327,12 @@ def main() -> None:
         "--selection-mode", choices=["soft_select", "hard_select"], default="hard_select"
     )
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument(
+        "--policy-terminal-scope",
+        choices=["stabilize_chain", "selected", "all"],
+        default="stabilize_chain",
+        help="Which ReCoN proposals can be force-blended with the PPO terminal.",
+    )
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/policy_terminal_iterative")

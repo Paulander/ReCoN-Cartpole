@@ -75,6 +75,7 @@ class RunnerConfig:
     policy_terminal_path: str = ""
     policy_terminal_blend: float = 1.0
     policy_terminal_frame_stack: int = 1
+    policy_terminal_scope: str = "stabilize_chain"
 
 
 class ReConCartPoleController:
@@ -397,6 +398,7 @@ class ReConCartPoleController:
                 "policy_terminal_path": self.config.policy_terminal_path,
                 "policy_terminal_blend": self.config.policy_terminal_blend,
                 "policy_terminal_frame_stack": self.config.policy_terminal_frame_stack,
+                "policy_terminal_scope": self.config.policy_terminal_scope,
             },
             "edge_weights": {
                 f"{edge.src}->{edge.dst}:{edge.ltype.name}": self.edge_weight(
@@ -494,20 +496,37 @@ class ReConCartPoleController:
         ] * pad_count + self.policy_terminal_obs_history
         return np.concatenate(frames).astype(np.float32, copy=False)
 
-    def _policy_terminal_force(self, observation: Any) -> tuple[float | None, dict[str, Any]]:
+    def _policy_terminal_applies(self, regime: str, selected: str | None) -> bool:
+        scope = self.config.policy_terminal_scope
+        if scope == "all":
+            return True
+        if scope == "selected":
+            return regime == selected
+        return regime == "stabilize_chain"
+
+    def _policy_terminal_force(
+        self, observation: Any, context: dict[str, Any] | None = None
+    ) -> tuple[float | None, dict[str, Any]]:
         if self.policy_terminal_model is None:
             return None, {"available": False, "reason": "no_model"}
+        if context is not None and "_policy_terminal_cache" in context:
+            cached = context["_policy_terminal_cache"]
+            return cached["force"], dict(cached["info"])
         policy_observation = self._policy_terminal_observation(observation)
         action, _state = self.policy_terminal_model.predict(policy_observation, deterministic=True)
         force = self._force_from_policy_action(action)
-        return force, {
+        info = {
             "available": True,
             "model_path": self.config.policy_terminal_path,
             "frame_stack": max(1, int(self.config.policy_terminal_frame_stack)),
             "observation_size": int(policy_observation.size),
+            "scope": self.config.policy_terminal_scope,
             "action": np.asarray(action).reshape(-1).tolist(),
             "force": force,
         }
+        if context is not None:
+            context["_policy_terminal_cache"] = {"force": force, "info": dict(info)}
+        return force, info
 
     def _callbacks(self):
         return {
@@ -643,8 +662,8 @@ class ReConCartPoleController:
             mlp_info["base_force"] = base_force
             mlp_info["corrected_force"] = proposal.force
             self.last_mlp_terminal = mlp_info
-        if self._uses_policy_terminal() and regime == "stabilize_chain":
-            policy_force, policy_info = self._policy_terminal_force(env["observation"])
+        if self._uses_policy_terminal() and self._policy_terminal_applies(regime, selected):
+            policy_force, policy_info = self._policy_terminal_force(env["observation"], env)
             if policy_force is not None:
                 base_force = proposal.force
                 blend = max(0.0, min(1.0, self.config.policy_terminal_blend))
@@ -661,6 +680,11 @@ class ReConCartPoleController:
                 policy_info["base_force"] = base_force
                 policy_info["policy_force"] = policy_force
                 policy_info["proposal_force"] = proposal.force
+                policy_info["applied_regime"] = regime
+                policy_info["applied_regimes"] = sorted(
+                    set(env.setdefault("_policy_terminal_applied_regimes", []) + [regime])
+                )
+                env["_policy_terminal_applied_regimes"] = policy_info["applied_regimes"]
             self.last_policy_terminal = policy_info
         proposal.raw_confidence = proposal.confidence
         proposal.raw_urgency = proposal.urgency

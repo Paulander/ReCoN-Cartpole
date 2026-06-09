@@ -214,6 +214,7 @@ def evaluate_recon_terminal(
             policy_terminal_path=str(model_path),
             policy_terminal_blend=args.policy_terminal_blend,
             policy_terminal_frame_stack=int(_arg(args, "frame_stack", 1)),
+            policy_terminal_scope=str(_arg(args, "policy_terminal_scope", "stabilize_chain")),
         )
     )
     steps: list[float] = []
@@ -253,6 +254,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
     try:
         from stable_baselines3 import PPO
         from stable_baselines3.common.env_util import make_vec_env
+        from stable_baselines3.common.vec_env import SubprocVecEnv
     except Exception as exc:  # pragma: no cover - optional dependency path
         raise RuntimeError(
             "Install RL extras with `uv sync --extra rl` to train policy terminals"
@@ -264,10 +266,13 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
         train_timesteps = 0
         status = "evaluated"
     else:
+        vec_env_cls = SubprocVecEnv if _arg(args, "vec_env", "dummy") == "subproc" else None
         train_env = make_vec_env(
             lambda: make_env(args, reward_mode=args.reward_mode, use_hard_seeds=True),
             n_envs=args.n_envs,
             seed=args.train_seed,
+            vec_env_cls=vec_env_cls,
+            vec_env_kwargs={"start_method": "fork"} if vec_env_cls is SubprocVecEnv else None,
         )
         if args.resume_model_path:
             model = PPO.load(str(args.resume_model_path), env=train_env, device=args.device)
@@ -313,12 +318,14 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "force_noise": args.force_noise,
             "link_coupling": args.link_coupling,
             "frame_stack": int(_arg(args, "frame_stack", 1)),
+            "vec_env": str(_arg(args, "vec_env", "dummy")),
         },
         "reward_mode": args.reward_mode,
         "hard_train_seeds": hard_train_seeds(args),
         "hard_train_seed_probability": _arg(args, "hard_train_seed_probability", 1.0),
         "selection_mode": args.selection_mode,
         "policy_terminal_blend": args.policy_terminal_blend,
+        "policy_terminal_scope": str(_arg(args, "policy_terminal_scope", "stabilize_chain")),
         "ppo_config": {
             "policy": args.policy,
             "net_arch": _arg(args, "net_arch", "64,64"),
@@ -334,6 +341,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "vf_coef": _arg(args, "vf_coef", 0.5),
             "max_grad_norm": _arg(args, "max_grad_norm", 0.5),
             "frame_stack": int(_arg(args, "frame_stack", 1)),
+            "vec_env": str(_arg(args, "vec_env", "dummy")),
         },
         "pure_ppo_eval": ppo_eval,
         "recon_policy_terminal_eval": recon_eval,
@@ -361,7 +369,9 @@ def write_report_md(report: dict[str, Any], path: Path) -> None:
         f"Model: `{report['model_path']}`",
         f"Train timesteps: `{report['train_timesteps']}`",
         f"PPO config: `{report.get('ppo_config', {})}`",
+        f"Policy terminal scope: `{report.get('policy_terminal_scope', 'stabilize_chain')}`",
         f"Frame stack: `{report.get('ppo_config', {}).get('frame_stack', 1)}`",
+        f"Vec env: `{report.get('ppo_config', {}).get('vec_env', 'dummy')}`",
         f"Wall-clock seconds: `{report['wall_clock_seconds']:.2f}`",
         "",
         "| evaluator | mean | p10 | success | max | episodes |",
@@ -411,6 +421,7 @@ def main() -> None:
     parser.add_argument("--eval-seed-start", type=int, default=620_000)
     parser.add_argument("--eval-episodes", type=int, default=60)
     parser.add_argument("--n-envs", type=int, default=16)
+    parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="dummy")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--policy", default="MlpPolicy")
     parser.add_argument("--net-arch", default="64,64")
@@ -432,6 +443,12 @@ def main() -> None:
         "--selection-mode", choices=["soft_select", "hard_select"], default="hard_select"
     )
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument(
+        "--policy-terminal-scope",
+        choices=["stabilize_chain", "selected", "all"],
+        default="stabilize_chain",
+        help="Which ReCoN proposals can be force-blended with the PPO terminal.",
+    )
     parser.add_argument(
         "--frame-stack",
         type=int,
