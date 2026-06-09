@@ -8,7 +8,13 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Any
 
-from train_policy_terminal import evaluate_model, evaluate_recon_terminal, make_env, ppo_kwargs
+from train_policy_terminal import (
+    evaluate_model,
+    evaluate_recon_terminal,
+    hard_train_seeds,
+    make_env,
+    ppo_kwargs,
+)
 
 
 def solve_threshold(n_poles: int) -> dict[str, float]:
@@ -29,11 +35,17 @@ def solve_threshold(n_poles: int) -> dict[str, float]:
     return {"mean_survival": 475.0, "p10_survival": 350.0, "success_rate": 0.80, "episodes": 300}
 
 
-def score(summary: dict[str, Any]) -> float:
+def score(
+    summary: dict[str, Any],
+    *,
+    mean_weight: float = 1.0,
+    p10_weight: float = 0.25,
+    success_weight: float = 50.0,
+) -> float:
     return (
-        float(summary.get("mean_survival", 0.0))
-        + 0.25 * float(summary.get("p10_survival", 0.0))
-        + 50.0 * float(summary.get("success_rate", 0.0))
+        mean_weight * float(summary.get("mean_survival", 0.0))
+        + p10_weight * float(summary.get("p10_survival", 0.0))
+        + success_weight * float(summary.get("success_rate", 0.0))
     )
 
 
@@ -71,11 +83,19 @@ def eval_args(args: argparse.Namespace, eval_seed_start: int, eval_episodes: int
 
 
 def validation_seeds(args: argparse.Namespace) -> list[int]:
-    return [args.validation_seed_start + idx for idx in range(args.validation_episodes)]
+    starts = args.validation_seed_starts or [args.validation_seed_start]
+    seeds: list[int] = []
+    for start in starts:
+        seeds.extend(start + idx for idx in range(args.validation_episodes))
+    return seeds
 
 
 def final_seeds(args: argparse.Namespace) -> list[int]:
     return [args.final_seed_start + idx for idx in range(args.final_eval_episodes)]
+
+
+def make_training_env(args: argparse.Namespace):
+    return make_env(args, reward_mode=args.reward_mode, use_hard_seeds=True)
 
 
 def record_checkpoint(
@@ -86,13 +106,21 @@ def record_checkpoint(
     label: str,
 ) -> dict[str, Any]:
     v_args = eval_args(args, args.validation_seed_start, args.validation_episodes)
-    summary = evaluate_recon_terminal(checkpoint_path, v_args, validation_seeds(args))
+    seeds = validation_seeds(args)
+    summary = evaluate_recon_terminal(checkpoint_path, v_args, seeds)
     row = {
         "label": label,
         "checkpoint": str(checkpoint_path),
         "total_timesteps": total_timesteps,
         "validation": summary,
-        "score": score(summary),
+        "score": score(
+            summary,
+            mean_weight=args.score_mean_weight,
+            p10_weight=args.score_p10_weight,
+            success_weight=args.score_success_weight,
+        ),
+        "validation_seed_starts": args.validation_seed_starts or [args.validation_seed_start],
+        "validation_seed_count": len(seeds),
     }
     (out / "latest_validation.json").write_text(json.dumps(row, indent=2), encoding="utf-8")
     return row
@@ -110,6 +138,10 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Frame stack: `{result.get('frame_stack', 1)}`",
         f"Policy observation mode: `{result.get('policy_observation_mode', 'env')}`",
         f"Success bonus: `{result.get('success_bonus', 0.0)}`",
+        f"Hard train seeds: `{result.get('hard_train_seed_count', 0)}` at probability `{result.get('hard_train_seed_probability', 1.0)}`",
+        f"Validation seed starts: `{', '.join(str(seed) for seed in result.get('validation_seed_starts', []))}`",
+        f"Validation seed count per start: `{result.get('validation_episodes', '')}`",
+        f"Score weights: mean `{result.get('score_weights', {}).get('mean_survival', '')}`, p10 `{result.get('score_weights', {}).get('p10_survival', '')}`, success `{result.get('score_weights', {}).get('success_rate', '')}`",
         "",
         "| checkpoint | timesteps | score | mean | p10 | success |",
         "|---|---:|---:|---:|---:|---:|",
@@ -169,7 +201,7 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
 
     vec_env_cls = SubprocVecEnv if args.vec_env == "subproc" else None
     train_env = make_vec_env(
-        lambda: make_env(args, reward_mode=args.reward_mode),
+        lambda: make_training_env(args),
         n_envs=args.n_envs,
         seed=args.train_seed,
         vec_env_cls=vec_env_cls,
@@ -230,8 +262,17 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
         },
         "chunk_timesteps": args.chunk_timesteps,
         "chunks": args.chunks,
+        "hard_train_seed_count": len(hard_train_seeds(args)),
+        "hard_train_seed_probability": args.hard_train_seed_probability,
+        "validation_seed_starts": args.validation_seed_starts or [args.validation_seed_start],
         "validation_episodes": args.validation_episodes,
+        "validation_seed_count": len(validation_seeds(args)),
         "final_eval_episodes": args.final_eval_episodes,
+        "score_weights": {
+            "mean_survival": args.score_mean_weight,
+            "p10_survival": args.score_p10_weight,
+            "success_rate": args.score_success_weight,
+        },
         "history": history,
         "best": best,
     }
@@ -309,8 +350,21 @@ def main() -> None:
     parser.add_argument("--hard-train-seeds", default="")
     parser.add_argument("--hard-train-seed-probability", type=float, default=1.0)
     parser.add_argument("--validation-seed-start", type=int, default=970_000)
+    parser.add_argument(
+        "--validation-seed-starts",
+        type=int,
+        nargs="+",
+        default=None,
+        help=(
+            "Optional list of validation seed block starts. Each start contributes "
+            "--validation-episodes consecutive seeds; useful for less lucky checkpoint selection."
+        ),
+    )
     parser.add_argument("--success-bonus", type=float, default=0.0)
     parser.add_argument("--validation-episodes", type=int, default=100)
+    parser.add_argument("--score-mean-weight", type=float, default=1.0)
+    parser.add_argument("--score-p10-weight", type=float, default=0.25)
+    parser.add_argument("--score-success-weight", type=float, default=50.0)
     parser.add_argument("--final-seed-start", type=int, default=980_000)
     parser.add_argument("--final-eval-episodes", type=int, default=300)
     parser.add_argument("--n-envs", type=int, default=16)

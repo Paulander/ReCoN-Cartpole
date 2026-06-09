@@ -57,6 +57,9 @@ def make_controller(args: argparse.Namespace) -> ReConCartPoleController:
             reset_bandit_each_episode=False,
             policy_terminal_path=args.model_path,
             policy_terminal_blend=args.policy_terminal_blend,
+            policy_terminal_frame_stack=args.frame_stack,
+            policy_terminal_scope=args.policy_terminal_scope,
+            policy_terminal_observation_mode=args.policy_observation_mode,
         )
     )
 
@@ -91,6 +94,9 @@ def run_collect(args: argparse.Namespace) -> dict[str, Any]:
         "status": "completed",
         "model_path": args.model_path,
         "seed_start": args.seed_start,
+        "policy_terminal_scope": args.policy_terminal_scope,
+        "policy_observation_mode": args.policy_observation_mode,
+        "frame_stack": args.frame_stack,
         "episodes_requested": args.episodes,
         "episodes_run": len(rows),
         "hard_seeds": hard,
@@ -140,6 +146,15 @@ def main() -> None:
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument(
+        "--policy-terminal-scope",
+        choices=["stabilize_chain", "selected", "all"],
+        default="stabilize_chain",
+    )
+    parser.add_argument(
+        "--policy-observation-mode", choices=["env", "normalized_raw"], default="env"
+    )
+    parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--episodes", type=int, default=200)
     parser.add_argument("--seed-start", type=int, default=1_100_000)
     parser.add_argument("--min-steps", type=float, default=0.0)
