@@ -68,6 +68,7 @@ class RunnerConfig:
     node_params: NodeParamConfig = field(default_factory=NodeParamConfig)
     mlp_terminal: MlpTerminalConfig = field(default_factory=MlpTerminalConfig)
     policy_terminal_path: str = ""
+    policy_terminal_blend: float = 1.0
 
 
 class ReConCartPoleController:
@@ -316,6 +317,7 @@ class ReConCartPoleController:
                 "consolidation_config": self.config.consolidation.__dict__,
                 "mlp_terminal_config": self.config.mlp_terminal.__dict__,
                 "policy_terminal_path": self.config.policy_terminal_path,
+                "policy_terminal_blend": self.config.policy_terminal_blend,
             },
             "edge_weights": {
                 f"{edge.src}->{edge.dst}:{edge.ltype.name}": self.edge_weight(edge.src, edge.dst, edge.ltype)
@@ -521,10 +523,13 @@ class ReConCartPoleController:
             policy_force, policy_info = self._policy_terminal_force(env["observation"])
             if policy_force is not None:
                 base_force = proposal.force
-                proposal.force = policy_force
+                blend = max(0.0, min(1.0, self.config.policy_terminal_blend))
+                proposal.force = float(np.clip(base_force + blend * (policy_force - base_force), -self.config.force_mag, self.config.force_mag))
                 proposal.confidence = max(proposal.confidence, 0.9)
                 proposal.reason = f"{proposal.reason}; policy_terminal"
+                policy_info["blend"] = blend
                 policy_info["base_force"] = base_force
+                policy_info["policy_force"] = policy_force
                 policy_info["proposal_force"] = proposal.force
             self.last_policy_terminal = policy_info
         proposal.raw_confidence = proposal.confidence

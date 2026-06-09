@@ -54,10 +54,16 @@ PPO uses optional dependencies. If `torch`/`stable-baselines3` are missing, the 
 ```bash
 uv sync --extra rl
 uv run python scripts/train_policy_terminal.py --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --reward-mode upright_shaping --timesteps 50000 --out reports/policy_terminal_n4
-uv run python scripts/train_policy_terminal.py --model-path reports/policy_terminal_n4/ppo_policy_terminal.zip --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --eval-episodes 300 --out reports/policy_terminal_n4_eval300
+uv run python scripts/train_policy_terminal.py --model-path reports/policy_terminal_n4/ppo_policy_terminal.zip --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --eval-episodes 300 --policy-terminal-blend 1.0 --out reports/policy_terminal_n4_eval300
 ```
 
 Reports compare pure PPO against the same policy routed through ReCoN and list the active mechanisms separately.
+
+For model selection across train seeds:
+
+```bash
+uv run python scripts/sweep_policy_terminals.py --train-seeds 550000 560000 570000 --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --timesteps 50000 --validation-episodes 100 --final-eval-episodes 300 --out reports/policy_terminal_n4_sweep
+```
 
 ## Iterative ReCoN-Native Training
 

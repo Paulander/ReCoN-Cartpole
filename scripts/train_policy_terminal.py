@@ -86,6 +86,7 @@ def evaluate_recon_terminal(model_path: Path, args: argparse.Namespace, seeds: l
             learn=False,
             reset_bandit_each_episode=False,
             policy_terminal_path=str(model_path),
+            policy_terminal_blend=args.policy_terminal_blend,
         )
     )
     steps: list[float] = []
@@ -154,6 +155,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
         },
         "reward_mode": args.reward_mode,
         "selection_mode": args.selection_mode,
+        "policy_terminal_blend": args.policy_terminal_blend,
         "pure_ppo_eval": ppo_eval,
         "recon_policy_terminal_eval": recon_eval,
         "mechanisms": {
@@ -216,6 +218,7 @@ def main() -> None:
     parser.add_argument("--policy", default="MlpPolicy")
     parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="survival")
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
+    parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/policy_terminal_train")
     args = parser.parse_args()

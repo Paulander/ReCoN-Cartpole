@@ -195,4 +195,29 @@ def test_recon_policy_terminal_can_drive_stabilize_chain_proposal():
     assert diagnostics["force"] == controller.config.force_mag
     assert action == 4
     assert diagnostics["policy_terminal"]["available"] is True
+    assert diagnostics["policy_terminal"]["blend"] == 1.0
+
+
+def test_recon_policy_terminal_blend_can_preserve_base_force():
+    class FakePolicy:
+        def predict(self, observation, deterministic=True):
+            return 4, None
+
+    raw = [0.0, 0.0, 0.01, 0.04, 0.12, -0.03, 0.0, 0.0, 0.0, 0.0]
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=4,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_blend=0.0,
+        )
+    )
+    controller.policy_terminal_model = FakePolicy()
+    _, diagnostics = controller.act(raw, raw)
+    info = diagnostics["policy_terminal"]
+    assert info["blend"] == 0.0
+    assert diagnostics["force"] == info["base_force"]
+    assert info["policy_force"] == controller.config.force_mag
 
