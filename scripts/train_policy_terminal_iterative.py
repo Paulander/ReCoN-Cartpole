@@ -76,6 +76,7 @@ def eval_args(args: argparse.Namespace, eval_seed_start: int, eval_episodes: int
         frame_stack=args.frame_stack,
         policy_observation_mode=args.policy_observation_mode,
         success_bonus=args.success_bonus,
+        failure_penalty=args.failure_penalty,
         reward_mode=args.reward_mode,
         eval_seed_start=eval_seed_start,
         eval_episodes=eval_episodes,
@@ -138,6 +139,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Frame stack: `{result.get('frame_stack', 1)}`",
         f"Policy observation mode: `{result.get('policy_observation_mode', 'env')}`",
         f"Success bonus: `{result.get('success_bonus', 0.0)}`",
+        f"Failure penalty: `{result.get('failure_penalty', 0.0)}`",
         f"Hard train seeds: `{result.get('hard_train_seed_count', 0)}` at probability `{result.get('hard_train_seed_probability', 1.0)}`",
         f"Validation seed starts: `{', '.join(str(seed) for seed in result.get('validation_seed_starts', []))}`",
         f"Validation seed count per start: `{result.get('validation_episodes', '')}`",
@@ -241,6 +243,7 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
         "frame_stack": args.frame_stack,
         "policy_observation_mode": args.policy_observation_mode,
         "success_bonus": args.success_bonus,
+        "failure_penalty": args.failure_penalty,
         "ppo_config": {
             "policy": args.policy,
             "net_arch": args.net_arch,
@@ -258,6 +261,7 @@ def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
             "frame_stack": args.frame_stack,
             "policy_observation_mode": args.policy_observation_mode,
             "success_bonus": args.success_bonus,
+            "failure_penalty": args.failure_penalty,
             "vec_env": args.vec_env,
         },
         "chunk_timesteps": args.chunk_timesteps,
@@ -361,6 +365,7 @@ def main() -> None:
         ),
     )
     parser.add_argument("--success-bonus", type=float, default=0.0)
+    parser.add_argument("--failure-penalty", type=float, default=0.0)
     parser.add_argument("--validation-episodes", type=int, default=100)
     parser.add_argument("--score-mean-weight", type=float, default=1.0)
     parser.add_argument("--score-p10-weight", type=float, default=0.25)

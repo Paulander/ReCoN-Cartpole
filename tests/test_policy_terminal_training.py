@@ -24,7 +24,8 @@ def _load_iterative_trainer():
     return module
 
 
-make_env = _load_trainer().make_env
+trainer = _load_trainer()
+make_env = trainer.make_env
 iterative_trainer = _load_iterative_trainer()
 
 
@@ -45,6 +46,7 @@ def _args(success_bonus: float):
         frame_stack=1,
         policy_observation_mode="env",
         success_bonus=success_bonus,
+        failure_penalty=0.0,
     )
 
 
@@ -64,6 +66,29 @@ def test_success_bonus_is_training_only():
     assert truncated
     assert reward == 1.0
     assert "success_bonus" not in info
+
+
+def test_failure_penalty_subtracts_only_on_termination():
+    import gymnasium as gym
+    import numpy as np
+
+    class TerminatingEnv(gym.Env):
+        observation_space = gym.spaces.Box(-1.0, 1.0, shape=(1,), dtype=np.float32)
+        action_space = gym.spaces.Discrete(1)
+
+        def reset(self, *, seed=None, options=None):
+            return np.zeros(1, dtype=np.float32), {}
+
+        def step(self, action):
+            return np.zeros(1, dtype=np.float32), 1.0, True, False, {}
+
+    env = trainer.FailurePenaltyWrapper(TerminatingEnv(), 3.5)
+    _obs, reward, terminated, truncated, info = env.step(0)
+
+    assert terminated
+    assert not truncated
+    assert reward == -2.5
+    assert info["failure_penalty"] == 3.5
 
 
 def test_validation_seed_starts_expand_to_disjoint_blocks():
