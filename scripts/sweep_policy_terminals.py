@@ -52,6 +52,8 @@ def candidate_args(args: argparse.Namespace, seed: int, out: Path, model_path: s
         model_path=model_path,
         resume_model_path="",
         train_seed=seed,
+        hard_train_seeds=args.hard_train_seeds,
+        hard_train_seed_probability=args.hard_train_seed_probability,
         eval_seed_start=args.validation_seed_start,
         eval_episodes=args.validation_episodes,
         n_envs=args.n_envs,
@@ -221,6 +223,8 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--train-seeds", type=int, nargs="+", required=True)
+    parser.add_argument("--hard-train-seeds", default="")
+    parser.add_argument("--hard-train-seed-probability", type=float, default=1.0)
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--dt", type=float, default=0.02)

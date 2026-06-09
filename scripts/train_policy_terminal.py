@@ -31,7 +31,53 @@ class UprightShapingWrapper(gym.Wrapper):
         return obs, float(reward), terminated, truncated, info
 
 
-def make_env(args: argparse.Namespace, reward_mode: str = "survival"):
+class HardSeedResetWrapper(gym.Wrapper):
+    def __init__(self, env: gym.Env, seeds: list[int], probability: float = 1.0):
+        super().__init__(env)
+        if not seeds:
+            raise ValueError("HardSeedResetWrapper requires at least one seed")
+        self.seeds = list(seeds)
+        self.probability = max(0.0, min(1.0, float(probability)))
+        self.index = 0
+        self.rng = np.random.default_rng(99173)
+        self.config = getattr(env, "config", None)
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+        if self.rng.random() < self.probability:
+            chosen = self.seeds[self.index % len(self.seeds)]
+            self.index += 1
+            return self.env.reset(seed=chosen, options=options)
+        return self.env.reset(seed=seed, options=options)
+
+
+def parse_seed_list(value: Any) -> list[int]:
+    if not value:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [int(item) for item in value]
+    text = str(value).strip()
+    if not text:
+        return []
+    path = Path(text)
+    if path.exists():
+        raw = path.read_text(encoding="utf-8")
+        if path.suffix.lower() == ".json":
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                for key in ("hard_seeds", "failed_seeds", "seeds"):
+                    if key in data:
+                        return [int(item) for item in data[key]]
+            if isinstance(data, list):
+                return [int(item) for item in data]
+        text = raw
+    return [int(part) for part in text.replace("\n", ",").split(",") if part.strip()]
+
+
+def hard_train_seeds(args: argparse.Namespace) -> list[int]:
+    return parse_seed_list(_arg(args, "hard_train_seeds", ""))
+
+
+def make_env(args: argparse.Namespace, reward_mode: str = "survival", use_hard_seeds: bool = False):
     env = CartPoleNEnv(
         CartPoleNConfig(
             n_poles=args.n_poles,
@@ -46,6 +92,10 @@ def make_env(args: argparse.Namespace, reward_mode: str = "survival"):
             link_coupling=args.link_coupling,
         )
     )
+    if use_hard_seeds:
+        seeds = hard_train_seeds(args)
+        if seeds:
+            env = HardSeedResetWrapper(env, seeds, _arg(args, "hard_train_seed_probability", 1.0))
     if reward_mode == "upright_shaping":
         return UprightShapingWrapper(env)
     return env
@@ -150,7 +200,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
         train_timesteps = 0
         status = "evaluated"
     else:
-        train_env = make_vec_env(lambda: make_env(args, reward_mode=args.reward_mode), n_envs=args.n_envs, seed=args.train_seed)
+        train_env = make_vec_env(lambda: make_env(args, reward_mode=args.reward_mode, use_hard_seeds=True), n_envs=args.n_envs, seed=args.train_seed)
         if args.resume_model_path:
             model = PPO.load(str(args.resume_model_path), env=train_env, device=args.device)
             model.set_random_seed(args.train_seed)
@@ -185,6 +235,8 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "link_coupling": args.link_coupling,
         },
         "reward_mode": args.reward_mode,
+        "hard_train_seeds": hard_train_seeds(args),
+        "hard_train_seed_probability": _arg(args, "hard_train_seed_probability", 1.0),
         "selection_mode": args.selection_mode,
         "policy_terminal_blend": args.policy_terminal_blend,
         "ppo_config": {
@@ -258,6 +310,8 @@ def main() -> None:
     parser.add_argument("--model-path", default="", help="Evaluate an existing PPO policy zip instead of training a new one.")
     parser.add_argument("--resume-model-path", default="", help="Continue training an existing PPO policy zip, then save a new terminal policy.")
     parser.add_argument("--train-seed", type=int, default=510_000)
+    parser.add_argument("--hard-train-seeds", default="", help="Comma-separated seeds or JSON/text file of seeds to cycle through during training resets.")
+    parser.add_argument("--hard-train-seed-probability", type=float, default=1.0)
     parser.add_argument("--eval-seed-start", type=int, default=620_000)
     parser.add_argument("--eval-episodes", type=int, default=60)
     parser.add_argument("--n-envs", type=int, default=16)

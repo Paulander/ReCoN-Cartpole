@@ -67,6 +67,13 @@ For model selection across train seeds:
 uv run python scripts/sweep_policy_terminals.py --train-seeds 550000 560000 570000 --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --timesteps 50000 --validation-episodes 100 --final-eval-episodes 300 --out reports/policy_terminal_n4_sweep
 ```
 
+For hard-seed collection and mixed hard/random terminal training:
+
+```bash
+uv run python scripts/collect_hard_seeds.py --model-path reports/policy_terminal_n4/ppo_policy_terminal.zip --episodes 200 --seed-start 1100000 --dt 0.0005 --dynamics-mode serial_lagrange --out reports/policy_terminal_n4_hard_seeds
+uv run python scripts/train_policy_terminal.py --resume-model-path reports/policy_terminal_n4/ppo_policy_terminal.zip --hard-train-seeds reports/policy_terminal_n4_hard_seeds/hard_seeds.txt --hard-train-seed-probability 0.5 --n-poles 4 --dt 0.0005 --dynamics-mode serial_lagrange --action-mode discrete --discrete-action-bins 5 --timesteps 50000 --out reports/policy_terminal_n4_hard_seed_resume
+```
+
 For target-rung failure/action audits:
 
 ```bash

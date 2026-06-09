@@ -53,6 +53,8 @@ def stage_args(
         model_path=model_path,
         resume_model_path=resume_model_path,
         train_seed=args.train_seed + index * args.seed_stride,
+        hard_train_seeds=args.hard_train_seeds,
+        hard_train_seed_probability=args.hard_train_seed_probability,
         eval_seed_start=args.validation_seed_start + index * args.seed_stride if eval_seed_start is None else eval_seed_start,
         eval_episodes=args.validation_episodes if eval_episodes is None else eval_episodes,
         n_envs=args.n_envs,
@@ -207,6 +209,8 @@ def main() -> None:
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--timesteps", type=int, default=25_000)
     parser.add_argument("--train-seed", type=int, default=710_000)
+    parser.add_argument("--hard-train-seeds", default="")
+    parser.add_argument("--hard-train-seed-probability", type=float, default=1.0)
     parser.add_argument("--seed-stride", type=int, default=100_000)
     parser.add_argument("--validation-seed-start", type=int, default=720_000)
     parser.add_argument("--validation-episodes", type=int, default=80)

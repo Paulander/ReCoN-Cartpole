@@ -255,6 +255,8 @@ def main() -> None:
     parser.add_argument("--chunk-timesteps", type=int, default=25_000)
     parser.add_argument("--chunks", type=int, default=4)
     parser.add_argument("--train-seed", type=int, default=610_000)
+    parser.add_argument("--hard-train-seeds", default="")
+    parser.add_argument("--hard-train-seed-probability", type=float, default=1.0)
     parser.add_argument("--validation-seed-start", type=int, default=970_000)
     parser.add_argument("--validation-episodes", type=int, default=100)
     parser.add_argument("--final-seed-start", type=int, default=980_000)
