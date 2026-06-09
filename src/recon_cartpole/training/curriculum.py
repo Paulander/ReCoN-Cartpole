@@ -40,6 +40,7 @@ def run_curriculum(path: str, output_dir: str | None = None) -> list[dict[str, A
             stage=stage,
             mode=mode,
             horizon=horizon,
+            dt=float(stage.get("dt", 0.02)),
             train_seed=train_start + stage_index * 20_000,
             validation_seed=validation_start + stage_index * 20_000,
             starting_gains=current_gains,
@@ -95,6 +96,7 @@ def run_stage(
             episodes=trial_train_episodes,
             seed=train_seed + trial_index * 1_000,
             horizon=horizon,
+            dt=float(stage.get("dt", 0.02)),
             trace=False,
         )
         controller.config.learn = False
@@ -104,6 +106,7 @@ def run_stage(
             episodes=eval_episodes,
             seed=validation_seed + trial_index * 1_000,
             horizon=horizon,
+            dt=float(stage.get("dt", 0.02)),
             trace=False,
         )
         train_steps = [float(item["steps"]) for item in train_results]
@@ -196,6 +199,7 @@ def make_env(stage: dict[str, Any], horizon: int) -> CartPoleNEnv:
             discrete_action_bins=int(stage.get("discrete_action_bins", 2)),
             dynamics_mode=str(stage.get("dynamics_mode", "parallel")),
             horizon=horizon,
+            dt=float(stage.get("dt", 0.02)),
             initial_angle_range=float(stage.get("initial_angle_range", 0.05)),
             force_noise=float(stage.get("force_noise", 0.0)),
             force_mag=float(stage.get("force_mag", 10.0)),

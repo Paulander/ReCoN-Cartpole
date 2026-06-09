@@ -9,6 +9,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--n-poles", type=int, default=3)
     parser.add_argument("--horizon", type=int, default=500)
+    parser.add_argument("--dt", type=float, default=0.02)
     parser.add_argument("--action-mode", choices=["discrete", "continuous"], default="discrete")
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--seed-start", type=int, default=230_000)
@@ -25,6 +26,7 @@ def main() -> None:
     seeds = [args.seed_start + idx for idx in range(args.episodes)]
     env_params = {
         "action_mode": args.action_mode,
+        "dt": args.dt,
         "initial_angle_range": args.initial_angle_range,
         "force_noise": args.force_noise,
         "link_coupling": args.link_coupling,

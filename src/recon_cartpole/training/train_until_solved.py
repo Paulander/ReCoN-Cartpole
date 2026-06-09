@@ -34,6 +34,7 @@ class IterationConfig:
     mode: str = "recon_learn_only"
     action_mode: str = "discrete"
     horizon: int = 500
+    dt: float = 0.02
     budget_episodes: int = 50_000
     train_block_episodes: int = 250
     eval_episodes: int = 50
@@ -90,6 +91,7 @@ def make_env(config: IterationConfig) -> CartPoleNEnv:
             n_poles=config.n_poles,
             action_mode=config.action_mode,
             horizon=config.horizon,
+            dt=config.dt,
             initial_angle_range=config.initial_angle_range,
             force_noise=config.force_noise,
             link_coupling=config.link_coupling,

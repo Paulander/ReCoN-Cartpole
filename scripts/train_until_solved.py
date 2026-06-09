@@ -17,6 +17,7 @@ def main() -> None:
     parser.add_argument("--train-block-episodes", type=int, default=250)
     parser.add_argument("--eval-episodes", type=int, default=50)
     parser.add_argument("--horizon", type=int, default=500)
+    parser.add_argument("--dt", type=float, default=0.02)
     parser.add_argument("--seed", type=int, default=300_000)
     parser.add_argument("--validation-seed", type=int, default=430_000)
     parser.add_argument("--initial-angle-range", type=float, default=0.05)
@@ -43,6 +44,7 @@ def main() -> None:
         train_block_episodes=args.train_block_episodes,
         eval_episodes=args.eval_episodes,
         horizon=args.horizon,
+        dt=args.dt,
         seed=args.seed,
         validation_seed=args.validation_seed,
         initial_angle_range=args.initial_angle_range,
