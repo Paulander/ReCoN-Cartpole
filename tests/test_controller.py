@@ -169,3 +169,30 @@ def test_recon_mlp_terminal_affects_chain_proposal_and_updates():
     update = result["episode_learning"]["applied"]["mlp_terminal"]
     assert "update_norm" in update
     assert any(step.get("mlp_terminal") for step in result["trace"])
+
+
+def test_recon_policy_terminal_can_drive_stabilize_chain_proposal():
+    class FakePolicy:
+        def predict(self, observation, deterministic=True):
+            assert deterministic is True
+            return 4, None
+
+    raw = [0.0, 0.0, 0.01, 0.04, 0.12, -0.03, 0.0, 0.0, 0.0, 0.0]
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=4,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+        )
+    )
+    controller.policy_terminal_model = FakePolicy()
+    action, diagnostics = controller.act(raw, raw)
+    assert diagnostics["selected_regime"] == "stabilize_chain"
+    assert diagnostics["proposal"]["source_node"] == "stabilize_chain"
+    assert "policy_terminal" in diagnostics["proposal"]["reason"]
+    assert diagnostics["force"] == controller.config.force_mag
+    assert action == 4
+    assert diagnostics["policy_terminal"]["available"] is True
+

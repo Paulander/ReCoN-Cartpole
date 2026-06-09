@@ -67,6 +67,7 @@ class RunnerConfig:
     consolidation: ConsolidationConfig = field(default_factory=ConsolidationConfig)
     node_params: NodeParamConfig = field(default_factory=NodeParamConfig)
     mlp_terminal: MlpTerminalConfig = field(default_factory=MlpTerminalConfig)
+    policy_terminal_path: str = ""
 
 
 class ReConCartPoleController:
@@ -86,6 +87,10 @@ class ReConCartPoleController:
         self.mlp_terminal_state = MlpTerminalState.create(self.config.n_poles, self.config.mlp_terminal.hidden_size)
         self.mlp_rng = np.random.default_rng(1009 + self.config.n_poles)
         self.last_mlp_terminal: dict[str, Any] = {}
+        self.policy_terminal_model: Any | None = None
+        self.last_policy_terminal: dict[str, Any] = {}
+        if self._uses_policy_terminal() and self.config.policy_terminal_path:
+            self.policy_terminal_model = self._load_policy_terminal(self.config.policy_terminal_path)
         self.consolidation = ConsolidationEngine(self.config.consolidation)
         self.consolidation.init_from_graph(self.graph, list(self.plasticity_state))
         self.last_selected_regime: str | None = None
@@ -128,6 +133,9 @@ class ReConCartPoleController:
     def _uses_mlp_terminal(self) -> bool:
         return self.config.mode == "recon_mlp_terminal"
 
+    def _uses_policy_terminal(self) -> bool:
+        return self.config.mode == "recon_policy_terminal"
+
     def learning_mechanisms(self) -> dict[str, bool]:
         return {
             "edge_plasticity": self._uses_fast_plasticity(),
@@ -135,6 +143,7 @@ class ReConCartPoleController:
             "slow_consolidation": self._uses_slow_consolidation(),
             "node_param_learning": self._uses_node_params(),
             "mlp_terminal": self._uses_mlp_terminal(),
+            "policy_terminal": self._uses_policy_terminal(),
             "gain_mutation": self.config.mode in ("gain_search_only", "gain_search_recon_fast_bandit"),
         }
 
@@ -150,6 +159,7 @@ class ReConCartPoleController:
         for item in self.node_param_state.values():
             item.reset_episode()
         self.mlp_terminal_state.start_episode(self.config.mlp_terminal, self.mlp_rng, self.config.learn and self._uses_mlp_terminal())
+        self.last_policy_terminal = {}
 
     def observe_reward(self, reward: float) -> None:
         if not self.config.learn:
@@ -236,6 +246,7 @@ class ReConCartPoleController:
             "consolidation": self.consolidation.to_dict() if self._uses_slow_consolidation() else {},
             "consolidation_applied": dict(self.last_consolidation_applied),
             "mlp_terminal": dict(self.last_mlp_terminal),
+            "policy_terminal": dict(self.last_policy_terminal),
             "bandit": snapshot_bandit(self.bandit_state),
             "graph_nodes": {nid: node.state.name for nid, node in self.graph.nodes.items()},
             "graph_ticks": graph_ticks,
@@ -304,6 +315,7 @@ class ReConCartPoleController:
                 "node_params_config": self.config.node_params.__dict__,
                 "consolidation_config": self.config.consolidation.__dict__,
                 "mlp_terminal_config": self.config.mlp_terminal.__dict__,
+                "policy_terminal_path": self.config.policy_terminal_path,
             },
             "edge_weights": {
                 f"{edge.src}->{edge.dst}:{edge.ltype.name}": self.edge_weight(edge.src, edge.dst, edge.ltype)
@@ -363,6 +375,34 @@ class ReConCartPoleController:
         src, rest = key.split("->", 1)
         dst, ltype = rest.split(":", 1)
         return self.set_edge_weight(src, dst, ltype, weight)
+
+    def _load_policy_terminal(self, path: str) -> Any:
+        try:
+            from stable_baselines3 import PPO
+        except Exception as exc:  # pragma: no cover - optional dependency path
+            raise RuntimeError("recon_policy_terminal requires stable-baselines3") from exc
+        return PPO.load(path, device="cpu")
+
+    def _force_from_policy_action(self, action: Any) -> float:
+        if self.config.action_mode == "continuous":
+            return float(np.clip(np.asarray(action, dtype=float).reshape(-1)[0], -self.config.force_mag, self.config.force_mag))
+        bins = max(2, int(self.config.discrete_action_bins))
+        idx = int(np.clip(int(np.asarray(action).reshape(-1)[0]), 0, bins - 1))
+        if bins == 2:
+            return self.config.force_mag if idx == 1 else -self.config.force_mag
+        return float(np.linspace(-self.config.force_mag, self.config.force_mag, bins)[idx])
+
+    def _policy_terminal_force(self, observation: Any) -> tuple[float | None, dict[str, Any]]:
+        if self.policy_terminal_model is None:
+            return None, {"available": False, "reason": "no_model"}
+        action, _state = self.policy_terminal_model.predict(observation, deterministic=True)
+        force = self._force_from_policy_action(action)
+        return force, {
+            "available": True,
+            "model_path": self.config.policy_terminal_path,
+            "action": np.asarray(action).reshape(-1).tolist(),
+            "force": force,
+        }
 
     def _callbacks(self):
         return {
@@ -477,6 +517,16 @@ class ReConCartPoleController:
             mlp_info["base_force"] = base_force
             mlp_info["corrected_force"] = proposal.force
             self.last_mlp_terminal = mlp_info
+        if self._uses_policy_terminal() and regime == "stabilize_chain":
+            policy_force, policy_info = self._policy_terminal_force(env["observation"])
+            if policy_force is not None:
+                base_force = proposal.force
+                proposal.force = policy_force
+                proposal.confidence = max(proposal.confidence, 0.9)
+                proposal.reason = f"{proposal.reason}; policy_terminal"
+                policy_info["base_force"] = base_force
+                policy_info["proposal_force"] = proposal.force
+            self.last_policy_terminal = policy_info
         proposal.raw_confidence = proposal.confidence
         proposal.raw_urgency = proposal.urgency
         proposal = self._score_proposal(proposal, selected, env.get("modulators", self.last_modulators).c_explore_eff)

@@ -18,6 +18,7 @@ ControllerMode = Literal[
     "recon_learn_only",
     "recon_slow_no_gain_search",
     "recon_mlp_terminal",
+    "recon_policy_terminal",
 ]
 
 

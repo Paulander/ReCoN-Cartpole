@@ -32,6 +32,8 @@ The controller modes are:
 - `recon_slow`
 - `gain_search_only`
 - `gain_search_recon_fast_bandit`
+- `recon_mlp_terminal`
+- `recon_policy_terminal`
 
 Reports list active mechanisms separately: edge plasticity, bandit persistence, slow consolidation, and external gain mutation. Do not describe a gain-search-only improvement as "ReCoN learned" unless one of the ReCoN learning mechanisms was active on the held-out run.
 
@@ -44,6 +46,18 @@ uv run python scripts/run_comparison.py --n-values 2 3 4 --horizon 500 --eval-ep
 ```
 
 PPO uses optional dependencies. If `torch`/`stable-baselines3` are missing, the report keeps an explicit `ppo` row with `status: unavailable`. Install with `uv sync --extra rl` before making PPO performance claims.
+
+## Policy Terminal Training
+
+`recon_policy_terminal` lets a saved PPO policy emit the `stabilize_chain` terminal proposal while ReCoN still handles graph routing and arbitration. This is a learned neural terminal inside the ReCoN scaffold, not pure symbolic ReCoN.
+
+```bash
+uv sync --extra rl
+uv run python scripts/train_policy_terminal.py --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --reward-mode upright_shaping --timesteps 50000 --out reports/policy_terminal_n4
+uv run python scripts/train_policy_terminal.py --model-path reports/policy_terminal_n4/ppo_policy_terminal.zip --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --eval-episodes 300 --out reports/policy_terminal_n4_eval300
+```
+
+Reports compare pure PPO against the same policy routed through ReCoN and list the active mechanisms separately.
 
 ## Iterative ReCoN-Native Training
 
