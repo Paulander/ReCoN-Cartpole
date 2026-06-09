@@ -65,6 +65,13 @@ For model selection across train seeds:
 uv run python scripts/sweep_policy_terminals.py --train-seeds 550000 560000 570000 --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --timesteps 50000 --validation-episodes 100 --final-eval-episodes 300 --out reports/policy_terminal_n4_sweep
 ```
 
+For validation-aware continuation and a static-vs-terminal oracle bound:
+
+```bash
+uv run python scripts/train_policy_terminal_iterative.py --start-model-path reports/policy_terminal_n4/ppo_policy_terminal.zip --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --chunk-timesteps 25000 --chunks 4 --validation-episodes 100 --final-eval-episodes 300 --out reports/policy_terminal_n4_iterative
+uv run python scripts/analyze_policy_terminal_oracle.py --model-path reports/policy_terminal_n4/ppo_policy_terminal.zip --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --action-mode discrete --discrete-action-bins 5 --episodes 300 --out reports/policy_terminal_n4_oracle
+```
+
 ## Iterative ReCoN-Native Training
 
 Use `train_until_solved.py` for claim-disciplined training attempts that separate ReCoN-native learning from gain search:

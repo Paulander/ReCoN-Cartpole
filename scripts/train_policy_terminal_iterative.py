@@ -1,0 +1,262 @@
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import time
+from argparse import Namespace
+from pathlib import Path
+from typing import Any
+
+from train_policy_terminal import evaluate_model, evaluate_recon_terminal, make_env
+
+
+def solve_threshold(n_poles: int) -> dict[str, float]:
+    if n_poles == 3:
+        return {"mean_survival": 475.0, "p10_survival": 400.0, "success_rate": 0.80, "episodes": 300}
+    if n_poles == 4:
+        return {"mean_survival": 475.0, "p10_survival": 350.0, "success_rate": 0.70, "episodes": 300}
+    return {"mean_survival": 475.0, "p10_survival": 350.0, "success_rate": 0.80, "episodes": 300}
+
+
+def score(summary: dict[str, Any]) -> float:
+    return (
+        float(summary.get("mean_survival", 0.0))
+        + 0.25 * float(summary.get("p10_survival", 0.0))
+        + 50.0 * float(summary.get("success_rate", 0.0))
+    )
+
+
+def passes(summary: dict[str, Any], threshold: dict[str, float]) -> bool:
+    return (
+        int(summary.get("episodes", 0)) >= int(threshold["episodes"])
+        and float(summary.get("mean_survival", 0.0)) >= threshold["mean_survival"]
+        and float(summary.get("p10_survival", 0.0)) >= threshold["p10_survival"]
+        and float(summary.get("success_rate", 0.0)) >= threshold["success_rate"]
+    )
+
+
+def eval_args(args: argparse.Namespace, eval_seed_start: int, eval_episodes: int) -> Namespace:
+    return Namespace(
+        n_poles=args.n_poles,
+        horizon=args.horizon,
+        dt=args.dt,
+        dynamics_mode=args.dynamics_mode,
+        action_mode=args.action_mode,
+        discrete_action_bins=args.discrete_action_bins,
+        force_mag=args.force_mag,
+        initial_angle_range=args.initial_angle_range,
+        force_noise=args.force_noise,
+        link_coupling=args.link_coupling,
+        selection_mode=args.selection_mode,
+        policy_terminal_blend=args.policy_terminal_blend,
+        reward_mode=args.reward_mode,
+        eval_seed_start=eval_seed_start,
+        eval_episodes=eval_episodes,
+    )
+
+
+def validation_seeds(args: argparse.Namespace) -> list[int]:
+    return [args.validation_seed_start + idx for idx in range(args.validation_episodes)]
+
+
+def final_seeds(args: argparse.Namespace) -> list[int]:
+    return [args.final_seed_start + idx for idx in range(args.final_eval_episodes)]
+
+
+def record_checkpoint(
+    args: argparse.Namespace,
+    out: Path,
+    checkpoint_path: Path,
+    total_timesteps: int,
+    label: str,
+) -> dict[str, Any]:
+    v_args = eval_args(args, args.validation_seed_start, args.validation_episodes)
+    summary = evaluate_recon_terminal(checkpoint_path, v_args, validation_seeds(args))
+    row = {
+        "label": label,
+        "checkpoint": str(checkpoint_path),
+        "total_timesteps": total_timesteps,
+        "validation": summary,
+        "score": score(summary),
+    }
+    (out / "latest_validation.json").write_text(json.dumps(row, indent=2), encoding="utf-8")
+    return row
+
+
+def write_markdown(result: dict[str, Any], path: Path) -> None:
+    lines = [
+        "# Iterative Policy Terminal Training",
+        "",
+        f"Status: `{result.get('status', 'running')}`",
+        f"Reward mode: `{result.get('reward_mode', '')}`",
+        f"Selection mode: `{result.get('selection_mode', '')}`",
+        f"Policy terminal blend: `{result.get('policy_terminal_blend', '')}`",
+        "",
+        "| checkpoint | timesteps | score | mean | p10 | success |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for row in result.get("history", []):
+        val = row["validation"]
+        lines.append(
+            f"| {row['label']} | {row['total_timesteps']} | {row['score']:.1f} | {val['mean_survival']:.1f} | {val['p10_survival']:.1f} | {val['success_rate']:.2f} |"
+        )
+    best = result.get("best")
+    if best:
+        lines.extend(["", f"Best validation checkpoint: `{best['checkpoint']}`"])
+    final = result.get("final_eval")
+    if final:
+        recon = final["recon_policy_terminal_eval"]
+        ppo = final["pure_ppo_eval"]
+        lines.extend(
+            [
+                "",
+                "## Final Held-Out Eval",
+                "",
+                "| evaluator | mean | p10 | success | episodes |",
+                "|---|---:|---:|---:|---:|",
+                f"| pure_ppo | {ppo['mean_survival']:.1f} | {ppo['p10_survival']:.1f} | {ppo['success_rate']:.2f} | {ppo['episodes']} |",
+                f"| recon_policy_terminal | {recon['mean_survival']:.1f} | {recon['p10_survival']:.1f} | {recon['success_rate']:.2f} | {recon['episodes']} |",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Discipline",
+            "",
+            "This runner promotes checkpoints by ReCoN-routed validation survival. It is still a learned PPO terminal inside ReCoN, not pure symbolic ReCoN. N=4 is solved only if the final held-out block meets the configured threshold.",
+        ]
+    )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def save_summary(out: Path, result: dict[str, Any]) -> None:
+    (out / "summary.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    write_markdown(result, out / "summary.md")
+
+
+def run_iterative(args: argparse.Namespace) -> dict[str, Any]:
+    started = time.perf_counter()
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    threshold = solve_threshold(args.n_poles)
+    try:
+        from stable_baselines3 import PPO
+        from stable_baselines3.common.env_util import make_vec_env
+    except Exception as exc:  # pragma: no cover - optional dependency path
+        raise RuntimeError("Install RL extras with `uv sync --extra rl` to train policy terminals") from exc
+
+    train_env = make_vec_env(lambda: make_env(args, reward_mode=args.reward_mode), n_envs=args.n_envs, seed=args.train_seed)
+    history: list[dict[str, Any]] = []
+    best: dict[str, Any] | None = None
+    best_score = float("-inf")
+    total_timesteps = 0
+
+    if args.start_model_path:
+        model = PPO.load(str(args.start_model_path), env=train_env, device=args.device)
+        model.set_random_seed(args.train_seed)
+        start_path = out / "checkpoint_000000_start.zip"
+        shutil.copy2(args.start_model_path, start_path)
+        row = record_checkpoint(args, out, start_path, total_timesteps, "start")
+        history.append(row)
+        best = row
+        best_score = float(row["score"])
+    else:
+        model = PPO(args.policy, train_env, seed=args.train_seed, verbose=args.verbose, device=args.device)
+
+    result: dict[str, Any] = {
+        "status": "running",
+        "threshold": threshold,
+        "reward_mode": args.reward_mode,
+        "selection_mode": args.selection_mode,
+        "policy_terminal_blend": args.policy_terminal_blend,
+        "chunk_timesteps": args.chunk_timesteps,
+        "chunks": args.chunks,
+        "validation_episodes": args.validation_episodes,
+        "final_eval_episodes": args.final_eval_episodes,
+        "history": history,
+        "best": best,
+    }
+    save_summary(out, result)
+
+    for chunk in range(1, args.chunks + 1):
+        model.learn(total_timesteps=args.chunk_timesteps, reset_num_timesteps=(chunk == 1 and not args.start_model_path))
+        total_timesteps += args.chunk_timesteps
+        checkpoint = out / f"checkpoint_{total_timesteps:06d}.zip"
+        model.save(str(checkpoint))
+        row = record_checkpoint(args, out, checkpoint, total_timesteps, f"chunk_{chunk}")
+        history.append(row)
+        if row["score"] > best_score:
+            best_score = float(row["score"])
+            best = row
+            shutil.copy2(checkpoint, out / "best_policy_terminal.zip")
+        result.update({"history": history, "best": best})
+        save_summary(out, result)
+
+    final_eval = None
+    if best is not None and args.final_eval_episodes > 0:
+        best_path = Path(best["checkpoint"])
+        final_args = eval_args(args, args.final_seed_start, args.final_eval_episodes)
+        model = PPO.load(str(best_path), device=args.device)
+        seeds = final_seeds(args)
+        final_eval = {
+            "checkpoint": str(best_path),
+            "pure_ppo_eval": evaluate_model(model, final_args, seeds),
+            "recon_policy_terminal_eval": evaluate_recon_terminal(
+                best_path,
+                final_args,
+                seeds,
+                trace_seed=args.final_seed_start + 999_999,
+                out_dir=out,
+            ),
+        }
+
+    final_recon = final_eval["recon_policy_terminal_eval"] if final_eval else None
+    result.update(
+        {
+            "status": "solved" if final_recon and passes(final_recon, threshold) else "completed_not_solved",
+            "history": history,
+            "best": best,
+            "final_eval": final_eval,
+            "wall_clock_seconds": time.perf_counter() - started,
+        }
+    )
+    save_summary(out, result)
+    return result
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--start-model-path", default="")
+    parser.add_argument("--n-poles", type=int, default=4)
+    parser.add_argument("--horizon", type=int, default=500)
+    parser.add_argument("--dt", type=float, default=0.02)
+    parser.add_argument("--dynamics-mode", choices=["parallel", "serial_lagrange"], default="parallel")
+    parser.add_argument("--action-mode", choices=["discrete", "continuous"], default="discrete")
+    parser.add_argument("--discrete-action-bins", type=int, default=5)
+    parser.add_argument("--force-mag", type=float, default=10.0)
+    parser.add_argument("--initial-angle-range", type=float, default=0.05)
+    parser.add_argument("--force-noise", type=float, default=0.02)
+    parser.add_argument("--link-coupling", type=float, default=12.0)
+    parser.add_argument("--chunk-timesteps", type=int, default=25_000)
+    parser.add_argument("--chunks", type=int, default=4)
+    parser.add_argument("--train-seed", type=int, default=610_000)
+    parser.add_argument("--validation-seed-start", type=int, default=970_000)
+    parser.add_argument("--validation-episodes", type=int, default=100)
+    parser.add_argument("--final-seed-start", type=int, default=980_000)
+    parser.add_argument("--final-eval-episodes", type=int, default=300)
+    parser.add_argument("--n-envs", type=int, default=16)
+    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--policy", default="MlpPolicy")
+    parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping")
+    parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
+    parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument("--verbose", type=int, default=0)
+    parser.add_argument("--out", default="reports/policy_terminal_iterative")
+    args = parser.parse_args()
+    result = run_iterative(args)
+    print(json.dumps({"out": args.out, "status": result["status"], "wall_clock_seconds": result["wall_clock_seconds"]}, indent=2))
+
+
+if __name__ == "__main__":
+    main()
