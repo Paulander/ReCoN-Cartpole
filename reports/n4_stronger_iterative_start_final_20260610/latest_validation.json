@@ -1,0 +1,20 @@
+{
+  "label": "start",
+  "checkpoint": "reports/n4_stronger_iterative_start_final_20260610/checkpoint_000000_start.zip",
+  "total_timesteps": 0,
+  "validation": {
+    "mean_survival": 486.7416666666667,
+    "p10_survival": 446.0,
+    "success_rate": 0.7208333333333333,
+    "max_survival": 500.0,
+    "returns_mean": 486.4625,
+    "episodes": 240
+  },
+  "score": 707.7166666666667,
+  "validation_seed_starts": [
+    950000,
+    960000,
+    970000
+  ],
+  "validation_seed_count": 240
+}

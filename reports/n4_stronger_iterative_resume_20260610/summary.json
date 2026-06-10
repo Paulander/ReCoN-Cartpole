@@ -1,0 +1,136 @@
+{
+  "status": "running",
+  "threshold": {
+    "mean_survival": 475.0,
+    "p10_survival": 350.0,
+    "success_rate": 0.7,
+    "episodes": 300
+  },
+  "reward_mode": "upright_shaping",
+  "selection_mode": "hard_select",
+  "policy_terminal_blend": 1.0,
+  "policy_terminal_scope": "stabilize_chain",
+  "frame_stack": 1,
+  "policy_observation_mode": "normalized_raw",
+  "success_bonus": 25.0,
+  "failure_penalty": 2.0,
+  "ppo_config": {
+    "policy": "MlpPolicy",
+    "net_arch": "64,64",
+    "activation": "tanh",
+    "learning_rate": 5e-06,
+    "n_steps": 1024,
+    "batch_size": 256,
+    "n_epochs": 2,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip_range": 0.03,
+    "ent_coef": 0.0,
+    "vf_coef": 0.5,
+    "max_grad_norm": 0.5,
+    "frame_stack": 1,
+    "policy_observation_mode": "normalized_raw",
+    "success_bonus": 25.0,
+    "failure_penalty": 2.0,
+    "vec_env": "subproc"
+  },
+  "chunk_timesteps": 25000,
+  "chunks": 6,
+  "hard_train_seed_count": 600,
+  "hard_train_seed_probability": 0.6,
+  "validation_seed_starts": [
+    950000,
+    960000,
+    970000
+  ],
+  "validation_episodes": 80,
+  "validation_seed_count": 240,
+  "final_eval_episodes": 300,
+  "score_weights": {
+    "mean_survival": 1.0,
+    "p10_survival": 0.35,
+    "success_rate": 90.0
+  },
+  "history": [
+    {
+      "label": "start",
+      "checkpoint": "reports/n4_stronger_iterative_resume_20260610/checkpoint_000000_start.zip",
+      "total_timesteps": 0,
+      "validation": {
+        "mean_survival": 486.7416666666667,
+        "p10_survival": 446.0,
+        "success_rate": 0.7208333333333333,
+        "max_survival": 500.0,
+        "returns_mean": 486.4625,
+        "episodes": 240
+      },
+      "score": 707.7166666666667,
+      "validation_seed_starts": [
+        950000,
+        960000,
+        970000
+      ],
+      "validation_seed_count": 240
+    },
+    {
+      "label": "chunk_1",
+      "checkpoint": "reports/n4_stronger_iterative_resume_20260610/checkpoint_025000.zip",
+      "total_timesteps": 25000,
+      "validation": {
+        "mean_survival": 485.77916666666664,
+        "p10_survival": 443.9,
+        "success_rate": 0.7,
+        "max_survival": 500.0,
+        "returns_mean": 485.4791666666667,
+        "episodes": 240
+      },
+      "score": 704.1441666666666,
+      "validation_seed_starts": [
+        950000,
+        960000,
+        970000
+      ],
+      "validation_seed_count": 240
+    },
+    {
+      "label": "chunk_2",
+      "checkpoint": "reports/n4_stronger_iterative_resume_20260610/checkpoint_050000.zip",
+      "total_timesteps": 50000,
+      "validation": {
+        "mean_survival": 483.81666666666666,
+        "p10_survival": 438.5,
+        "success_rate": 0.7,
+        "max_survival": 500.0,
+        "returns_mean": 483.51666666666665,
+        "episodes": 240
+      },
+      "score": 700.2916666666666,
+      "validation_seed_starts": [
+        950000,
+        960000,
+        970000
+      ],
+      "validation_seed_count": 240
+    }
+  ],
+  "best": {
+    "label": "start",
+    "checkpoint": "reports/n4_stronger_iterative_resume_20260610/checkpoint_000000_start.zip",
+    "total_timesteps": 0,
+    "validation": {
+      "mean_survival": 486.7416666666667,
+      "p10_survival": 446.0,
+      "success_rate": 0.7208333333333333,
+      "max_survival": 500.0,
+      "returns_mean": 486.4625,
+      "episodes": 240
+    },
+    "score": 707.7166666666667,
+    "validation_seed_starts": [
+      950000,
+      960000,
+      970000
+    ],
+    "validation_seed_count": 240
+  }
+}

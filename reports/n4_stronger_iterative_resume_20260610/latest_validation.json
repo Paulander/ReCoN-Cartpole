@@ -1,0 +1,20 @@
+{
+  "label": "chunk_2",
+  "checkpoint": "reports/n4_stronger_iterative_resume_20260610/checkpoint_050000.zip",
+  "total_timesteps": 50000,
+  "validation": {
+    "mean_survival": 483.81666666666666,
+    "p10_survival": 438.5,
+    "success_rate": 0.7,
+    "max_survival": 500.0,
+    "returns_mean": 483.51666666666665,
+    "episodes": 240
+  },
+  "score": 700.2916666666666,
+  "validation_seed_starts": [
+    950000,
+    960000,
+    970000
+  ],
+  "validation_seed_count": 240
+}
