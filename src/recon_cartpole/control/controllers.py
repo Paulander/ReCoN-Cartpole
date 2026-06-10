@@ -20,6 +20,7 @@ ControllerMode = Literal[
     "recon_mlp_terminal",
     "recon_policy_terminal",
     "recon_mingru_terminal",
+    "recon_mingru_terminal_plus_recon_learning",
 ]
 
 

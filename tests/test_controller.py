@@ -328,6 +328,28 @@ def test_recon_mingru_terminal_scope_all_caches_one_prediction_and_resets():
     assert fake.reset_calls == 1
 
 
+def test_recon_mingru_plus_learning_enables_recon_learning_mechanisms():
+    controller = _controller_with_fake_mingru(
+        RunnerConfig(
+            n_poles=1,
+            mode="static_recon",
+            discrete_action_bins=5,
+            learn=True,
+            reset_bandit_each_episode=False,
+            mingru_terminal=MinGRUTerminalConfig(enabled=True),
+        )
+    )
+    controller.config.mode = "recon_mingru_terminal_plus_recon_learning"
+
+    mechanisms = controller.learning_mechanisms()
+
+    assert mechanisms["minGRU_terminal"] is True
+    assert mechanisms["edge_plasticity"] is True
+    assert mechanisms["bandit_persistence"] is True
+    assert mechanisms["slow_consolidation"] is True
+    assert mechanisms["node_param_learning"] is False
+
+
 def test_recon_policy_terminal_can_drive_stabilize_chain_proposal():
     class FakePolicy:
         def predict(self, observation, deterministic=True):

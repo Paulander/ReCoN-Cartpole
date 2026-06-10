@@ -143,6 +143,7 @@ class ReConCartPoleController:
             "recon_learn_only",
             "recon_slow_no_gain_search",
             "recon_mlp_terminal",
+            "recon_mingru_terminal_plus_recon_learning",
         )
 
     def _uses_bandit(self) -> bool:
@@ -154,6 +155,7 @@ class ReConCartPoleController:
             "recon_learn_only",
             "recon_slow_no_gain_search",
             "recon_mlp_terminal",
+            "recon_mingru_terminal_plus_recon_learning",
         )
 
     def _uses_slow_consolidation(self) -> bool:
@@ -162,6 +164,7 @@ class ReConCartPoleController:
             "recon_learn_only",
             "recon_slow_no_gain_search",
             "recon_mlp_terminal",
+            "recon_mingru_terminal_plus_recon_learning",
         )
 
     def _uses_node_params(self) -> bool:
@@ -178,7 +181,10 @@ class ReConCartPoleController:
         return self.config.mode == "recon_policy_terminal"
 
     def _uses_mingru_terminal(self) -> bool:
-        return self.config.mode == "recon_mingru_terminal"
+        return self.config.mode in (
+            "recon_mingru_terminal",
+            "recon_mingru_terminal_plus_recon_learning",
+        )
 
     def learning_mechanisms(self) -> dict[str, bool]:
         return {

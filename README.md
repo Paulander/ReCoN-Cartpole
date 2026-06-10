@@ -38,6 +38,7 @@ The controller modes are:
 - `recon_mlp_terminal`
 - `recon_policy_terminal`
 - `recon_mingru_terminal`
+- `recon_mingru_terminal_plus_recon_learning`
 
 Reports list active mechanisms separately: edge plasticity, bandit persistence, slow consolidation, and external gain mutation. Do not describe a gain-search-only improvement as "ReCoN learned" unless one of the ReCoN learning mechanisms was active on the held-out run.
 
