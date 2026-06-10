@@ -12,6 +12,8 @@ The first milestone is intentionally honest:
 - Replay traces can be exported as JSON and rendered as standalone HTML.
 - `recon_slow` enables slow consolidation; other modes keep it disabled.
 
+- Current project state and best N=4 metrics: [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)
+
 ## Quick Start
 
 ```bash
