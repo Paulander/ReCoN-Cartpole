@@ -29,6 +29,7 @@ class StepTrace:
     node_param_deltas: dict[str, float] = field(default_factory=dict)
     mlp_terminal: dict[str, Any] = field(default_factory=dict)
     policy_terminal: dict[str, Any] = field(default_factory=dict)
+    mingru_terminal: dict[str, Any] = field(default_factory=dict)
     bandit: dict[str, Any] = field(default_factory=dict)
     consolidation: dict[str, Any] = field(default_factory=dict)
     graph_nodes: dict[str, str] = field(default_factory=dict)

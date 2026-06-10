@@ -37,6 +37,7 @@ The controller modes are:
 - `gain_search_recon_fast_bandit`
 - `recon_mlp_terminal`
 - `recon_policy_terminal`
+- `recon_mingru_terminal`
 
 Reports list active mechanisms separately: edge plasticity, bandit persistence, slow consolidation, and external gain mutation. Do not describe a gain-search-only improvement as "ReCoN learned" unless one of the ReCoN learning mechanisms was active on the held-out run.
 
@@ -63,6 +64,21 @@ uv run python scripts/train_policy_terminal.py --model-path reports/policy_termi
 The PPO terminal trainer exposes policy/network and optimizer knobs (`--net-arch`, `--activation`, `--learning-rate`, `--n-steps`, `--batch-size`, `--gamma`, `--gae-lambda`, `--ent-coef`, and related PPO settings) so terminal learning experiments can be reproduced without editing code. Use `--frame-stack N` to train/evaluate a PPO terminal on concatenated recent observations; ReCoN replay traces then show the terminal frame stack and observation size used per tick. Use `--policy-terminal-scope {stabilize_chain,selected,all}` to ablate where the learned terminal is allowed to blend into ReCoN proposals. Use `--vec-env subproc` for longer PPO runs on machines where subprocess vector environments are supported.
 
 Reports compare pure PPO against the same policy routed through ReCoN and list the active mechanisms separately.
+
+## Recurrent minGRU Terminal
+
+`recon_mingru_terminal` lets a compact recurrent terminal emit a `ForceProposal` inside the same ReCoN scoring path. ReCoN still selects regimes, applies learned SUB edge weights, soft/hard selection, and arbitration. Trace rows include the terminal force, confidence, value estimate, failure probability, hidden norm, applied regime, proposal force, and active edge-weighted proposal score.
+
+Build an imitation dataset from a teacher, train a supervised recurrent terminal, then run the fail-fast ladder that compares pure minGRU control against the same checkpoint routed through ReCoN on identical seeds:
+
+```bash
+uv sync --extra rl
+uv run python scripts/build_policy_dataset.py --teacher recon_policy_terminal --policy-terminal-path reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --discrete-action-bins 5 --episodes 200 --out reports/mingru_dataset_n4/dataset.npz
+uv run python scripts/train_mingru_supervised.py --dataset reports/mingru_dataset_n4/dataset.npz --n-poles 4 --horizon 500 --hidden-size 64 --sequence-length 8 --out reports/mingru_supervised_n4
+uv run python scripts/train_recurrent_terminal_ladder.py --checkpoints reports/mingru_supervised_n4/mingru_terminal.pt --n-poles 4 --dynamics-mode serial_lagrange --dt 0.0005 --discrete-action-bins 5 --validation-episodes 300 --out reports/recurrent_terminal_ladder_n4
+```
+
+The ladder does not make solved claims. It reports active mechanisms and separates terminal imitation, pure recurrent policy performance, and ReCoN-routed recurrent terminal performance. Final N=4/N=5 claims still require held-out thresholds from `docs/RECURRENT_TERMINAL_STRATEGY.md`.
 
 For model selection across train seeds:
 

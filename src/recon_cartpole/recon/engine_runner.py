@@ -42,6 +42,7 @@ from recon_cartpole.control.sensors import StateFeatures, features_from_state
 
 from .fired_edges import fired_edges_from_requests
 from .graph_factory import GraphConfig, build_cartpole_graph, trainable_edge_whitelist
+from .mingru_terminal import MinGRUPrediction, MinGRUTerminal, MinGRUTerminalConfig
 from .mlp_terminal import MlpTerminalConfig, MlpTerminalState
 from .node_params import (
     NodeParamConfig,
@@ -78,6 +79,7 @@ class RunnerConfig:
     policy_terminal_frame_stack: int = 1
     policy_terminal_scope: str = "stabilize_chain"
     policy_terminal_observation_mode: str = "env"
+    mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
 
 
 class ReConCartPoleController:
@@ -103,6 +105,17 @@ class ReConCartPoleController:
         )
         self.mlp_rng = np.random.default_rng(1009 + self.config.n_poles)
         self.last_mlp_terminal: dict[str, Any] = {}
+        self.mingru_terminal: MinGRUTerminal | None = None
+        self.last_mingru_terminal: dict[str, Any] = {}
+        if self._uses_mingru_terminal() and not self.config.mingru_terminal.enabled:
+            self.config.mingru_terminal.enabled = True
+        if self._uses_mingru_terminal():
+            self.mingru_terminal = MinGRUTerminal(
+                self.config.n_poles,
+                self.config.force_mag,
+                self.config.discrete_action_bins,
+                self.config.mingru_terminal,
+            )
         self.policy_terminal_model: Any | None = None
         self.policy_terminal_obs_history: list[np.ndarray] = []
         self.last_policy_terminal: dict[str, Any] = {}
@@ -164,6 +177,9 @@ class ReConCartPoleController:
     def _uses_policy_terminal(self) -> bool:
         return self.config.mode == "recon_policy_terminal"
 
+    def _uses_mingru_terminal(self) -> bool:
+        return self.config.mode == "recon_mingru_terminal"
+
     def learning_mechanisms(self) -> dict[str, bool]:
         return {
             "edge_plasticity": self._uses_fast_plasticity(),
@@ -172,6 +188,7 @@ class ReConCartPoleController:
             "node_param_learning": self._uses_node_params(),
             "mlp_terminal": self._uses_mlp_terminal(),
             "policy_terminal": self._uses_policy_terminal(),
+            "minGRU_terminal": self._uses_mingru_terminal(),
             "gain_mutation": self.config.mode
             in ("gain_search_only", "gain_search_recon_fast_bandit"),
         }
@@ -192,6 +209,9 @@ class ReConCartPoleController:
         )
         self.policy_terminal_obs_history = []
         self.last_policy_terminal = {}
+        self.last_mingru_terminal = {}
+        if self.mingru_terminal is not None:
+            self.mingru_terminal.reset()
 
     def observe_reward(self, reward: float) -> None:
         if not self.config.learn:
@@ -304,6 +324,7 @@ class ReConCartPoleController:
             "consolidation_applied": dict(self.last_consolidation_applied),
             "mlp_terminal": dict(self.last_mlp_terminal),
             "policy_terminal": dict(self.last_policy_terminal),
+            "mingru_terminal": dict(self.last_mingru_terminal),
             "bandit": snapshot_bandit(self.bandit_state),
             "graph_nodes": {nid: node.state.name for nid, node in self.graph.nodes.items()},
             "graph_ticks": graph_ticks,
@@ -402,6 +423,7 @@ class ReConCartPoleController:
                 "policy_terminal_frame_stack": self.config.policy_terminal_frame_stack,
                 "policy_terminal_scope": self.config.policy_terminal_scope,
                 "policy_terminal_observation_mode": self.config.policy_terminal_observation_mode,
+                "mingru_terminal_config": self.config.mingru_terminal.__dict__,
             },
             "edge_weights": {
                 f"{edge.src}->{edge.dst}:{edge.ltype.name}": self.edge_weight(
@@ -538,6 +560,49 @@ class ReConCartPoleController:
         if context is not None:
             context["_policy_terminal_cache"] = {"force": force, "info": dict(info)}
         return force, info
+
+    def _mingru_terminal_applies(self, regime: str, selected: str | None) -> bool:
+        scope = self.config.mingru_terminal.scope
+        if scope == "all":
+            return True
+        if scope == "selected":
+            return regime == selected
+        return regime == "stabilize_chain"
+
+    def _mingru_terminal_force(
+        self, observation: Any, raw_state: Any | None = None, context: dict[str, Any] | None = None
+    ) -> tuple[MinGRUPrediction, dict[str, Any]]:
+        if self.mingru_terminal is None:
+            pred = MinGRUPrediction(None, 0.0, 0.0, 0.0, 0.0, 0, valid=False, reason="no_model")
+            return pred, {"available": False, "reason": "no_model"}
+        if context is not None and "_mingru_terminal_cache" in context:
+            cached = context["_mingru_terminal_cache"]
+            return cached["prediction"], dict(cached["info"])
+        try:
+            prediction = self.mingru_terminal.predict(observation, raw_state, context)
+        except Exception as exc:  # pragma: no cover - defensive optional model path
+            prediction = MinGRUPrediction(None, 0.0, 0.0, 1.0, 0.0, 0, valid=False, reason=type(exc).__name__)
+        info = {
+            "available": bool(prediction.valid and prediction.force is not None),
+            "model_path": self.config.mingru_terminal.checkpoint_path,
+            "checkpoint_path": self.config.mingru_terminal.checkpoint_path,
+            "loaded_checkpoint": getattr(self.mingru_terminal, "loaded_checkpoint", ""),
+            "scope": self.config.mingru_terminal.scope,
+            "observation_mode": self.config.mingru_terminal.observation_mode,
+            "sequence_length": int(prediction.sequence_length),
+            "configured_sequence_length": max(1, int(self.config.mingru_terminal.sequence_length)),
+            "force": prediction.force,
+            "confidence": float(prediction.confidence),
+            "value": float(prediction.value),
+            "failure_probability": float(prediction.failure_probability),
+            "hidden_norm": float(prediction.hidden_norm),
+            "logits": list(prediction.logits),
+            "valid": bool(prediction.valid),
+            "reason": prediction.reason,
+        }
+        if context is not None:
+            context["_mingru_terminal_cache"] = {"prediction": prediction, "info": dict(info)}
+        return prediction, info
 
     def _callbacks(self):
         return {
@@ -699,6 +764,38 @@ class ReConCartPoleController:
                 )
                 env["_policy_terminal_applied_regimes"] = policy_info["applied_regimes"]
             self.last_policy_terminal = policy_info
+        if self._uses_mingru_terminal() and self._mingru_terminal_applies(regime, selected):
+            prediction, mingru_info = self._mingru_terminal_force(
+                env["observation"], env.get("raw_state"), env
+            )
+            base_force = proposal.force
+            confidence = max(0.0, min(1.0, float(prediction.confidence)))
+            blend = max(0.0, min(1.0, self.config.mingru_terminal.blend))
+            confidence_floor = max(0.0, min(1.0, self.config.mingru_terminal.confidence_floor))
+            applied = bool(prediction.valid and prediction.force is not None and confidence >= confidence_floor)
+            if applied:
+                terminal_force = float(prediction.force)
+                proposal.force = float(
+                    np.clip(
+                        base_force + blend * (terminal_force - base_force),
+                        -self.config.force_mag,
+                        self.config.force_mag,
+                    )
+                )
+                proposal.reason = f"{proposal.reason}; mingru_terminal"
+            proposal.confidence = max(0.0, proposal.confidence * max(confidence, confidence_floor))
+            mingru_info["blend"] = blend
+            mingru_info["base_force"] = base_force
+            mingru_info["terminal_force"] = prediction.force
+            mingru_info["proposal_force"] = proposal.force
+            mingru_info["confidence_floor"] = confidence_floor
+            mingru_info["applied"] = applied
+            mingru_info["applied_regime"] = regime
+            mingru_info["applied_regimes"] = sorted(
+                set(env.setdefault("_mingru_terminal_applied_regimes", []) + [regime])
+            )
+            env["_mingru_terminal_applied_regimes"] = mingru_info["applied_regimes"]
+            self.last_mingru_terminal = mingru_info
         proposal.raw_confidence = proposal.confidence
         proposal.raw_urgency = proposal.urgency
         proposal = self._score_proposal(

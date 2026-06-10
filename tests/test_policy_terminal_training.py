@@ -164,3 +164,23 @@ def test_iterative_training_env_enables_hard_seed_wrapper(monkeypatch):
     assert iterative_trainer.make_training_env(args) == "env"
     assert calls == {"reward_mode": "upright_shaping", "use_hard_seeds": True}
 
+
+
+def _load_script(name: str):
+    path = Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py"
+    spec = spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_recurrent_terminal_scripts_import_and_hash_configs():
+    dataset_builder = _load_script("build_policy_dataset")
+    supervised = _load_script("train_mingru_supervised")
+    ladder = _load_script("train_recurrent_terminal_ladder")
+
+    assert callable(dataset_builder.collect)
+    assert callable(supervised.train)
+    assert ladder.config_hash({"a": 1}) == ladder.config_hash({"a": 1})
+    assert ladder.config_hash({"a": 1}) != ladder.config_hash({"a": 2})

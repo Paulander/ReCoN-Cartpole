@@ -5,6 +5,7 @@ from recon_lite.plasticity import ConsolidationConfig, assign_reward
 
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
+from recon_cartpole.recon.mingru_terminal import MinGRUPrediction, MinGRUTerminalConfig
 from recon_cartpole.training.evaluate import rollout
 
 
@@ -200,6 +201,131 @@ def test_recon_mlp_terminal_affects_chain_proposal_and_updates():
     update = result["episode_learning"]["applied"]["mlp_terminal"]
     assert "update_norm" in update
     assert any(step.get("mlp_terminal") for step in result["trace"])
+
+
+class FakeMinGRUTerminal:
+    def __init__(self, force=10.0, confidence=1.0):
+        self.force = force
+        self.confidence = confidence
+        self.calls = 0
+        self.reset_calls = 0
+        self.loaded_checkpoint = "fake.pt"
+
+    def predict(self, observation, raw_state, context=None):
+        self.calls += 1
+        return MinGRUPrediction(
+            force=self.force,
+            confidence=self.confidence,
+            value=0.25,
+            failure_probability=0.1,
+            hidden_norm=1.5,
+            sequence_length=4,
+            logits=[-1.0, 0.0, 1.0],
+        )
+
+    def reset(self):
+        self.reset_calls += 1
+
+
+def _controller_with_fake_mingru(config):
+    controller = ReConCartPoleController(config)
+    controller.config.mode = "recon_mingru_terminal"
+    controller.config.mingru_terminal.enabled = True
+    controller.mingru_terminal = FakeMinGRUTerminal()
+    return controller
+
+
+def test_recon_mingru_terminal_can_drive_stabilize_chain_proposal():
+    raw = [0.0, 0.0, 0.01, 0.04, 0.12, -0.03, 0.0, 0.0, 0.0, 0.0]
+    controller = _controller_with_fake_mingru(
+        RunnerConfig(
+            n_poles=4,
+            mode="static_recon",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            mingru_terminal=MinGRUTerminalConfig(
+                enabled=True,
+                scope="stabilize_chain",
+                blend=1.0,
+                confidence_floor=0.05,
+            ),
+        )
+    )
+
+    action, diagnostics = controller.act(raw, raw)
+
+    assert diagnostics["selected_regime"] == "stabilize_chain"
+    assert diagnostics["proposal"]["source_node"] == "stabilize_chain"
+    assert "mingru_terminal" in diagnostics["proposal"]["reason"]
+    assert diagnostics["force"] == controller.config.force_mag
+    assert action == 4
+    assert diagnostics["mingru_terminal"]["available"] is True
+    assert diagnostics["mingru_terminal"]["applied"] is True
+    assert diagnostics["mingru_terminal"]["hidden_norm"] == 1.5
+
+
+def test_recon_mingru_terminal_low_confidence_is_traced_and_downweighted():
+    raw = [0.0, 0.0, 0.01, 0.04, 0.12, -0.03, 0.0, 0.0, 0.0, 0.0]
+    controller = _controller_with_fake_mingru(
+        RunnerConfig(
+            n_poles=4,
+            mode="static_recon",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            mingru_terminal=MinGRUTerminalConfig(
+                enabled=True,
+                scope="stabilize_chain",
+                blend=1.0,
+                confidence_floor=0.5,
+            ),
+        )
+    )
+    controller.mingru_terminal = FakeMinGRUTerminal(force=10.0, confidence=0.1)
+
+    _action, diagnostics = controller.act(raw, raw)
+    chain = diagnostics["proposal"]
+
+    assert "mingru_terminal" not in chain["reason"]
+    assert diagnostics["mingru_terminal"]["applied"] is False
+    assert chain["raw_confidence"] < 0.65
+    assert diagnostics["mingru_terminal"]["confidence"] == 0.1
+
+
+def test_recon_mingru_terminal_scope_all_caches_one_prediction_and_resets():
+    raw = [0.0, 0.0, 0.02, 0.0]
+    controller = _controller_with_fake_mingru(
+        RunnerConfig(
+            n_poles=1,
+            mode="static_recon",
+            discrete_action_bins=5,
+            selection_mode="soft_select",
+            learn=False,
+            mingru_terminal=MinGRUTerminalConfig(enabled=True, scope="all"),
+        )
+    )
+    fake = FakeMinGRUTerminal(force=10.0, confidence=1.0)
+    controller.mingru_terminal = fake
+
+    _, diagnostics = controller.act(raw, raw)
+
+    assert fake.calls == 1
+    applied = {
+        item["source_node"] for item in diagnostics["proposals"] if "mingru_terminal" in item["reason"]
+    }
+    assert applied == {
+        "avoid_rail",
+        "damp_energy",
+        "recover_worst_pole",
+        "recover_base_pole",
+        "stabilize_chain",
+        "center_cart",
+    }
+    assert set(diagnostics["mingru_terminal"]["applied_regimes"]) == applied
+
+    controller.start_episode()
+    assert fake.reset_calls == 1
 
 
 def test_recon_policy_terminal_can_drive_stabilize_chain_proposal():
