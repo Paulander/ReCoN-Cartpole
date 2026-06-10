@@ -1,0 +1,5 @@
+candidate,episodes,mean_survival,median_survival,p10_survival,success_at_500,max_survival,fail_to_success,success_to_fail,net_success_change,changed_count,dominant_failure,model_path
+recon_feedforward_terminal_finetuned,300,483.27,500.0,432.9,0.67,500.0,1,0,1,9,pole_1_angle,reports/n4_pole1_policy_finetune_20260610_220858_lr1e5_5k/finetune_training/ppo_policy_terminal.zip
+baseline_best_frozen,300,483.2366666666667,500.0,432.9,0.6666666666666666,500.0,0,0,0,0,pole_1_angle,reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip
+recon_feedforward_terminal_finetuned_25k_rejected,300,481.2866666666667,500.0,425.9,0.6466666666666666,500.0,0,6,-6,23,pole_1_angle,reports/n4_pole1_policy_finetune_20260610_220858/finetune_training/ppo_policy_terminal.zip
+recon_mingru_terminal_frozen_reference,300,459.1566666666667,483.5,379.9,0.44333333333333336,500.0,,,,,pole_1_angle,reports/n4_autonomous_recurrent_20260610_160353/candidate_logs/b0021ba0d0bb/supervised/mingru_terminal.pt

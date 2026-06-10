@@ -1,0 +1,14 @@
+{
+  "dataset_path": "reports/n4_pole1_policy_finetune_20260610_220858_lr1e5_5k/pole1_failure_dataset.npz",
+  "samples": 15000,
+  "failure_seed_count": 60,
+  "success_seed_count": 60,
+  "source_counts": {
+    "fixed_benchmark_failure": 9000,
+    "fixed_benchmark_success_match": 6000
+  },
+  "failure_within_25": 1500,
+  "failure_within_50": 3000,
+  "failure_within_100": 6000,
+  "failure_within_150": 9000
+}

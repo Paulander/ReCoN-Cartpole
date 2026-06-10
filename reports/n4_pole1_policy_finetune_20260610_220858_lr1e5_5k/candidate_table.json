@@ -1,0 +1,62 @@
+[
+  {
+    "candidate": "recon_feedforward_terminal_finetuned",
+    "episodes": 300,
+    "mean_survival": 483.27,
+    "median_survival": 500.0,
+    "p10_survival": 432.9,
+    "success_at_500": 0.67,
+    "max_survival": 500.0,
+    "fail_to_success": 1,
+    "success_to_fail": 0,
+    "net_success_change": 1,
+    "changed_count": 9,
+    "dominant_failure": "pole_1_angle",
+    "model_path": "reports/n4_pole1_policy_finetune_20260610_220858_lr1e5_5k/finetune_training/ppo_policy_terminal.zip"
+  },
+  {
+    "candidate": "baseline_best_frozen",
+    "episodes": 300,
+    "mean_survival": 483.2366666666667,
+    "median_survival": 500.0,
+    "p10_survival": 432.9,
+    "success_at_500": 0.6666666666666666,
+    "max_survival": 500.0,
+    "fail_to_success": 0,
+    "success_to_fail": 0,
+    "net_success_change": 0,
+    "changed_count": 0,
+    "dominant_failure": "pole_1_angle",
+    "model_path": "reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip"
+  },
+  {
+    "candidate": "recon_feedforward_terminal_finetuned_25k_rejected",
+    "episodes": 300,
+    "mean_survival": 481.2866666666667,
+    "median_survival": 500.0,
+    "p10_survival": 425.9,
+    "success_at_500": 0.6466666666666666,
+    "max_survival": 500.0,
+    "fail_to_success": 0,
+    "success_to_fail": 6,
+    "net_success_change": -6,
+    "changed_count": 23,
+    "dominant_failure": "pole_1_angle",
+    "model_path": "reports/n4_pole1_policy_finetune_20260610_220858/finetune_training/ppo_policy_terminal.zip"
+  },
+  {
+    "candidate": "recon_mingru_terminal_frozen_reference",
+    "episodes": 300,
+    "mean_survival": 459.1566666666667,
+    "median_survival": 483.5,
+    "p10_survival": 379.9,
+    "success_at_500": 0.44333333333333336,
+    "max_survival": 500.0,
+    "fail_to_success": "",
+    "success_to_fail": "",
+    "net_success_change": "",
+    "changed_count": "",
+    "dominant_failure": "pole_1_angle",
+    "model_path": "reports/n4_autonomous_recurrent_20260610_160353/candidate_logs/b0021ba0d0bb/supervised/mingru_terminal.pt"
+  }
+]
