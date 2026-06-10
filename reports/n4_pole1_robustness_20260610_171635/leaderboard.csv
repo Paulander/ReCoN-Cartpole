@@ -1,0 +1,8 @@
+mode,mean_survival,median_survival,p10_survival,p90_survival,success_at_500,max_survival,eval_episodes,train_env_steps,checkpoint_path
+recon_feedforward_terminal_frozen,483.2366666666667,500.0,432.9,500.0,0.6666666666666666,500.0,300,0,reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip
+recon_feedforward_terminal_with_pole1_fix,483.2033333333333,500.0,432.9,500.0,0.6633333333333333,500.0,300,0,reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip
+recon_feedforward_terminal_plus_recon_learning,465.94,496.5,391.0,500.0,0.49333333333333335,500.0,300,18910,reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip
+static_recon,460.59,484.5,382.8,500.0,0.44666666666666666,500.0,300,0,
+recon_mingru_terminal_frozen,459.1566666666667,483.5,379.9,500.0,0.44333333333333336,500.0,300,0,reports/n4_autonomous_recurrent_20260610_160353/candidate_logs/b0021ba0d0bb/supervised/mingru_terminal.pt
+baseline_heuristic,456.49,475.0,375.0,500.0,0.41,500.0,300,0,
+pure_feedforward_policy_terminal,439.3233333333333,500.0,324.0,500.0,0.52,500.0,300,0,reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip

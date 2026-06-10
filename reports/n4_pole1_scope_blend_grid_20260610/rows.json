@@ -1,0 +1,42 @@
+[
+  {
+    "scope": "stabilize_chain",
+    "blend": 0.0,
+    "mean_survival": 460.59,
+    "median_survival": 484.5,
+    "p10_survival": 382.8,
+    "success_at_500": 0.44666666666666666,
+    "max_survival": 500.0,
+    "episodes": 300
+  },
+  {
+    "scope": "stabilize_chain",
+    "blend": 0.25,
+    "mean_survival": 462.04,
+    "median_survival": 488.5,
+    "p10_survival": 387.0,
+    "success_at_500": 0.4633333333333333,
+    "max_survival": 500.0,
+    "episodes": 300
+  },
+  {
+    "scope": "stabilize_chain",
+    "blend": 0.5,
+    "mean_survival": 474.19,
+    "median_survival": 500.0,
+    "p10_survival": 404.7,
+    "success_at_500": 0.6033333333333334,
+    "max_survival": 500.0,
+    "episodes": 300
+  },
+  {
+    "scope": "stabilize_chain",
+    "blend": 0.75,
+    "mean_survival": 477.24333333333334,
+    "median_survival": 500.0,
+    "p10_survival": 409.7,
+    "success_at_500": 0.64,
+    "max_survival": 500.0,
+    "episodes": 300
+  }
+]

@@ -56,6 +56,18 @@ from .node_params import (
 
 
 @dataclass
+class Pole1FixConfig:
+    enabled: bool = False
+    angle_threshold: float = 0.14
+    velocity_threshold: float = 1.2
+    urgency_boost: float = 0.45
+    confidence_boost: float = 0.20
+    force_blend: float = 0.35
+    rail_guard: float = 2.05
+    velocity_mix: float = 0.30
+
+
+@dataclass
 class RunnerConfig:
     n_poles: int = 1
     mode: ControllerMode = "static_recon"
@@ -80,6 +92,7 @@ class RunnerConfig:
     policy_terminal_scope: str = "stabilize_chain"
     policy_terminal_observation_mode: str = "env"
     mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
+    pole1_fix: Pole1FixConfig = field(default_factory=Pole1FixConfig)
 
 
 class ReConCartPoleController:
@@ -100,6 +113,8 @@ class ReConCartPoleController:
             self.config.consolidation.enabled = True
         if self._uses_mlp_terminal() and not self.config.mlp_terminal.enabled:
             self.config.mlp_terminal.enabled = True
+        if self._uses_pole1_fix() and not self.config.pole1_fix.enabled:
+            self.config.pole1_fix.enabled = True
         self.mlp_terminal_state = MlpTerminalState.create(
             self.config.n_poles, self.config.mlp_terminal.hidden_size
         )
@@ -144,6 +159,7 @@ class ReConCartPoleController:
             "recon_slow_no_gain_search",
             "recon_mlp_terminal",
             "recon_mingru_terminal_plus_recon_learning",
+            "recon_feedforward_terminal_plus_recon_learning",
         )
 
     def _uses_bandit(self) -> bool:
@@ -156,6 +172,7 @@ class ReConCartPoleController:
             "recon_slow_no_gain_search",
             "recon_mlp_terminal",
             "recon_mingru_terminal_plus_recon_learning",
+            "recon_feedforward_terminal_plus_recon_learning",
         )
 
     def _uses_slow_consolidation(self) -> bool:
@@ -165,6 +182,7 @@ class ReConCartPoleController:
             "recon_slow_no_gain_search",
             "recon_mlp_terminal",
             "recon_mingru_terminal_plus_recon_learning",
+            "recon_feedforward_terminal_plus_recon_learning",
         )
 
     def _uses_node_params(self) -> bool:
@@ -178,13 +196,21 @@ class ReConCartPoleController:
         return self.config.mode == "recon_mlp_terminal"
 
     def _uses_policy_terminal(self) -> bool:
-        return self.config.mode == "recon_policy_terminal"
+        return self.config.mode in (
+            "recon_policy_terminal",
+            "recon_feedforward_terminal_frozen",
+            "recon_feedforward_terminal_plus_recon_learning",
+            "recon_feedforward_terminal_with_pole1_fix",
+        )
 
     def _uses_mingru_terminal(self) -> bool:
         return self.config.mode in (
             "recon_mingru_terminal",
             "recon_mingru_terminal_plus_recon_learning",
         )
+
+    def _uses_pole1_fix(self) -> bool:
+        return self.config.mode == "recon_feedforward_terminal_with_pole1_fix"
 
     def learning_mechanisms(self) -> dict[str, bool]:
         return {
@@ -195,6 +221,7 @@ class ReConCartPoleController:
             "mlp_terminal": self._uses_mlp_terminal(),
             "policy_terminal": self._uses_policy_terminal(),
             "minGRU_terminal": self._uses_mingru_terminal(),
+            "pole1_fix": self.config.pole1_fix.enabled or self._uses_pole1_fix(),
             "gain_mutation": self.config.mode
             in ("gain_search_only", "gain_search_recon_fast_bandit"),
         }
@@ -430,6 +457,7 @@ class ReConCartPoleController:
                 "policy_terminal_scope": self.config.policy_terminal_scope,
                 "policy_terminal_observation_mode": self.config.policy_terminal_observation_mode,
                 "mingru_terminal_config": self.config.mingru_terminal.__dict__,
+                "pole1_fix_config": self.config.pole1_fix.__dict__,
             },
             "edge_weights": {
                 f"{edge.src}->{edge.dst}:{edge.ltype.name}": self.edge_weight(
@@ -713,6 +741,48 @@ class ReConCartPoleController:
         proposal.selection_mode = selection_mode
         return proposal
 
+    def _apply_pole1_fix(self, proposal: ForceProposal, env: dict[str, Any]) -> ForceProposal:
+        cfg = self.config.pole1_fix
+        if not cfg.enabled or self.config.n_poles < 2 or len(env["features"].poles) < 2:
+            return proposal
+        if proposal.source_node not in ("stabilize_chain", "recover_worst_pole", "damp_energy"):
+            return proposal
+        features = env["features"]
+        pole = features.poles[1]
+        pressure = max(
+            abs(pole.theta) / max(cfg.angle_threshold, 1e-9),
+            abs(pole.theta_dot) / max(cfg.velocity_threshold, 1e-9),
+        )
+        if pressure < 1.0:
+            return proposal
+        if abs(features.x) >= cfg.rail_guard:
+            proposal.reason = f"{proposal.reason}; pole1_fix_rail_guard"
+            return proposal
+        desired_force = (
+            self.config.force_mag
+            if pole.theta + cfg.velocity_mix * pole.theta_dot >= 0.0
+            else -self.config.force_mag
+        )
+        sign_mismatch = (
+            abs(proposal.force) > 1e-9 and np.sign(proposal.force) != np.sign(desired_force)
+        )
+        blend = max(0.0, min(1.0, cfg.force_blend if sign_mismatch else cfg.force_blend * 0.35))
+        base_force = proposal.force
+        proposal.force = float(
+            np.clip(
+                base_force + blend * (desired_force - base_force),
+                -self.config.force_mag,
+                self.config.force_mag,
+            )
+        )
+        proposal.confidence = min(1.0, proposal.confidence + cfg.confidence_boost)
+        proposal.urgency = min(1.5, proposal.urgency + cfg.urgency_boost * min(2.0, pressure))
+        proposal.reason = (
+            f"{proposal.reason}; pole1_fix pressure={pressure:.2f} "
+            f"desired={desired_force:.2f} base={base_force:.2f}"
+        )
+        return proposal
+
     def _proposal(self, node, env):
         regime = node.meta["regime"]
         selected = env.get("selected_regime")
@@ -802,6 +872,7 @@ class ReConCartPoleController:
             )
             env["_mingru_terminal_applied_regimes"] = mingru_info["applied_regimes"]
             self.last_mingru_terminal = mingru_info
+        proposal = self._apply_pole1_fix(proposal, env)
         proposal.raw_confidence = proposal.confidence
         proposal.raw_urgency = proposal.urgency
         proposal = self._score_proposal(

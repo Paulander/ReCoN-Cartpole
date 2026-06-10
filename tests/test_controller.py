@@ -4,7 +4,7 @@ from recon_lite import LinkType
 from recon_lite.plasticity import ConsolidationConfig, assign_reward
 
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
-from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
+from recon_cartpole.recon.engine_runner import Pole1FixConfig, ReConCartPoleController, RunnerConfig
 from recon_cartpole.recon.mingru_terminal import MinGRUPrediction, MinGRUTerminalConfig
 from recon_cartpole.training.evaluate import rollout
 
@@ -348,6 +348,26 @@ def test_recon_mingru_plus_learning_enables_recon_learning_mechanisms():
     assert mechanisms["bandit_persistence"] is True
     assert mechanisms["slow_consolidation"] is True
     assert mechanisms["node_param_learning"] is False
+
+
+def test_feedforward_pole1_fix_boosts_midlink_recovery_proposal():
+    raw = [0.0, 0.0, 0.01, 0.18, 0.0, 0.0]
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=2,
+            mode="recon_feedforward_terminal_with_pole1_fix",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            pole1_fix=Pole1FixConfig(enabled=True, angle_threshold=0.10),
+        )
+    )
+
+    _action, diagnostics = controller.act(raw, raw)
+
+    assert diagnostics["proposal"]["source_node"] == "stabilize_chain"
+    assert "pole1_fix" in diagnostics["proposal"]["reason"]
+    assert controller.learning_mechanisms()["pole1_fix"] is True
 
 
 def test_recon_policy_terminal_can_drive_stabilize_chain_proposal():
