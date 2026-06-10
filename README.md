@@ -13,6 +13,7 @@ The first milestone is intentionally honest:
 - `recon_slow` enables slow consolidation; other modes keep it disabled.
 
 - Current project state and best N=4 metrics: [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)
+- Updated recurrent/minGRU strategy: [`docs/RECURRENT_TERMINAL_STRATEGY.md`](docs/RECURRENT_TERMINAL_STRATEGY.md)
 
 ## Quick Start
 

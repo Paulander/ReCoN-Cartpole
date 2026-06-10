@@ -90,8 +90,11 @@ The running process was stopped before this note was committed.
 
 ## Suggested Next Steps
 
+The updated project strategy is tracked in [`RECURRENT_TERMINAL_STRATEGY.md`](RECURRENT_TERMINAL_STRATEGY.md). In short: stop adding random knobs; build a fast recurrent/minGRU terminal pipeline, a supervised sequence dataset path, and a fail-fast ladder that tests environment learnability and ReCoN arbitration cleanly.
+
 1. Do not claim N=4 solved yet. Use the current checkpoint as the near-solved baseline.
-2. If continuing N=4, collect near-miss failures from a fresh weak block, not from final proof blocks, then evaluate on at least two fresh 300-seed blocks plus the historical `980000` block.
-3. Consider an evaluation harness that reports per-block pass/fail and aggregate metrics in one table, so solve claims are less fragile.
-4. Once N=4 passes per-block held-out gates consistently, freeze it and run an N=5 probe with the same claim discipline.
-5. Keep reports explicit about mechanisms: PPO terminal, ReCoN routing, edge plasticity, bandit persistence, slow consolidation, gain mutation, and hard-seed curriculum.
+2. Implement `recon_mingru_terminal` as a ReCoN-arbitrated `ForceProposal`, not a direct action bypass.
+3. Add sequence dataset tooling and supervised minGRU training before launching long RL runs.
+4. Add a fail-fast recurrent ladder with train/validation/test seed splits and per-block reporting.
+5. Once N=4 passes per-block held-out gates consistently, freeze it and run an N=5 probe with the same claim discipline.
+6. Keep reports explicit about mechanisms: PPO terminal, minGRU terminal, ReCoN routing, edge plasticity, bandit persistence, slow consolidation, gain mutation, and hard-seed curriculum.
