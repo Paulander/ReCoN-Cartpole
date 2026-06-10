@@ -68,6 +68,28 @@ class Pole1FixConfig:
 
 
 @dataclass
+class RescueConfig:
+    enabled: bool = False
+    late_episode_conservative_mode: bool = False
+    late_start_step: int = 400
+    late_rail_guard: float = 2.05
+    rail_vs_pole_priority_gate: bool = False
+    rail_imminent_x: float = 2.10
+    terminal_force_passthrough_high_confidence: bool = False
+    passthrough_start_step: int = 400
+    passthrough_angle_threshold: float = 0.14
+    passthrough_velocity_pressure: float = 0.65
+    anti_oscillation_damper: bool = False
+    oscillation_window: int = 12
+    oscillation_flip_threshold: int = 8
+    pole1_emergency_guard_v2: bool = False
+    pole1_angle_threshold: float = 0.18
+    pole1_velocity_threshold: float = 0.75
+    pole1_velocity_mix: float = 0.25
+    pole1_force_blend: float = 0.75
+
+
+@dataclass
 class RunnerConfig:
     n_poles: int = 1
     mode: ControllerMode = "static_recon"
@@ -93,6 +115,7 @@ class RunnerConfig:
     policy_terminal_observation_mode: str = "env"
     mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
     pole1_fix: Pole1FixConfig = field(default_factory=Pole1FixConfig)
+    rescue: RescueConfig = field(default_factory=RescueConfig)
 
 
 class ReConCartPoleController:
@@ -148,6 +171,9 @@ class ReConCartPoleController:
         self.last_node_param_deltas: dict[str, float] = {}
         self.last_consolidation_applied: dict[str, Any] = {}
         self.last_proposal = ForceProposal("none", 0.0, 0.0, 0.0, "not run")
+        self.episode_step = 0
+        self.recent_forces: list[float] = []
+        self.last_rescue: dict[str, Any] = {}
 
     def _uses_fast_plasticity(self) -> bool:
         return self.config.mode in (
@@ -222,6 +248,7 @@ class ReConCartPoleController:
             "policy_terminal": self._uses_policy_terminal(),
             "minGRU_terminal": self._uses_mingru_terminal(),
             "pole1_fix": self.config.pole1_fix.enabled or self._uses_pole1_fix(),
+            "rescue_patches": self.config.rescue.enabled,
             "gain_mutation": self.config.mode
             in ("gain_search_only", "gain_search_recon_fast_bandit"),
         }
@@ -243,6 +270,9 @@ class ReConCartPoleController:
         self.policy_terminal_obs_history = []
         self.last_policy_terminal = {}
         self.last_mingru_terminal = {}
+        self.last_rescue = {}
+        self.episode_step = 0
+        self.recent_forces = []
         if self.mingru_terminal is not None:
             self.mingru_terminal.reset()
 
@@ -317,6 +347,8 @@ class ReConCartPoleController:
             "callbacks": self._callbacks(),
             "proposals": [],
             "suppressed_proposals": [],
+            "episode_step": self.episode_step,
+            "rescue": {},
         }
         graph_ticks = [self._graph_tick_snapshot(context, [], "root_requested")]
         self.last_fired_edges = []
@@ -361,7 +393,12 @@ class ReConCartPoleController:
             "bandit": snapshot_bandit(self.bandit_state),
             "graph_nodes": {nid: node.state.name for nid, node in self.graph.nodes.items()},
             "graph_ticks": graph_ticks,
+            "rescue": dict(context.get("rescue", {})),
         }
+        self.last_rescue = dict(context.get("rescue", {}))
+        self.recent_forces.append(float(context.get("force", 0.0)))
+        self.recent_forces = self.recent_forces[-max(2, int(self.config.rescue.oscillation_window)) :]
+        self.episode_step += 1
         return action, diagnostics
 
     def _graph_tick_snapshot(
@@ -458,6 +495,7 @@ class ReConCartPoleController:
                 "policy_terminal_observation_mode": self.config.policy_terminal_observation_mode,
                 "mingru_terminal_config": self.config.mingru_terminal.__dict__,
                 "pole1_fix_config": self.config.pole1_fix.__dict__,
+                "rescue_config": self.config.rescue.__dict__,
             },
             "edge_weights": {
                 f"{edge.src}->{edge.dst}:{edge.ltype.name}": self.edge_weight(
@@ -741,6 +779,68 @@ class ReConCartPoleController:
         proposal.selection_mode = selection_mode
         return proposal
 
+    def _rescue_enabled(self) -> bool:
+        return bool(self.config.rescue.enabled)
+
+    def _rail_imminent(self, features: StateFeatures) -> bool:
+        cfg = self.config.rescue
+        if abs(features.x) >= cfg.rail_imminent_x:
+            return True
+        return bool(abs(features.x) > 1.5 and features.x * features.x_dot > 0.0)
+
+    def _recent_force_flips(self) -> int:
+        forces = [force for force in self.recent_forces if abs(force) > 1e-6]
+        return sum(1 for a, b in zip(forces, forces[1:]) if np.sign(a) != np.sign(b))
+
+    def _high_risk_for_passthrough(self, env: dict[str, Any]) -> bool:
+        cfg = self.config.rescue
+        features = env["features"]
+        if self.episode_step < cfg.passthrough_start_step:
+            return False
+        if self._rail_imminent(features):
+            return False
+        if features.max_angle_abs >= cfg.passthrough_angle_threshold:
+            return True
+        if env.get("goal_vector", {}).get("max_velocity_pressure", 0.0) >= cfg.passthrough_velocity_pressure:
+            return True
+        if cfg.anti_oscillation_damper and self._recent_force_flips() >= cfg.oscillation_flip_threshold:
+            return True
+        return False
+
+    def _rescue_terminal_applies(self, regime: str, selected: str | None, env: dict[str, Any]) -> bool:
+        cfg = self.config.rescue
+        if not (self._rescue_enabled() and cfg.terminal_force_passthrough_high_confidence):
+            return False
+        if regime != selected:
+            return False
+        if regime == "avoid_rail" and self._rail_imminent(env["features"]):
+            return False
+        return self._high_risk_for_passthrough(env)
+
+    def _apply_pole1_emergency_guard(self, proposal: ForceProposal, env: dict[str, Any]) -> ForceProposal:
+        cfg = self.config.rescue
+        if not (self._rescue_enabled() and cfg.pole1_emergency_guard_v2):
+            return proposal
+        if self.config.n_poles < 2 or len(env["features"].poles) < 2:
+            return proposal
+        if self._rail_imminent(env["features"]):
+            return proposal
+        pole = env["features"].poles[1]
+        moving_outward = abs(pole.theta) > cfg.pole1_angle_threshold and pole.theta * pole.theta_dot > 0.0
+        fast_outward = abs(pole.theta_dot) > cfg.pole1_velocity_threshold and pole.theta * pole.theta_dot > 0.0
+        if not (moving_outward or fast_outward):
+            return proposal
+        desired_force = self.config.force_mag if pole.theta + cfg.pole1_velocity_mix * pole.theta_dot >= 0.0 else -self.config.force_mag
+        base_force = proposal.force
+        blend = max(0.0, min(1.0, cfg.pole1_force_blend))
+        proposal.force = float(np.clip(base_force + blend * (desired_force - base_force), -self.config.force_mag, self.config.force_mag))
+        proposal.confidence = max(proposal.confidence, 0.95)
+        proposal.urgency = max(proposal.urgency, 1.0)
+        proposal.reason = f"{proposal.reason}; pole1_emergency_v2 desired={desired_force:.2f} base={base_force:.2f}"
+        env.setdefault("rescue", {}).setdefault("events", []).append("pole1_emergency_guard_v2")
+        return proposal
+
+
     def _apply_pole1_fix(self, proposal: ForceProposal, env: dict[str, Any]) -> ForceProposal:
         cfg = self.config.pole1_fix
         if not cfg.enabled or self.config.n_poles < 2 or len(env["features"].poles) < 2:
@@ -814,7 +914,11 @@ class ReConCartPoleController:
             mlp_info["base_force"] = base_force
             mlp_info["corrected_force"] = proposal.force
             self.last_mlp_terminal = mlp_info
-        if self._uses_policy_terminal() and self._policy_terminal_applies(regime, selected):
+        policy_applies = self._uses_policy_terminal() and (
+            self._policy_terminal_applies(regime, selected)
+            or self._rescue_terminal_applies(regime, selected, env)
+        )
+        if policy_applies:
             policy_force, policy_info = self._policy_terminal_force(
                 env["observation"], env.get("raw_state"), env
             )
@@ -835,6 +939,12 @@ class ReConCartPoleController:
                 policy_info["policy_force"] = policy_force
                 policy_info["proposal_force"] = proposal.force
                 policy_info["applied_regime"] = regime
+                policy_info["rescue_passthrough"] = bool(self._rescue_terminal_applies(regime, selected, env))
+                if policy_info["rescue_passthrough"]:
+                    rescue_info = env.setdefault("rescue", {})
+                    rescue_info.setdefault("events", []).append("terminal_force_passthrough_high_confidence")
+                    rescue_info["policy_terminal"] = dict(policy_info)
+                    proposal.reason = f"{proposal.reason}; rescue_passthrough"
                 policy_info["applied_regimes"] = sorted(
                     set(env.setdefault("_policy_terminal_applied_regimes", []) + [regime])
                 )
@@ -872,6 +982,7 @@ class ReConCartPoleController:
             )
             env["_mingru_terminal_applied_regimes"] = mingru_info["applied_regimes"]
             self.last_mingru_terminal = mingru_info
+        proposal = self._apply_pole1_emergency_guard(proposal, env)
         proposal = self._apply_pole1_fix(proposal, env)
         proposal.raw_confidence = proposal.confidence
         proposal.raw_urgency = proposal.urgency
@@ -916,8 +1027,18 @@ class ReConCartPoleController:
                 )
                 if child:
                     return child
+        rescue = self.config.rescue
         if abs(features.x) > 1.5:
-            return "avoid_rail"
+            if not (self._rescue_enabled() and rescue.rail_vs_pole_priority_gate) or self._rail_imminent(features):
+                return "avoid_rail"
+        if (
+            self._rescue_enabled()
+            and rescue.late_episode_conservative_mode
+            and self.episode_step >= rescue.late_start_step
+            and abs(features.x) < rescue.late_rail_guard
+            and self.config.n_poles > 1
+        ):
+            return "stabilize_chain"
         if goal_vector.get("max_velocity_pressure", 0.0) > 0.65:
             return "damp_energy"
         if self.config.n_poles > 1 and features.worst_pole_index > 0:

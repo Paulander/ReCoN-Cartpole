@@ -4,7 +4,12 @@ from recon_lite import LinkType
 from recon_lite.plasticity import ConsolidationConfig, assign_reward
 
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
-from recon_cartpole.recon.engine_runner import Pole1FixConfig, ReConCartPoleController, RunnerConfig
+from recon_cartpole.recon.engine_runner import (
+    Pole1FixConfig,
+    ReConCartPoleController,
+    RescueConfig,
+    RunnerConfig,
+)
 from recon_cartpole.recon.mingru_terminal import MinGRUPrediction, MinGRUTerminalConfig
 from recon_cartpole.training.evaluate import rollout
 
@@ -541,3 +546,64 @@ def test_recon_policy_terminal_blend_can_preserve_base_force():
     assert info["blend"] == 0.0
     assert diagnostics["force"] == info["base_force"]
     assert info["policy_force"] == controller.config.force_mag
+
+
+def test_rescue_patches_are_default_off():
+    class FakePolicy:
+        def predict(self, observation, deterministic=True):
+            return 0, None
+
+    raw = [0.0, 0.0, 0.15, 0.01, 5.0, 0.0]
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=2,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+        )
+    )
+    controller.policy_terminal_model = FakePolicy()
+    controller.episode_step = 450
+
+    _action, diagnostics = controller.act(raw, raw)
+
+    assert diagnostics["selected_regime"] == "damp_energy"
+    assert "policy_terminal" not in diagnostics["proposal"]["reason"]
+    assert diagnostics["rescue"] == {}
+    assert controller.learning_mechanisms()["rescue_patches"] is False
+
+
+def test_terminal_passthrough_rescue_can_take_over_selected_high_risk_regime():
+    class FakePolicy:
+        def predict(self, observation, deterministic=True):
+            return 0, None
+
+    raw = [0.0, 0.0, 0.15, 0.01, 5.0, 0.0]
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=2,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            rescue=RescueConfig(
+                enabled=True,
+                terminal_force_passthrough_high_confidence=True,
+                passthrough_start_step=400,
+                passthrough_angle_threshold=0.14,
+            ),
+        )
+    )
+    controller.policy_terminal_model = FakePolicy()
+    controller.episode_step = 450
+
+    action, diagnostics = controller.act(raw, raw)
+
+    assert diagnostics["selected_regime"] == "damp_energy"
+    assert "rescue_passthrough" in diagnostics["proposal"]["reason"]
+    assert diagnostics["rescue"]["policy_terminal"]["rescue_passthrough"] is True
+    assert "terminal_force_passthrough_high_confidence" in diagnostics["rescue"]["events"]
+    assert diagnostics["force"] == -controller.config.force_mag
+    assert action == 0
+    assert controller.learning_mechanisms()["rescue_patches"] is True

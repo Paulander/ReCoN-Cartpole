@@ -1,0 +1,12 @@
+phase,candidate,episodes,mean_survival,p10_survival,success_at_500,max_survival,changed_count,fail_to_success,success_to_fail,net_success_change
+dev,late_episode_conservative_mode,143,477.0,433.6,0.3986013986013986,500.0,59,0,3,-3
+dev,terminal_force_passthrough_high_confidence,143,477.05594405594405,433.6,0.3986013986013986,500.0,59,0,3,-3
+dev,anti_oscillation_damper,143,477.4825174825175,433.6,0.4125874125874126,500.0,55,0,1,-1
+dev,rail_vs_pole_priority_gate,143,477.34965034965035,433.6,0.4195804195804196,500.0,0,0,0,0
+dev,pole1_emergency_guard_v2,143,471.9230769230769,422.4,0.3986013986013986,500.0,70,0,3,-3
+dev,late_terminal_passthrough_combo,143,477.0,433.6,0.3986013986013986,500.0,59,0,3,-3
+dev,rail_gate_terminal_passthrough_combo,143,477.05594405594405,433.6,0.3986013986013986,500.0,59,0,3,-3
+full,rail_vs_pole_priority_gate,300,483.2366666666667,432.9,0.6666666666666666,500.0,0,0,0,0
+full,anti_oscillation_damper,300,483.30333333333334,432.9,0.6633333333333333,500.0,56,0,1,-1
+full,terminal_force_passthrough_high_confidence,300,483.1,432.9,0.6566666666666666,500.0,60,0,3,-3
+full,rail_gate_terminal_passthrough_combo,300,483.1,432.9,0.6566666666666666,500.0,60,0,3,-3

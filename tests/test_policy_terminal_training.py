@@ -181,6 +181,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     ladder = _load_script("train_recurrent_terminal_ladder")
     autonomous = _load_script("run_n4_autonomous_recurrent")
     pole1 = _load_script("run_n4_pole1_robustness")
+    final_gap = _load_script("run_n4_final_success_gap")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -188,3 +189,4 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert ladder.config_hash({"a": 1}) != ladder.config_hash({"a": 2})
     assert autonomous.mechanism_flags("recon_mingru_terminal_plus_recon_learning")["edge_plasticity"] is True
     assert callable(pole1.compare_outcomes)
+    assert callable(final_gap.candidate_configs)

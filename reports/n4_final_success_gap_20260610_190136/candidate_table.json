@@ -1,0 +1,211 @@
+[
+  {
+    "phase": "dev",
+    "candidate": "late_episode_conservative_mode",
+    "episodes": 143,
+    "mean_survival": 477.0,
+    "p10_survival": 433.6,
+    "success_at_500": 0.3986013986013986,
+    "max_survival": 500.0,
+    "changed_count": 59,
+    "fail_to_success": 0,
+    "success_to_fail": 3,
+    "net_success_change": -3,
+    "failure_distribution": {
+      "pole_1_angle": 35,
+      "pole_0_angle": 22,
+      "pole_2_angle": 29,
+      "success": 57
+    }
+  },
+  {
+    "phase": "dev",
+    "candidate": "terminal_force_passthrough_high_confidence",
+    "episodes": 143,
+    "mean_survival": 477.05594405594405,
+    "p10_survival": 433.6,
+    "success_at_500": 0.3986013986013986,
+    "max_survival": 500.0,
+    "changed_count": 59,
+    "fail_to_success": 0,
+    "success_to_fail": 3,
+    "net_success_change": -3,
+    "failure_distribution": {
+      "pole_1_angle": 35,
+      "pole_0_angle": 22,
+      "pole_2_angle": 29,
+      "success": 57
+    }
+  },
+  {
+    "phase": "dev",
+    "candidate": "anti_oscillation_damper",
+    "episodes": 143,
+    "mean_survival": 477.4825174825175,
+    "p10_survival": 433.6,
+    "success_at_500": 0.4125874125874126,
+    "max_survival": 500.0,
+    "changed_count": 55,
+    "fail_to_success": 0,
+    "success_to_fail": 1,
+    "net_success_change": -1,
+    "failure_distribution": {
+      "pole_1_angle": 38,
+      "pole_0_angle": 15,
+      "pole_2_angle": 31,
+      "success": 59
+    }
+  },
+  {
+    "phase": "dev",
+    "candidate": "rail_vs_pole_priority_gate",
+    "episodes": 143,
+    "mean_survival": 477.34965034965035,
+    "p10_survival": 433.6,
+    "success_at_500": 0.4195804195804196,
+    "max_survival": 500.0,
+    "changed_count": 0,
+    "fail_to_success": 0,
+    "success_to_fail": 0,
+    "net_success_change": 0,
+    "failure_distribution": {
+      "pole_1_angle": 41,
+      "pole_2_angle": 39,
+      "pole_0_angle": 3,
+      "success": 60
+    }
+  },
+  {
+    "phase": "dev",
+    "candidate": "pole1_emergency_guard_v2",
+    "episodes": 143,
+    "mean_survival": 471.9230769230769,
+    "p10_survival": 422.4,
+    "success_at_500": 0.3986013986013986,
+    "max_survival": 500.0,
+    "changed_count": 70,
+    "fail_to_success": 0,
+    "success_to_fail": 3,
+    "net_success_change": -3,
+    "failure_distribution": {
+      "pole_1_angle": 42,
+      "pole_2_angle": 42,
+      "pole_0_angle": 2,
+      "success": 57
+    }
+  },
+  {
+    "phase": "dev",
+    "candidate": "late_terminal_passthrough_combo",
+    "episodes": 143,
+    "mean_survival": 477.0,
+    "p10_survival": 433.6,
+    "success_at_500": 0.3986013986013986,
+    "max_survival": 500.0,
+    "changed_count": 59,
+    "fail_to_success": 0,
+    "success_to_fail": 3,
+    "net_success_change": -3,
+    "failure_distribution": {
+      "pole_1_angle": 35,
+      "pole_0_angle": 22,
+      "pole_2_angle": 29,
+      "success": 57
+    }
+  },
+  {
+    "phase": "dev",
+    "candidate": "rail_gate_terminal_passthrough_combo",
+    "episodes": 143,
+    "mean_survival": 477.05594405594405,
+    "p10_survival": 433.6,
+    "success_at_500": 0.3986013986013986,
+    "max_survival": 500.0,
+    "changed_count": 59,
+    "fail_to_success": 0,
+    "success_to_fail": 3,
+    "net_success_change": -3,
+    "failure_distribution": {
+      "pole_1_angle": 35,
+      "pole_0_angle": 22,
+      "pole_2_angle": 29,
+      "success": 57
+    }
+  },
+  {
+    "phase": "full",
+    "candidate": "rail_vs_pole_priority_gate",
+    "episodes": 300,
+    "mean_survival": 483.2366666666667,
+    "p10_survival": 432.9,
+    "success_at_500": 0.6666666666666666,
+    "max_survival": 500.0,
+    "changed_count": 0,
+    "fail_to_success": 0,
+    "success_to_fail": 0,
+    "net_success_change": 0,
+    "failure_distribution": {
+      "success": 200,
+      "pole_1_angle": 53,
+      "pole_2_angle": 44,
+      "pole_0_angle": 3
+    }
+  },
+  {
+    "phase": "full",
+    "candidate": "anti_oscillation_damper",
+    "episodes": 300,
+    "mean_survival": 483.30333333333334,
+    "p10_survival": 432.9,
+    "success_at_500": 0.6633333333333333,
+    "max_survival": 500.0,
+    "changed_count": 56,
+    "fail_to_success": 0,
+    "success_to_fail": 1,
+    "net_success_change": -1,
+    "failure_distribution": {
+      "success": 199,
+      "pole_1_angle": 50,
+      "pole_0_angle": 15,
+      "pole_2_angle": 36
+    }
+  },
+  {
+    "phase": "full",
+    "candidate": "terminal_force_passthrough_high_confidence",
+    "episodes": 300,
+    "mean_survival": 483.1,
+    "p10_survival": 432.9,
+    "success_at_500": 0.6566666666666666,
+    "max_survival": 500.0,
+    "changed_count": 60,
+    "fail_to_success": 0,
+    "success_to_fail": 3,
+    "net_success_change": -3,
+    "failure_distribution": {
+      "success": 197,
+      "pole_1_angle": 47,
+      "pole_0_angle": 22,
+      "pole_2_angle": 34
+    }
+  },
+  {
+    "phase": "full",
+    "candidate": "rail_gate_terminal_passthrough_combo",
+    "episodes": 300,
+    "mean_survival": 483.1,
+    "p10_survival": 432.9,
+    "success_at_500": 0.6566666666666666,
+    "max_survival": 500.0,
+    "changed_count": 60,
+    "fail_to_success": 0,
+    "success_to_fail": 3,
+    "net_success_change": -3,
+    "failure_distribution": {
+      "success": 197,
+      "pole_1_angle": 47,
+      "pole_0_angle": 22,
+      "pole_2_angle": 34
+    }
+  }
+]
