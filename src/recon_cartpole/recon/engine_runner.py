@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import json
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -114,6 +116,7 @@ class RunnerConfig:
     policy_terminal_scope: str = "stabilize_chain"
     policy_terminal_observation_mode: str = "env"
     policy_terminal_recurrent: bool = False
+    policy_terminal_normalizer_path: str = ""
     mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
     pole1_fix: Pole1FixConfig = field(default_factory=Pole1FixConfig)
     rescue: RescueConfig = field(default_factory=RescueConfig)
@@ -160,6 +163,9 @@ class ReConCartPoleController:
         self.policy_terminal_state: Any | None = None
         self.policy_terminal_episode_start = np.ones((1,), dtype=bool)
         self.last_policy_terminal: dict[str, Any] = {}
+        self.policy_terminal_normalizer: dict[str, np.ndarray] | None = self._load_policy_terminal_normalizer(
+            self.config.policy_terminal_normalizer_path
+        )
         if self._uses_policy_terminal() and self.config.policy_terminal_path:
             self.policy_terminal_model = self._load_policy_terminal(
                 self.config.policy_terminal_path
@@ -502,6 +508,7 @@ class ReConCartPoleController:
                 "policy_terminal_scope": self.config.policy_terminal_scope,
                 "policy_terminal_observation_mode": self.config.policy_terminal_observation_mode,
                 "policy_terminal_recurrent": self.config.policy_terminal_recurrent,
+                "policy_terminal_normalizer_path": self.config.policy_terminal_normalizer_path,
                 "mingru_terminal_config": self.config.mingru_terminal.__dict__,
                 "pole1_fix_config": self.config.pole1_fix.__dict__,
                 "rescue_config": self.config.rescue.__dict__,
@@ -567,6 +574,39 @@ class ReConCartPoleController:
         dst, ltype = rest.split(":", 1)
         return self.set_edge_weight(src, dst, ltype, weight)
 
+
+    def _load_policy_terminal_normalizer(self, path: str) -> dict[str, np.ndarray] | None:
+        if not path:
+            return None
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        mean = np.asarray(data.get("mean", []), dtype=np.float32).reshape(-1)
+        var = np.asarray(data.get("var", []), dtype=np.float32).reshape(-1)
+        if mean.size == 0 or var.size == 0 or mean.shape != var.shape:
+            raise ValueError(f"invalid policy terminal normalizer at {path}")
+        return {
+            "mean": mean,
+            "var": np.maximum(var, 1e-12),
+            "epsilon": np.asarray([float(data.get("epsilon", 1e-8))], dtype=np.float32),
+            "clip_obs": np.asarray([float(data.get("clip_obs", 10.0))], dtype=np.float32),
+        }
+
+    def _normalize_policy_terminal_observation(self, observation: np.ndarray) -> np.ndarray:
+        obs = np.asarray(observation, dtype=np.float32).reshape(-1)
+        normalizer = self.policy_terminal_normalizer
+        if normalizer is None:
+            return obs
+        mean = normalizer["mean"]
+        var = normalizer["var"]
+        if obs.shape != mean.shape:
+            raise ValueError(
+                "policy terminal normalizer shape mismatch: "
+                f"obs={obs.shape} mean={mean.shape}"
+            )
+        epsilon = float(normalizer["epsilon"][0])
+        clip_obs = float(normalizer["clip_obs"][0])
+        normalized = (obs - mean) / np.sqrt(var + epsilon)
+        return np.clip(normalized, -clip_obs, clip_obs).astype(np.float32, copy=False)
+
     def _load_policy_terminal(self, path: str) -> Any:
         if self.config.policy_terminal_recurrent:
             try:
@@ -608,14 +648,15 @@ class ReConCartPoleController:
         )
         frame_stack = max(1, int(self.config.policy_terminal_frame_stack))
         if frame_stack <= 1:
-            return obs
+            return self._normalize_policy_terminal_observation(obs)
         self.policy_terminal_obs_history.append(obs)
         self.policy_terminal_obs_history = self.policy_terminal_obs_history[-frame_stack:]
         pad_count = frame_stack - len(self.policy_terminal_obs_history)
         frames = [
             self.policy_terminal_obs_history[0]
         ] * pad_count + self.policy_terminal_obs_history
-        return np.concatenate(frames).astype(np.float32, copy=False)
+        stacked = np.concatenate(frames).astype(np.float32, copy=False)
+        return self._normalize_policy_terminal_observation(stacked)
 
     def _policy_terminal_applies(self, regime: str, selected: str | None) -> bool:
         scope = self.config.policy_terminal_scope
@@ -655,6 +696,8 @@ class ReConCartPoleController:
             "observation_size": int(policy_observation.size),
             "scope": self.config.policy_terminal_scope,
             "observation_mode": self.config.policy_terminal_observation_mode,
+            "normalizer_path": self.config.policy_terminal_normalizer_path,
+            "normalizer_applied": self.policy_terminal_normalizer is not None,
             "recurrent": bool(self.config.policy_terminal_recurrent),
             "episode_start": recurrent_episode_start
             if self.config.policy_terminal_recurrent

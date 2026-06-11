@@ -1,3 +1,4 @@
+import json
 import numpy as np
 
 from recon_lite import LinkType
@@ -686,3 +687,71 @@ def test_terminal_passthrough_rescue_can_take_over_selected_high_risk_regime():
     assert diagnostics["force"] == -controller.config.force_mag
     assert action == 0
     assert controller.learning_mechanisms()["rescue_patches"] is True
+
+
+def test_recon_policy_terminal_padded_prev_force_observation_mode():
+    class FakePolicy:
+        def __init__(self):
+            self.observations = []
+
+        def predict(self, observation, deterministic=True):
+            self.observations.append(np.asarray(observation, dtype=np.float32).copy())
+            return 4, None
+
+    raw = np.asarray([0.24, 0.5, 0.01, -0.02, -0.03, 0.1, -0.2, 0.3], dtype=np.float32)
+    policy = FakePolicy()
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=3,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_observation_mode="normalized_raw4_prev_force",
+        )
+    )
+    controller.policy_terminal_model = policy
+
+    controller.act(raw, raw)
+    controller.act(raw, raw)
+
+    assert policy.observations[0].shape == (11,)
+    assert policy.observations[0][5] == 0.0
+    assert policy.observations[0][9] == 0.0
+    assert policy.observations[0][-1] == 0.0
+    assert policy.observations[1][-1] == 1.0
+
+
+def test_policy_terminal_normalizer_is_applied(tmp_path):
+    class FakePolicy:
+        def __init__(self):
+            self.observation = None
+
+        def predict(self, observation, deterministic=True):
+            self.observation = np.asarray(observation, dtype=np.float32).copy()
+            return 4, None
+
+    normalizer_path = tmp_path / "normalizer.json"
+    normalizer_path.write_text(
+        json.dumps({"mean": [0.0, 0.0, 0.0, 0.0], "var": [1.0, 1.0, 1.0, 1.0], "epsilon": 0.0, "clip_obs": 10.0}),
+        encoding="utf-8",
+    )
+    policy = FakePolicy()
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=1,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_observation_mode="normalized_raw",
+            policy_terminal_normalizer_path=str(normalizer_path),
+        )
+    )
+    controller.policy_terminal_model = policy
+
+    raw = np.asarray([2.0, 5.0, 0.0, 0.0], dtype=np.float32)
+    _action, diagnostics = controller.act(raw, raw)
+
+    assert np.allclose(policy.observation, [2.0 / 2.4, 1.0, 0.0, 0.0])
+    assert diagnostics["policy_terminal"]["normalizer_applied"] is True

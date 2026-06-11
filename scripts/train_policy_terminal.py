@@ -173,6 +173,76 @@ class PolicyObservationWrapper(gym.Wrapper):
         return self._transform(observation, info), reward, terminated, truncated, info
 
 
+class ObservationNormalizerWrapper(gym.ObservationWrapper):
+    def __init__(self, env: gym.Env, normalizer_path: str):
+        super().__init__(env)
+        stats = load_observation_normalizer(normalizer_path)
+        self.mean = stats["mean"]
+        self.var = stats["var"]
+        self.epsilon = float(stats["epsilon"])
+        self.clip_obs = float(stats["clip_obs"])
+        base_space = env.observation_space
+        if not isinstance(base_space, gym.spaces.Box):
+            raise TypeError("ObservationNormalizerWrapper requires a Box observation space")
+        if tuple(base_space.shape) != tuple(self.mean.shape):
+            raise ValueError(
+                "normalizer shape mismatch: "
+                f"space={base_space.shape} mean={self.mean.shape}"
+            )
+        self.observation_space = gym.spaces.Box(
+            -self.clip_obs, self.clip_obs, shape=base_space.shape, dtype=np.float32
+        )
+
+    def observation(self, observation: Any):
+        obs = np.asarray(observation, dtype=np.float32).reshape(self.mean.shape)
+        normalized = (obs - self.mean) / np.sqrt(self.var + self.epsilon)
+        return np.clip(normalized, -self.clip_obs, self.clip_obs).astype(np.float32, copy=False)
+
+
+def load_observation_normalizer(path: str | Path) -> dict[str, Any]:
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    mean = np.asarray(data.get("mean", []), dtype=np.float32)
+    var = np.asarray(data.get("var", []), dtype=np.float32)
+    if mean.size == 0 or var.size == 0 or mean.shape != var.shape:
+        raise ValueError(f"invalid observation normalizer at {path}")
+    return {
+        "mean": mean,
+        "var": np.maximum(var, 1e-12),
+        "count": float(data.get("count", 0.0)),
+        "epsilon": float(data.get("epsilon", 1e-8)),
+        "clip_obs": float(data.get("clip_obs", 10.0)),
+    }
+
+
+def export_vec_normalize_stats(vec_env: Any, path: str | Path) -> str:
+    current = vec_env
+    while current is not None:
+        obs_rms = getattr(current, "obs_rms", None)
+        if obs_rms is not None:
+            data = {
+                "mean": np.asarray(obs_rms.mean, dtype=float).tolist(),
+                "var": np.asarray(obs_rms.var, dtype=float).tolist(),
+                "count": float(getattr(obs_rms, "count", 0.0)),
+                "epsilon": float(getattr(current, "epsilon", 1e-8)),
+                "clip_obs": float(getattr(current, "clip_obs", 10.0)),
+            }
+            path = Path(path)
+            path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            return str(path)
+        current = getattr(current, "venv", None)
+    return ""
+
+
+def copy_vec_normalize_stats(src: Any, dst: Any) -> None:
+    src_rms = getattr(src, "obs_rms", None)
+    dst_rms = getattr(dst, "obs_rms", None)
+    if src_rms is None or dst_rms is None:
+        return
+    dst_rms.mean = np.asarray(src_rms.mean, dtype=np.float64).copy()
+    dst_rms.var = np.asarray(src_rms.var, dtype=np.float64).copy()
+    dst_rms.count = float(getattr(src_rms, "count", 0.0))
+
+
 class FrameStackObservationWrapper(gym.ObservationWrapper):
     def __init__(self, env: gym.Env, frame_stack: int):
         super().__init__(env)
@@ -270,6 +340,9 @@ def make_env(
         env = PolicyObservationWrapper(env, obs_mode)
     if use_frame_stack and int(_arg(args, "frame_stack", 1)) > 1:
         env = FrameStackObservationWrapper(env, int(_arg(args, "frame_stack", 1)))
+    normalizer_path = str(_arg(args, "policy_terminal_normalizer_path", ""))
+    if normalizer_path:
+        env = ObservationNormalizerWrapper(env, normalizer_path)
     return env
 
 
@@ -366,6 +439,7 @@ def evaluate_recon_terminal(
             policy_terminal_frame_stack=int(_arg(args, "frame_stack", 1)),
             policy_terminal_scope=str(_arg(args, "policy_terminal_scope", "stabilize_chain")),
             policy_terminal_observation_mode=str(_arg(args, "policy_observation_mode", "env")),
+            policy_terminal_normalizer_path=str(_arg(args, "policy_terminal_normalizer_path", "")),
         )
     )
     steps: list[float] = []
@@ -487,6 +561,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "late_survival_bonus": float(_arg(args, "late_survival_bonus", 0.0)),
             "late_survival_start_fraction": float(_arg(args, "late_survival_start_fraction", 0.80)),
             "vec_env": str(_arg(args, "vec_env", "dummy")),
+            "policy_terminal_normalizer_path": str(_arg(args, "policy_terminal_normalizer_path", "")),
         },
         "reward_mode": args.reward_mode,
         "hard_train_seeds": hard_train_seeds(args),
@@ -515,6 +590,7 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "late_survival_bonus": float(_arg(args, "late_survival_bonus", 0.0)),
             "late_survival_start_fraction": float(_arg(args, "late_survival_start_fraction", 0.80)),
             "vec_env": str(_arg(args, "vec_env", "dummy")),
+            "policy_terminal_normalizer_path": str(_arg(args, "policy_terminal_normalizer_path", "")),
         },
         "pure_ppo_eval": ppo_eval,
         "recon_policy_terminal_eval": recon_eval,
@@ -652,7 +728,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--policy-observation-mode",
-        choices=["env", "normalized_raw"],
+        choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"],
         default="env",
         help="Observation representation used by the learned PPO terminal.",
     )
@@ -662,6 +738,7 @@ def main() -> None:
         default=1,
         help="Concatenate this many recent observations for the learned PPO terminal.",
     )
+    parser.add_argument("--policy-terminal-normalizer-path", default="")
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/policy_terminal_train")
     args = parser.parse_args()

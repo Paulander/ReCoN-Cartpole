@@ -19,7 +19,14 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from train_policy_terminal import evaluate_model, hard_train_seeds, make_env, ppo_kwargs  # noqa: E402
+from train_policy_terminal import (  # noqa: E402
+    copy_vec_normalize_stats,
+    evaluate_model,
+    export_vec_normalize_stats,
+    hard_train_seeds,
+    make_env,
+    ppo_kwargs,
+)
 from train_policy_terminal_iterative import eval_args, final_seeds, passes, solve_threshold  # noqa: E402
 
 
@@ -88,6 +95,7 @@ def evaluate_recon_terminal_tail(
             policy_terminal_scope=str(getattr(args, "policy_terminal_scope", "stabilize_chain")),
             policy_terminal_observation_mode=str(getattr(args, "policy_observation_mode", "env")),
             policy_terminal_recurrent=bool(getattr(args, "policy_terminal_recurrent", False)),
+            policy_terminal_normalizer_path=str(getattr(args, "policy_terminal_normalizer_path", "")),
         )
     )
     steps: list[float] = []
@@ -172,17 +180,21 @@ def record_checkpoint(
     checkpoint_path: Path,
     total_timesteps: int,
     label: str,
+    normalizer_path: str = "",
 ) -> dict[str, Any]:
     seeds = validation_seeds(args)
+    eval_config = eval_args(args, args.validation_seed_start, args.validation_episodes)
+    eval_config.policy_terminal_normalizer_path = normalizer_path
     summary = evaluate_recon_terminal_tail(
         checkpoint_path,
-        eval_args(args, args.validation_seed_start, args.validation_episodes),
+        eval_config,
         seeds,
         cvar_fraction=args.cvar_fraction,
     )
     row = {
         "label": label,
         "checkpoint": str(checkpoint_path),
+        "normalizer_path": str(normalizer_path),
         "total_timesteps": int(total_timesteps),
         "validation": summary,
         "score": tail_score(
@@ -293,7 +305,7 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
     try:
         from stable_baselines3 import PPO
         from stable_baselines3.common.env_util import make_vec_env
-        from stable_baselines3.common.vec_env import SubprocVecEnv
+        from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
     except Exception as exc:  # pragma: no cover - optional dependency path
         raise RuntimeError("Install RL extras with `uv sync --extra rl` to train policy terminals") from exc
 
@@ -302,14 +314,24 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
     write_seed_file(active_seed_file, base_hard_seeds)
     vec_env_cls = SubprocVecEnv if args.vec_env == "subproc" else None
 
-    def build_vec_env():
-        return make_vec_env(
+    def build_vec_env(source_stats: Any | None = None):
+        env = make_vec_env(
             lambda: make_train_env(args, active_seed_file),
             n_envs=args.n_envs,
             seed=args.train_seed,
             vec_env_cls=vec_env_cls,
             vec_env_kwargs={"start_method": "fork"} if vec_env_cls is SubprocVecEnv else None,
         )
+        if args.vec_normalize:
+            env = VecNormalize(
+                env,
+                norm_obs=True,
+                norm_reward=bool(args.vec_normalize_reward),
+                clip_obs=float(args.vec_normalize_clip_obs),
+            )
+            if source_stats is not None:
+                copy_vec_normalize_stats(source_stats, env)
+        return env
 
     train_env = build_vec_env()
     history: list[dict[str, Any]] = []
@@ -321,7 +343,8 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         model.set_random_seed(args.train_seed)
         start_path = out / "checkpoint_000000_start.zip"
         shutil.copy2(args.start_model_path, start_path)
-        row = record_checkpoint(args, out, start_path, total_timesteps, "start")
+        start_normalizer = export_vec_normalize_stats(train_env, out / "normalizer_000000_start.json") if args.vec_normalize else ""
+        row = record_checkpoint(args, out, start_path, total_timesteps, "start", start_normalizer)
         row["promoted"] = True
         history.append(row)
         best = row
@@ -348,6 +371,9 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         "hard_train_seed_probability": args.hard_train_seed_probability,
         "late_survival_bonus": args.late_survival_bonus,
         "late_survival_start_fraction": args.late_survival_start_fraction,
+        "vec_normalize": bool(args.vec_normalize),
+        "vec_normalize_reward": bool(args.vec_normalize_reward),
+        "vec_normalize_clip_obs": float(args.vec_normalize_clip_obs),
         "tail_seed_refresh_count": args.tail_seed_refresh_count,
         "tail_seed_pool_limit": args.tail_seed_pool_limit,
         "validation_seed_starts": args.validation_seed_starts or [args.validation_seed_start],
@@ -380,6 +406,9 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
             "max_grad_norm": args.max_grad_norm,
             "late_survival_bonus": args.late_survival_bonus,
             "late_survival_start_fraction": args.late_survival_start_fraction,
+            "vec_normalize": bool(args.vec_normalize),
+            "vec_normalize_reward": bool(args.vec_normalize_reward),
+            "vec_normalize_clip_obs": float(args.vec_normalize_clip_obs),
             "vec_env": args.vec_env,
         },
         "history": history,
@@ -396,7 +425,12 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         total_timesteps += args.chunk_timesteps
         checkpoint = out / f"checkpoint_{total_timesteps:06d}.zip"
         model.save(str(checkpoint))
-        row = record_checkpoint(args, out, checkpoint, total_timesteps, f"chunk_{chunk}")
+        normalizer_path = (
+            export_vec_normalize_stats(train_env, out / f"normalizer_{total_timesteps:06d}.json")
+            if args.vec_normalize
+            else ""
+        )
+        row = record_checkpoint(args, out, checkpoint, total_timesteps, f"chunk_{chunk}", normalizer_path)
         row["promoted"] = should_promote(row, best, args)
         history.append(row)
         if row["promoted"]:
@@ -414,8 +448,9 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
             encoding="utf-8",
         )
         if args.rebuild_env_each_chunk and chunk < args.chunks:
-            train_env.close()
-            train_env = build_vec_env()
+            old_env = train_env
+            train_env = build_vec_env(old_env if args.vec_normalize else None)
+            old_env.close()
             model.set_env(train_env)
         result.update({"history": history, "best": best, "active_tail_seed_count": len(active_seeds)})
         save_summary(out, result)
@@ -424,6 +459,7 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
     if best is not None and args.final_eval_episodes > 0:
         best_path = Path(best["checkpoint"])
         final_args = eval_args(args, args.final_seed_start, args.final_eval_episodes)
+        final_args.policy_terminal_normalizer_path = str(best.get("normalizer_path", ""))
         model_for_eval = PPO.load(str(best_path), device=args.device)
         seeds = final_seeds(args)
         final_eval = {
@@ -489,6 +525,9 @@ def main() -> None:
     parser.add_argument("--final-eval-episodes", type=int, default=300)
     parser.add_argument("--n-envs", type=int, default=12)
     parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="subproc")
+    parser.add_argument("--vec-normalize", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--vec-normalize-reward", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--vec-normalize-clip-obs", type=float, default=10.0)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--policy", default="MlpPolicy")
     parser.add_argument("--net-arch", default="64,64")
@@ -515,7 +554,7 @@ def main() -> None:
         choices=["stabilize_chain", "selected", "all"],
         default="stabilize_chain",
     )
-    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force"], default="normalized_raw")
+    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/policy_terminal_tail_curriculum")

@@ -229,6 +229,9 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     pole1_finetune = _load_script("run_n4_pole1_policy_finetune")
     tail_curriculum = _load_script("train_policy_terminal_tail_curriculum")
     recurrent_tail = _load_script("train_recurrent_policy_terminal_tail_curriculum")
+    ppo_sweep = _load_script("run_ppo_sweep")
+    residual = _load_script("train_residual_policy_terminal")
+    recurrent_curriculum = _load_script("train_recurrent_policy_terminal_curriculum")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -240,6 +243,9 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(pole1_finetune.collect_failure_dataset)
     assert callable(tail_curriculum.run_tail_curriculum)
     assert callable(recurrent_tail.run_recurrent_tail_curriculum)
+    assert callable(ppo_sweep.run_sweep)
+    assert callable(residual.train_residual)
+    assert callable(recurrent_curriculum.run_curriculum)
 
 
 def test_late_survival_bonus_starts_at_threshold():
@@ -272,3 +278,40 @@ def test_late_survival_bonus_starts_at_threshold():
     assert "late_survival_bonus" not in info_1
     assert "late_survival_bonus" not in info_2
     assert info_3["late_survival_bonus"] == 0.5
+
+
+def test_policy_observation_wrapper_pads_n3_to_raw4_prev_force():
+    args = _args(0.0)
+    args.n_poles = 3
+    args.horizon = 2
+    args.policy_observation_mode = "normalized_raw4_prev_force"
+    env = make_env(args, reward_mode="survival", use_success_bonus=False)
+    obs, _info = env.reset(seed=4)
+
+    assert obs.shape == (11,)
+    assert obs[5] == 0.0
+    assert obs[9] == 0.0
+    assert obs[-1] == 0.0
+
+
+def test_observation_normalizer_wrapper_applies_stats(tmp_path):
+    import gymnasium as gym
+    import json
+    import numpy as np
+
+    class ToyEnv(gym.Env):
+        observation_space = gym.spaces.Box(-10.0, 10.0, shape=(2,), dtype=np.float32)
+        action_space = gym.spaces.Discrete(1)
+
+        def reset(self, *, seed=None, options=None):
+            return np.asarray([3.0, 6.0], dtype=np.float32), {}
+
+        def step(self, action):
+            return np.asarray([3.0, 6.0], dtype=np.float32), 0.0, False, True, {}
+
+    path = tmp_path / "stats.json"
+    path.write_text(json.dumps({"mean": [1.0, 0.0], "var": [4.0, 9.0], "epsilon": 0.0, "clip_obs": 10.0}), encoding="utf-8")
+    env = trainer.ObservationNormalizerWrapper(ToyEnv(), str(path))
+    obs, _info = env.reset(seed=0)
+
+    assert np.allclose(obs, [1.0, 2.0])
