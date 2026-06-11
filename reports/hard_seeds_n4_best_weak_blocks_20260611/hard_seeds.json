@@ -1,0 +1,4207 @@
+{
+  "status": "completed",
+  "source": "weak 100-episode scout blocks below 0.70 success",
+  "model_path": "reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip",
+  "seed_starts": [
+    900000,
+    930000,
+    1010000,
+    1040000,
+    1140000
+  ],
+  "min_steps": 350.0,
+  "summary": {
+    "mean_survival": 482.832,
+    "p10_survival": 431.9,
+    "success_rate": 0.648,
+    "max_survival": 500.0,
+    "failure_counts": {
+      "pole_0_angle": 14,
+      "pole_2_angle": 70,
+      "pole_1_angle": 92
+    },
+    "hard_seed_count": 176,
+    "episodes_run": 500
+  },
+  "hard_seeds": [
+    900008,
+    900013,
+    900014,
+    900018,
+    900020,
+    900023,
+    900025,
+    900034,
+    900035,
+    900037,
+    900039,
+    900041,
+    900042,
+    900043,
+    900047,
+    900049,
+    900058,
+    900059,
+    900061,
+    900064,
+    900065,
+    900067,
+    900070,
+    900072,
+    900074,
+    900076,
+    900077,
+    900078,
+    900083,
+    900087,
+    900093,
+    900095,
+    900096,
+    930004,
+    930009,
+    930013,
+    930020,
+    930021,
+    930024,
+    930028,
+    930029,
+    930032,
+    930033,
+    930034,
+    930035,
+    930039,
+    930044,
+    930048,
+    930049,
+    930050,
+    930052,
+    930058,
+    930065,
+    930066,
+    930071,
+    930073,
+    930081,
+    930082,
+    930083,
+    930084,
+    930086,
+    930088,
+    930090,
+    930092,
+    930093,
+    930096,
+    930099,
+    1010014,
+    1010015,
+    1010017,
+    1010019,
+    1010022,
+    1010024,
+    1010025,
+    1010026,
+    1010029,
+    1010032,
+    1010041,
+    1010043,
+    1010044,
+    1010046,
+    1010050,
+    1010057,
+    1010059,
+    1010060,
+    1010063,
+    1010064,
+    1010066,
+    1010068,
+    1010071,
+    1010072,
+    1010080,
+    1010082,
+    1010083,
+    1010084,
+    1010088,
+    1010089,
+    1010092,
+    1010093,
+    1010098,
+    1010099,
+    1040000,
+    1040002,
+    1040003,
+    1040006,
+    1040007,
+    1040008,
+    1040009,
+    1040016,
+    1040017,
+    1040019,
+    1040023,
+    1040024,
+    1040029,
+    1040036,
+    1040037,
+    1040038,
+    1040042,
+    1040045,
+    1040047,
+    1040049,
+    1040050,
+    1040053,
+    1040054,
+    1040055,
+    1040057,
+    1040058,
+    1040063,
+    1040066,
+    1040067,
+    1040072,
+    1040074,
+    1040075,
+    1040076,
+    1040078,
+    1040086,
+    1040093,
+    1040095,
+    1040097,
+    1140000,
+    1140001,
+    1140002,
+    1140004,
+    1140009,
+    1140010,
+    1140011,
+    1140013,
+    1140018,
+    1140026,
+    1140027,
+    1140036,
+    1140038,
+    1140046,
+    1140047,
+    1140049,
+    1140050,
+    1140052,
+    1140053,
+    1140057,
+    1140058,
+    1140064,
+    1140065,
+    1140067,
+    1140069,
+    1140076,
+    1140079,
+    1140080,
+    1140082,
+    1140087,
+    1140089,
+    1140090,
+    1140093,
+    1140094,
+    1140096,
+    1140097,
+    1140098
+  ],
+  "rows": [
+    {
+      "seed": 900000,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900001,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900002,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900003,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900004,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900005,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900006,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900007,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900008,
+      "seed_start": 900000,
+      "steps": 482.0,
+      "return": 481.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 900009,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900010,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900011,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900012,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900013,
+      "seed_start": 900000,
+      "steps": 484.0,
+      "return": 483.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900014,
+      "seed_start": 900000,
+      "steps": 464.0,
+      "return": 463.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900015,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900016,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900017,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900018,
+      "seed_start": 900000,
+      "steps": 407.0,
+      "return": 406.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900019,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900020,
+      "seed_start": 900000,
+      "steps": 459.0,
+      "return": 458.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900021,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900022,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900023,
+      "seed_start": 900000,
+      "steps": 471.0,
+      "return": 470.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900024,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900025,
+      "seed_start": 900000,
+      "steps": 411.0,
+      "return": 410.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900026,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900027,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900028,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900029,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900030,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900031,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900032,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900033,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900034,
+      "seed_start": 900000,
+      "steps": 488.0,
+      "return": 487.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900035,
+      "seed_start": 900000,
+      "steps": 492.0,
+      "return": 491.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900036,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900037,
+      "seed_start": 900000,
+      "steps": 430.0,
+      "return": 429.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900038,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900039,
+      "seed_start": 900000,
+      "steps": 447.0,
+      "return": 446.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900040,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900041,
+      "seed_start": 900000,
+      "steps": 445.0,
+      "return": 444.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 900042,
+      "seed_start": 900000,
+      "steps": 462.0,
+      "return": 461.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900043,
+      "seed_start": 900000,
+      "steps": 419.0,
+      "return": 418.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900044,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900045,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900046,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900047,
+      "seed_start": 900000,
+      "steps": 414.0,
+      "return": 413.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900048,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900049,
+      "seed_start": 900000,
+      "steps": 453.0,
+      "return": 452.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900050,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900051,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900052,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900053,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900054,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900055,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900056,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900057,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900058,
+      "seed_start": 900000,
+      "steps": 468.0,
+      "return": 467.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900059,
+      "seed_start": 900000,
+      "steps": 475.0,
+      "return": 474.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900060,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900061,
+      "seed_start": 900000,
+      "steps": 443.0,
+      "return": 442.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900062,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900063,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900064,
+      "seed_start": 900000,
+      "steps": 438.0,
+      "return": 437.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900065,
+      "seed_start": 900000,
+      "steps": 482.0,
+      "return": 481.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 900066,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900067,
+      "seed_start": 900000,
+      "steps": 487.0,
+      "return": 486.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 900068,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900069,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900070,
+      "seed_start": 900000,
+      "steps": 477.0,
+      "return": 476.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900071,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900072,
+      "seed_start": 900000,
+      "steps": 489.0,
+      "return": 488.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900073,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900074,
+      "seed_start": 900000,
+      "steps": 432.0,
+      "return": 431.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900075,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900076,
+      "seed_start": 900000,
+      "steps": 485.0,
+      "return": 484.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900077,
+      "seed_start": 900000,
+      "steps": 489.0,
+      "return": 488.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900078,
+      "seed_start": 900000,
+      "steps": 455.0,
+      "return": 454.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900079,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900080,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900081,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900082,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900083,
+      "seed_start": 900000,
+      "steps": 439.0,
+      "return": 438.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900084,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900085,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900086,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900087,
+      "seed_start": 900000,
+      "steps": 407.0,
+      "return": 406.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900088,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900089,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 499.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900090,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900091,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900092,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900093,
+      "seed_start": 900000,
+      "steps": 437.0,
+      "return": 436.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900094,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900095,
+      "seed_start": 900000,
+      "steps": 476.0,
+      "return": 475.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 900096,
+      "seed_start": 900000,
+      "steps": 498.0,
+      "return": 497.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 900097,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900098,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 900099,
+      "seed_start": 900000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930000,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930001,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930002,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930003,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930004,
+      "seed_start": 930000,
+      "steps": 466.0,
+      "return": 465.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930005,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930006,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930007,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930008,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930009,
+      "seed_start": 930000,
+      "steps": 483.0,
+      "return": 482.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930010,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930011,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930012,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930013,
+      "seed_start": 930000,
+      "steps": 488.0,
+      "return": 487.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930014,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930015,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930016,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930017,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930018,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930019,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930020,
+      "seed_start": 930000,
+      "steps": 460.0,
+      "return": 459.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930021,
+      "seed_start": 930000,
+      "steps": 489.0,
+      "return": 488.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 930022,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930023,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930024,
+      "seed_start": 930000,
+      "steps": 402.0,
+      "return": 401.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930025,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930026,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930027,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930028,
+      "seed_start": 930000,
+      "steps": 438.0,
+      "return": 437.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930029,
+      "seed_start": 930000,
+      "steps": 446.0,
+      "return": 445.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930030,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930031,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930032,
+      "seed_start": 930000,
+      "steps": 433.0,
+      "return": 432.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930033,
+      "seed_start": 930000,
+      "steps": 440.0,
+      "return": 439.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930034,
+      "seed_start": 930000,
+      "steps": 411.0,
+      "return": 410.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930035,
+      "seed_start": 930000,
+      "steps": 469.0,
+      "return": 468.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930036,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930037,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930038,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930039,
+      "seed_start": 930000,
+      "steps": 497.0,
+      "return": 496.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930040,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930041,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930042,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930043,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930044,
+      "seed_start": 930000,
+      "steps": 480.0,
+      "return": 479.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930045,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930046,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930047,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930048,
+      "seed_start": 930000,
+      "steps": 406.0,
+      "return": 405.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930049,
+      "seed_start": 930000,
+      "steps": 448.0,
+      "return": 447.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930050,
+      "seed_start": 930000,
+      "steps": 397.0,
+      "return": 396.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930051,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930052,
+      "seed_start": 930000,
+      "steps": 481.0,
+      "return": 480.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930053,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930054,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930055,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930056,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 499.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930057,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930058,
+      "seed_start": 930000,
+      "steps": 490.0,
+      "return": 489.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930059,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930060,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930061,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930062,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930063,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930064,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930065,
+      "seed_start": 930000,
+      "steps": 408.0,
+      "return": 407.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930066,
+      "seed_start": 930000,
+      "steps": 490.0,
+      "return": 489.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 930067,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930068,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930069,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930070,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930071,
+      "seed_start": 930000,
+      "steps": 397.0,
+      "return": 396.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930072,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930073,
+      "seed_start": 930000,
+      "steps": 456.0,
+      "return": 455.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930074,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930075,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930076,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930077,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930078,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930079,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930080,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930081,
+      "seed_start": 930000,
+      "steps": 463.0,
+      "return": 462.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930082,
+      "seed_start": 930000,
+      "steps": 456.0,
+      "return": 455.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930083,
+      "seed_start": 930000,
+      "steps": 493.0,
+      "return": 492.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930084,
+      "seed_start": 930000,
+      "steps": 480.0,
+      "return": 479.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930085,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930086,
+      "seed_start": 930000,
+      "steps": 448.0,
+      "return": 447.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930087,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930088,
+      "seed_start": 930000,
+      "steps": 466.0,
+      "return": 465.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930089,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930090,
+      "seed_start": 930000,
+      "steps": 419.0,
+      "return": 418.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930091,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930092,
+      "seed_start": 930000,
+      "steps": 489.0,
+      "return": 488.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 930093,
+      "seed_start": 930000,
+      "steps": 424.0,
+      "return": 423.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930094,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930095,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930096,
+      "seed_start": 930000,
+      "steps": 445.0,
+      "return": 444.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 930097,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930098,
+      "seed_start": 930000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 930099,
+      "seed_start": 930000,
+      "steps": 458.0,
+      "return": 457.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010000,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010001,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010002,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010003,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010004,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010005,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010006,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010007,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010008,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010009,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010010,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010011,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010012,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010013,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010014,
+      "seed_start": 1010000,
+      "steps": 453.0,
+      "return": 452.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010015,
+      "seed_start": 1010000,
+      "steps": 486.0,
+      "return": 485.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010016,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010017,
+      "seed_start": 1010000,
+      "steps": 431.0,
+      "return": 430.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010018,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010019,
+      "seed_start": 1010000,
+      "steps": 399.0,
+      "return": 398.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010020,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010021,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010022,
+      "seed_start": 1010000,
+      "steps": 440.0,
+      "return": 439.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010023,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010024,
+      "seed_start": 1010000,
+      "steps": 432.0,
+      "return": 431.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010025,
+      "seed_start": 1010000,
+      "steps": 466.0,
+      "return": 465.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010026,
+      "seed_start": 1010000,
+      "steps": 434.0,
+      "return": 433.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010027,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010028,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010029,
+      "seed_start": 1010000,
+      "steps": 480.0,
+      "return": 479.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010030,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010031,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010032,
+      "seed_start": 1010000,
+      "steps": 406.0,
+      "return": 405.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010033,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010034,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010035,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010036,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010037,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010038,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010039,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010040,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010041,
+      "seed_start": 1010000,
+      "steps": 465.0,
+      "return": 464.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010042,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010043,
+      "seed_start": 1010000,
+      "steps": 486.0,
+      "return": 485.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 1010044,
+      "seed_start": 1010000,
+      "steps": 455.0,
+      "return": 454.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010045,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010046,
+      "seed_start": 1010000,
+      "steps": 486.0,
+      "return": 485.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010047,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010048,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010049,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010050,
+      "seed_start": 1010000,
+      "steps": 431.0,
+      "return": 430.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010051,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010052,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010053,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010054,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010055,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010056,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010057,
+      "seed_start": 1010000,
+      "steps": 481.0,
+      "return": 480.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010058,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010059,
+      "seed_start": 1010000,
+      "steps": 405.0,
+      "return": 404.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010060,
+      "seed_start": 1010000,
+      "steps": 445.0,
+      "return": 444.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010061,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010062,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010063,
+      "seed_start": 1010000,
+      "steps": 475.0,
+      "return": 474.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010064,
+      "seed_start": 1010000,
+      "steps": 420.0,
+      "return": 419.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010065,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010066,
+      "seed_start": 1010000,
+      "steps": 496.0,
+      "return": 495.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010067,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010068,
+      "seed_start": 1010000,
+      "steps": 497.0,
+      "return": 496.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010069,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010070,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010071,
+      "seed_start": 1010000,
+      "steps": 423.0,
+      "return": 422.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010072,
+      "seed_start": 1010000,
+      "steps": 427.0,
+      "return": 426.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010073,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010074,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010075,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010076,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010077,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010078,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010079,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010080,
+      "seed_start": 1010000,
+      "steps": 478.0,
+      "return": 477.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010081,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010082,
+      "seed_start": 1010000,
+      "steps": 458.0,
+      "return": 457.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010083,
+      "seed_start": 1010000,
+      "steps": 426.0,
+      "return": 425.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010084,
+      "seed_start": 1010000,
+      "steps": 435.0,
+      "return": 434.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010085,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010086,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010087,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010088,
+      "seed_start": 1010000,
+      "steps": 400.0,
+      "return": 399.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010089,
+      "seed_start": 1010000,
+      "steps": 434.0,
+      "return": 433.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010090,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010091,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010092,
+      "seed_start": 1010000,
+      "steps": 439.0,
+      "return": 438.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1010093,
+      "seed_start": 1010000,
+      "steps": 432.0,
+      "return": 431.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010094,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010095,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010096,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010097,
+      "seed_start": 1010000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1010098,
+      "seed_start": 1010000,
+      "steps": 401.0,
+      "return": 400.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1010099,
+      "seed_start": 1010000,
+      "steps": 447.0,
+      "return": 446.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040000,
+      "seed_start": 1040000,
+      "steps": 496.0,
+      "return": 495.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 1040001,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040002,
+      "seed_start": 1040000,
+      "steps": 469.0,
+      "return": 468.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040003,
+      "seed_start": 1040000,
+      "steps": 413.0,
+      "return": 412.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040004,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040005,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040006,
+      "seed_start": 1040000,
+      "steps": 478.0,
+      "return": 477.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040007,
+      "seed_start": 1040000,
+      "steps": 434.0,
+      "return": 433.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040008,
+      "seed_start": 1040000,
+      "steps": 430.0,
+      "return": 429.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040009,
+      "seed_start": 1040000,
+      "steps": 469.0,
+      "return": 468.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040010,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040011,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040012,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040013,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040014,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040015,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040016,
+      "seed_start": 1040000,
+      "steps": 446.0,
+      "return": 445.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040017,
+      "seed_start": 1040000,
+      "steps": 476.0,
+      "return": 475.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040018,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040019,
+      "seed_start": 1040000,
+      "steps": 423.0,
+      "return": 422.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040020,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040021,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040022,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040023,
+      "seed_start": 1040000,
+      "steps": 405.0,
+      "return": 404.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040024,
+      "seed_start": 1040000,
+      "steps": 493.0,
+      "return": 492.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040025,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040026,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040027,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040028,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040029,
+      "seed_start": 1040000,
+      "steps": 460.0,
+      "return": 459.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040030,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040031,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040032,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040033,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040034,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040035,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040036,
+      "seed_start": 1040000,
+      "steps": 445.0,
+      "return": 444.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040037,
+      "seed_start": 1040000,
+      "steps": 423.0,
+      "return": 422.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040038,
+      "seed_start": 1040000,
+      "steps": 492.0,
+      "return": 491.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040039,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040040,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040041,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040042,
+      "seed_start": 1040000,
+      "steps": 478.0,
+      "return": 477.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040043,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040044,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040045,
+      "seed_start": 1040000,
+      "steps": 428.0,
+      "return": 427.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040046,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040047,
+      "seed_start": 1040000,
+      "steps": 400.0,
+      "return": 399.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040048,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040049,
+      "seed_start": 1040000,
+      "steps": 455.0,
+      "return": 454.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040050,
+      "seed_start": 1040000,
+      "steps": 474.0,
+      "return": 473.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040051,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040052,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040053,
+      "seed_start": 1040000,
+      "steps": 478.0,
+      "return": 477.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040054,
+      "seed_start": 1040000,
+      "steps": 464.0,
+      "return": 463.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040055,
+      "seed_start": 1040000,
+      "steps": 445.0,
+      "return": 444.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040056,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040057,
+      "seed_start": 1040000,
+      "steps": 403.0,
+      "return": 402.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040058,
+      "seed_start": 1040000,
+      "steps": 497.0,
+      "return": 496.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040059,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040060,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040061,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040062,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040063,
+      "seed_start": 1040000,
+      "steps": 451.0,
+      "return": 450.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040064,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040065,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040066,
+      "seed_start": 1040000,
+      "steps": 472.0,
+      "return": 471.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 1040067,
+      "seed_start": 1040000,
+      "steps": 490.0,
+      "return": 489.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040068,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040069,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040070,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040071,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040072,
+      "seed_start": 1040000,
+      "steps": 488.0,
+      "return": 487.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040073,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040074,
+      "seed_start": 1040000,
+      "steps": 454.0,
+      "return": 453.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040075,
+      "seed_start": 1040000,
+      "steps": 373.0,
+      "return": 372.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040076,
+      "seed_start": 1040000,
+      "steps": 432.0,
+      "return": 431.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040077,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040078,
+      "seed_start": 1040000,
+      "steps": 488.0,
+      "return": 487.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040079,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040080,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040081,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040082,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040083,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040084,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040085,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040086,
+      "seed_start": 1040000,
+      "steps": 427.0,
+      "return": 426.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040087,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040088,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040089,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040090,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040091,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040092,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040093,
+      "seed_start": 1040000,
+      "steps": 477.0,
+      "return": 476.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1040094,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040095,
+      "seed_start": 1040000,
+      "steps": 453.0,
+      "return": 452.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1040096,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040097,
+      "seed_start": 1040000,
+      "steps": 494.0,
+      "return": 493.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 1040098,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1040099,
+      "seed_start": 1040000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140000,
+      "seed_start": 1140000,
+      "steps": 479.0,
+      "return": 478.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140001,
+      "seed_start": 1140000,
+      "steps": 421.0,
+      "return": 420.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140002,
+      "seed_start": 1140000,
+      "steps": 494.0,
+      "return": 493.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140003,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140004,
+      "seed_start": 1140000,
+      "steps": 489.0,
+      "return": 488.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 1140005,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140006,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140007,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140008,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140009,
+      "seed_start": 1140000,
+      "steps": 435.0,
+      "return": 434.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140010,
+      "seed_start": 1140000,
+      "steps": 445.0,
+      "return": 444.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 1140011,
+      "seed_start": 1140000,
+      "steps": 413.0,
+      "return": 412.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140012,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140013,
+      "seed_start": 1140000,
+      "steps": 474.0,
+      "return": 473.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140014,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140015,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140016,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140017,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140018,
+      "seed_start": 1140000,
+      "steps": 383.0,
+      "return": 382.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140019,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140020,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140021,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140022,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140023,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140024,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140025,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140026,
+      "seed_start": 1140000,
+      "steps": 402.0,
+      "return": 401.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140027,
+      "seed_start": 1140000,
+      "steps": 447.0,
+      "return": 446.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140028,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140029,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140030,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140031,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140032,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140033,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140034,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140035,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140036,
+      "seed_start": 1140000,
+      "steps": 479.0,
+      "return": 478.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140037,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140038,
+      "seed_start": 1140000,
+      "steps": 430.0,
+      "return": 429.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140039,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140040,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140041,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140042,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140043,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140044,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140045,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140046,
+      "seed_start": 1140000,
+      "steps": 475.0,
+      "return": 474.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140047,
+      "seed_start": 1140000,
+      "steps": 499.0,
+      "return": 498.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 1140048,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140049,
+      "seed_start": 1140000,
+      "steps": 486.0,
+      "return": 485.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140050,
+      "seed_start": 1140000,
+      "steps": 394.0,
+      "return": 393.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140051,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140052,
+      "seed_start": 1140000,
+      "steps": 410.0,
+      "return": 409.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140053,
+      "seed_start": 1140000,
+      "steps": 440.0,
+      "return": 439.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140054,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140055,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140056,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140057,
+      "seed_start": 1140000,
+      "steps": 460.0,
+      "return": 459.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140058,
+      "seed_start": 1140000,
+      "steps": 423.0,
+      "return": 422.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140059,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140060,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140061,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140062,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140063,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140064,
+      "seed_start": 1140000,
+      "steps": 459.0,
+      "return": 458.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140065,
+      "seed_start": 1140000,
+      "steps": 390.0,
+      "return": 389.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140066,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140067,
+      "seed_start": 1140000,
+      "steps": 498.0,
+      "return": 497.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140068,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140069,
+      "seed_start": 1140000,
+      "steps": 493.0,
+      "return": 492.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140070,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140071,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140072,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140073,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140074,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140075,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140076,
+      "seed_start": 1140000,
+      "steps": 495.0,
+      "return": 494.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140077,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140078,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140079,
+      "seed_start": 1140000,
+      "steps": 369.0,
+      "return": 368.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140080,
+      "seed_start": 1140000,
+      "steps": 430.0,
+      "return": 429.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140081,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140082,
+      "seed_start": 1140000,
+      "steps": 386.0,
+      "return": 385.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140083,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140084,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140085,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140086,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140087,
+      "seed_start": 1140000,
+      "steps": 476.0,
+      "return": 475.0,
+      "success": false,
+      "failure": "pole_0_angle"
+    },
+    {
+      "seed": 1140088,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140089,
+      "seed_start": 1140000,
+      "steps": 425.0,
+      "return": 424.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140090,
+      "seed_start": 1140000,
+      "steps": 456.0,
+      "return": 455.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140091,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140092,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140093,
+      "seed_start": 1140000,
+      "steps": 453.0,
+      "return": 452.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140094,
+      "seed_start": 1140000,
+      "steps": 449.0,
+      "return": 448.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140095,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    },
+    {
+      "seed": 1140096,
+      "seed_start": 1140000,
+      "steps": 499.0,
+      "return": 498.0,
+      "success": false,
+      "failure": "pole_2_angle"
+    },
+    {
+      "seed": 1140097,
+      "seed_start": 1140000,
+      "steps": 388.0,
+      "return": 387.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140098,
+      "seed_start": 1140000,
+      "steps": 409.0,
+      "return": 408.0,
+      "success": false,
+      "failure": "pole_1_angle"
+    },
+    {
+      "seed": 1140099,
+      "seed_start": 1140000,
+      "steps": 500.0,
+      "return": 500.0,
+      "success": true,
+      "failure": "truncated"
+    }
+  ],
+  "wall_clock_seconds": 368.017229923993
+}

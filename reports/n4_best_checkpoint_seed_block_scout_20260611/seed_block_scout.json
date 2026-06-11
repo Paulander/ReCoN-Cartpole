@@ -1,0 +1,110 @@
+{
+  "checkpoint": "reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip",
+  "episodes_per_block": 100,
+  "rows": [
+    {
+      "seed_start": 900000,
+      "mean_survival": 486.05,
+      "p10_survival": 442.6,
+      "success_rate": 0.67,
+      "max_survival": 500.0,
+      "cvar_survival": 423.4,
+      "bottom_count": 10.0,
+      "median_survival": 500.0,
+      "returns_mean": 485.71,
+      "episodes": 100,
+      "wall_clock_seconds": 71.5926570570009
+    },
+    {
+      "seed_start": 930000,
+      "mean_survival": 484.16,
+      "p10_survival": 439.8,
+      "success_rate": 0.66,
+      "max_survival": 500.0,
+      "cvar_survival": 413.5,
+      "bottom_count": 10.0,
+      "median_survival": 500.0,
+      "returns_mean": 483.81,
+      "episodes": 100,
+      "wall_clock_seconds": 71.2708493280079
+    },
+    {
+      "seed_start": 970000,
+      "mean_survival": 485.52,
+      "p10_survival": 438.8,
+      "success_rate": 0.72,
+      "max_survival": 500.0,
+      "cvar_survival": 414.8,
+      "bottom_count": 10.0,
+      "median_survival": 500.0,
+      "returns_mean": 485.23,
+      "episodes": 100,
+      "wall_clock_seconds": 71.21376086499367
+    },
+    {
+      "seed_start": 1010000,
+      "mean_survival": 481.69,
+      "p10_survival": 431.0,
+      "success_rate": 0.66,
+      "max_survival": 500.0,
+      "cvar_survival": 413.8,
+      "bottom_count": 10.0,
+      "median_survival": 500.0,
+      "returns_mean": 481.35,
+      "episodes": 100,
+      "wall_clock_seconds": 70.70612862899725
+    },
+    {
+      "seed_start": 1040000,
+      "mean_survival": 482.73,
+      "p10_survival": 431.8,
+      "success_rate": 0.62,
+      "max_survival": 500.0,
+      "cvar_survival": 412.5,
+      "bottom_count": 10.0,
+      "median_survival": 500.0,
+      "returns_mean": 482.35,
+      "episodes": 100,
+      "wall_clock_seconds": 70.90845770800661
+    },
+    {
+      "seed_start": 1070000,
+      "mean_survival": 485.42,
+      "p10_survival": 439.8,
+      "success_rate": 0.72,
+      "max_survival": 500.0,
+      "cvar_survival": 414.5,
+      "bottom_count": 10.0,
+      "median_survival": 500.0,
+      "returns_mean": 485.14,
+      "episodes": 100,
+      "wall_clock_seconds": 71.59385364300397
+    },
+    {
+      "seed_start": 1140000,
+      "mean_survival": 479.53,
+      "p10_survival": 420.2,
+      "success_rate": 0.63,
+      "max_survival": 500.0,
+      "cvar_survival": 394.4,
+      "bottom_count": 10.0,
+      "median_survival": 500.0,
+      "returns_mean": 479.16,
+      "episodes": 100,
+      "wall_clock_seconds": 70.21153607599263
+    },
+    {
+      "seed_start": 1300000,
+      "mean_survival": 486.46,
+      "p10_survival": 449.4,
+      "success_rate": 0.76,
+      "max_survival": 500.0,
+      "cvar_survival": 411.3,
+      "bottom_count": 10.0,
+      "median_survival": 500.0,
+      "returns_mean": 486.22,
+      "episodes": 100,
+      "wall_clock_seconds": 71.34294016500644
+    }
+  ]
+}
