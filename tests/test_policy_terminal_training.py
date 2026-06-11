@@ -228,6 +228,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     final_gap = _load_script("run_n4_final_success_gap")
     pole1_finetune = _load_script("run_n4_pole1_policy_finetune")
     tail_curriculum = _load_script("train_policy_terminal_tail_curriculum")
+    recurrent_tail = _load_script("train_recurrent_policy_terminal_tail_curriculum")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -238,3 +239,4 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(final_gap.candidate_configs)
     assert callable(pole1_finetune.collect_failure_dataset)
     assert callable(tail_curriculum.run_tail_curriculum)
+    assert callable(recurrent_tail.run_recurrent_tail_curriculum)

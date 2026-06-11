@@ -113,6 +113,7 @@ class RunnerConfig:
     policy_terminal_frame_stack: int = 1
     policy_terminal_scope: str = "stabilize_chain"
     policy_terminal_observation_mode: str = "env"
+    policy_terminal_recurrent: bool = False
     mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
     pole1_fix: Pole1FixConfig = field(default_factory=Pole1FixConfig)
     rescue: RescueConfig = field(default_factory=RescueConfig)
@@ -156,6 +157,8 @@ class ReConCartPoleController:
             )
         self.policy_terminal_model: Any | None = None
         self.policy_terminal_obs_history: list[np.ndarray] = []
+        self.policy_terminal_state: Any | None = None
+        self.policy_terminal_episode_start = np.ones((1,), dtype=bool)
         self.last_policy_terminal: dict[str, Any] = {}
         if self._uses_policy_terminal() and self.config.policy_terminal_path:
             self.policy_terminal_model = self._load_policy_terminal(
@@ -224,6 +227,7 @@ class ReConCartPoleController:
     def _uses_policy_terminal(self) -> bool:
         return self.config.mode in (
             "recon_policy_terminal",
+            "recon_recurrent_policy_terminal",
             "recon_feedforward_terminal_frozen",
             "recon_feedforward_terminal_plus_recon_learning",
             "recon_feedforward_terminal_with_pole1_fix",
@@ -246,6 +250,8 @@ class ReConCartPoleController:
             "node_param_learning": self._uses_node_params(),
             "mlp_terminal": self._uses_mlp_terminal(),
             "policy_terminal": self._uses_policy_terminal(),
+            "recurrent_policy_terminal": self._uses_policy_terminal()
+            and self.config.policy_terminal_recurrent,
             "minGRU_terminal": self._uses_mingru_terminal(),
             "pole1_fix": self.config.pole1_fix.enabled or self._uses_pole1_fix(),
             "rescue_patches": self.config.rescue.enabled,
@@ -268,6 +274,8 @@ class ReConCartPoleController:
             self.config.mlp_terminal, self.mlp_rng, self.config.learn and self._uses_mlp_terminal()
         )
         self.policy_terminal_obs_history = []
+        self.policy_terminal_state = None
+        self.policy_terminal_episode_start = np.ones((1,), dtype=bool)
         self.last_policy_terminal = {}
         self.last_mingru_terminal = {}
         self.last_rescue = {}
@@ -493,6 +501,7 @@ class ReConCartPoleController:
                 "policy_terminal_frame_stack": self.config.policy_terminal_frame_stack,
                 "policy_terminal_scope": self.config.policy_terminal_scope,
                 "policy_terminal_observation_mode": self.config.policy_terminal_observation_mode,
+                "policy_terminal_recurrent": self.config.policy_terminal_recurrent,
                 "mingru_terminal_config": self.config.mingru_terminal.__dict__,
                 "pole1_fix_config": self.config.pole1_fix.__dict__,
                 "rescue_config": self.config.rescue.__dict__,
@@ -559,6 +568,12 @@ class ReConCartPoleController:
         return self.set_edge_weight(src, dst, ltype, weight)
 
     def _load_policy_terminal(self, path: str) -> Any:
+        if self.config.policy_terminal_recurrent:
+            try:
+                from sb3_contrib import RecurrentPPO
+            except Exception as exc:  # pragma: no cover - optional dependency path
+                raise RuntimeError("recurrent policy terminals require sb3-contrib") from exc
+            return RecurrentPPO.load(path, device="cpu")
         try:
             from stable_baselines3 import PPO
         except Exception as exc:  # pragma: no cover - optional dependency path
@@ -617,7 +632,19 @@ class ReConCartPoleController:
             cached = context["_policy_terminal_cache"]
             return cached["force"], dict(cached["info"])
         policy_observation = self._policy_terminal_observation(observation, raw_state)
-        action, _state = self.policy_terminal_model.predict(policy_observation, deterministic=True)
+        recurrent_episode_start = bool(self.policy_terminal_episode_start[0])
+        if self.config.policy_terminal_recurrent:
+            action, self.policy_terminal_state = self.policy_terminal_model.predict(
+                policy_observation,
+                state=self.policy_terminal_state,
+                episode_start=self.policy_terminal_episode_start,
+                deterministic=True,
+            )
+            self.policy_terminal_episode_start = np.zeros((1,), dtype=bool)
+        else:
+            action, _state = self.policy_terminal_model.predict(
+                policy_observation, deterministic=True
+            )
         force = self._force_from_policy_action(action)
         info = {
             "available": True,
@@ -626,6 +653,10 @@ class ReConCartPoleController:
             "observation_size": int(policy_observation.size),
             "scope": self.config.policy_terminal_scope,
             "observation_mode": self.config.policy_terminal_observation_mode,
+            "recurrent": bool(self.config.policy_terminal_recurrent),
+            "episode_start": recurrent_episode_start
+            if self.config.policy_terminal_recurrent
+            else False,
             "action": np.asarray(action).reshape(-1).tolist(),
             "force": force,
         }

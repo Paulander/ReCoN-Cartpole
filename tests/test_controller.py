@@ -448,6 +448,54 @@ def test_recon_policy_terminal_frame_stack_feeds_policy_and_resets():
     )
 
 
+def test_recurrent_policy_terminal_tracks_state_and_episode_start():
+    class FakeRecurrentPolicy:
+        def __init__(self):
+            self.calls = []
+
+        def predict(self, observation, state=None, episode_start=None, deterministic=True):
+            self.calls.append(
+                {
+                    "state": state,
+                    "episode_start": np.asarray(episode_start, dtype=bool).copy(),
+                    "deterministic": deterministic,
+                }
+            )
+            next_state = "state_1" if state is None else f"{state}_next"
+            return 4, next_state
+
+    raw = np.asarray([0.24, 0.5, 0.01, -0.02, 0.03, -0.04, 0.1, -0.2, 0.3, -0.4], dtype=np.float32)
+    policy = FakeRecurrentPolicy()
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=4,
+            mode="recon_recurrent_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_recurrent=True,
+            policy_terminal_observation_mode="normalized_raw",
+        )
+    )
+    controller.policy_terminal_model = policy
+
+    _action, first = controller.act(raw, raw)
+    _action, second = controller.act(raw, raw)
+    controller.start_episode()
+    _action, third = controller.act(raw, raw)
+
+    assert policy.calls[0]["state"] is None
+    assert policy.calls[0]["episode_start"].tolist() == [True]
+    assert policy.calls[1]["state"] == "state_1"
+    assert policy.calls[1]["episode_start"].tolist() == [False]
+    assert policy.calls[2]["state"] is None
+    assert policy.calls[2]["episode_start"].tolist() == [True]
+    assert first["policy_terminal"]["recurrent"] is True
+    assert first["policy_terminal"]["episode_start"] is True
+    assert second["policy_terminal"]["episode_start"] is False
+    assert third["policy_terminal"]["episode_start"] is True
+
+
 def test_recon_policy_terminal_normalized_raw_observation_mode():
     class FakePolicy:
         def __init__(self):

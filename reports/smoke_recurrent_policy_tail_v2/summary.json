@@ -1,0 +1,209 @@
+{
+  "status": "completed_not_solved",
+  "threshold": {
+    "mean_survival": 475.0,
+    "p10_survival": 350.0,
+    "success_rate": 0.7,
+    "episodes": 300
+  },
+  "mechanism": "RecurrentPPO policy terminal inside ReCoN",
+  "reward_mode": "upright_shaping",
+  "selection_mode": "hard_select",
+  "policy_terminal_blend": 1.0,
+  "policy_terminal_scope": "stabilize_chain",
+  "frame_stack": 1,
+  "policy_observation_mode": "normalized_raw",
+  "hard_train_seed_count": 600,
+  "hard_train_seed_probability": 0.4,
+  "tail_seed_refresh_count": 2,
+  "tail_seed_pool_limit": 20,
+  "validation_seed_starts": [
+    1110000,
+    1120000
+  ],
+  "validation_episodes": 2,
+  "final_eval_episodes": 2,
+  "score_weights": {
+    "mean_survival": 0.25,
+    "p10_survival": 0.85,
+    "cvar_survival": 0.85,
+    "success_rate": 140.0
+  },
+  "promotion_gates": {
+    "max_success_regression": 0.01,
+    "max_p10_regression": 6.0,
+    "max_cvar_regression": 8.0
+  },
+  "ppo_config": {
+    "policy": "MlpLstmPolicy",
+    "net_arch": "64,64",
+    "activation": "tanh",
+    "learning_rate": 5e-05,
+    "n_steps": 16,
+    "batch_size": 16,
+    "n_epochs": 1,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip_range": 0.08,
+    "ent_coef": 0.0,
+    "vf_coef": 0.5,
+    "max_grad_norm": 0.5,
+    "lstm_hidden_size": 32,
+    "n_lstm_layers": 1,
+    "shared_lstm": false,
+    "enable_critic_lstm": true,
+    "vec_env": "dummy"
+  },
+  "history": [
+    {
+      "label": "chunk_1",
+      "checkpoint": "reports/smoke_recurrent_policy_tail_v2/checkpoint_000064.zip",
+      "total_timesteps": 64,
+      "validation": {
+        "mean_survival": 428.5,
+        "p10_survival": 356.3,
+        "success_rate": 0.25,
+        "max_survival": 500.0,
+        "cvar_survival": 317.0,
+        "bottom_count": 1.0,
+        "median_survival": 448.5,
+        "returns_mean": 427.75,
+        "episodes": 4,
+        "wall_clock_seconds": 3.3146926170011284,
+        "per_seed": [
+          {
+            "seed": 1110000,
+            "steps": 317,
+            "return": 316.0,
+            "success": false
+          },
+          {
+            "seed": 1110001,
+            "steps": 449,
+            "return": 448.0,
+            "success": false
+          },
+          {
+            "seed": 1120000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1120001,
+            "steps": 448,
+            "return": 447.0,
+            "success": false
+          }
+        ]
+      },
+      "score": 714.4300000000001,
+      "tail_seed_candidates": [
+        1110001,
+        1120001
+      ],
+      "validation_seed_starts": [
+        1110000,
+        1120000
+      ],
+      "validation_seed_count": 4,
+      "promoted": true
+    }
+  ],
+  "best": {
+    "label": "chunk_1",
+    "checkpoint": "reports/smoke_recurrent_policy_tail_v2/checkpoint_000064.zip",
+    "total_timesteps": 64,
+    "validation": {
+      "mean_survival": 428.5,
+      "p10_survival": 356.3,
+      "success_rate": 0.25,
+      "max_survival": 500.0,
+      "cvar_survival": 317.0,
+      "bottom_count": 1.0,
+      "median_survival": 448.5,
+      "returns_mean": 427.75,
+      "episodes": 4,
+      "wall_clock_seconds": 3.3146926170011284,
+      "per_seed": [
+        {
+          "seed": 1110000,
+          "steps": 317,
+          "return": 316.0,
+          "success": false
+        },
+        {
+          "seed": 1110001,
+          "steps": 449,
+          "return": 448.0,
+          "success": false
+        },
+        {
+          "seed": 1120000,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1120001,
+          "steps": 448,
+          "return": 447.0,
+          "success": false
+        }
+      ]
+    },
+    "score": 714.4300000000001,
+    "tail_seed_candidates": [
+      1110001,
+      1120001
+    ],
+    "validation_seed_starts": [
+      1110000,
+      1120000
+    ],
+    "validation_seed_count": 4,
+    "promoted": true
+  },
+  "active_tail_seed_count": 20,
+  "final_eval": {
+    "checkpoint": "reports/smoke_recurrent_policy_tail_v2/checkpoint_000064.zip",
+    "pure_recurrent_ppo_eval": {
+      "mean_survival": 379.0,
+      "p10_survival": 371.0,
+      "success_rate": 0.0,
+      "max_survival": 389.0,
+      "cvar_survival": 369.0,
+      "bottom_count": 1.0,
+      "median_survival": 379.0,
+      "returns_mean": 378.0,
+      "episodes": 2
+    },
+    "recon_policy_terminal_eval": {
+      "mean_survival": 379.0,
+      "p10_survival": 371.0,
+      "success_rate": 0.0,
+      "max_survival": 389.0,
+      "cvar_survival": 369.0,
+      "bottom_count": 1.0,
+      "median_survival": 379.0,
+      "returns_mean": 378.0,
+      "episodes": 2,
+      "wall_clock_seconds": 1.4585908130102325,
+      "per_seed": [
+        {
+          "seed": 1140000,
+          "steps": 389,
+          "return": 388.0,
+          "success": false
+        },
+        {
+          "seed": 1140001,
+          "steps": 369,
+          "return": 368.0,
+          "success": false
+        }
+      ]
+    }
+  },
+  "wall_clock_seconds": 30.566528102994198
+}

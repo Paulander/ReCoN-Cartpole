@@ -19,6 +19,7 @@ ControllerMode = Literal[
     "recon_slow_no_gain_search",
     "recon_mlp_terminal",
     "recon_policy_terminal",
+    "recon_recurrent_policy_terminal",
     "recon_feedforward_terminal_frozen",
     "recon_feedforward_terminal_plus_recon_learning",
     "recon_feedforward_terminal_with_pole1_fix",

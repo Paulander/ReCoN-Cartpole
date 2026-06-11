@@ -19,7 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10"]
 viz = ["plotly>=5", "jinja2>=3"]
-rl = ["torch", "stable-baselines3"]
+rl = ["torch", "stable-baselines3", "sb3-contrib"]
 
 [project.scripts]
 recon-cartpole = "recon_cartpole.cli:main"
