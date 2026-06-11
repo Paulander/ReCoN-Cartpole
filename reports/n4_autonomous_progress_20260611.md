@@ -46,6 +46,19 @@ Started from the best feedforward checkpoint and trained tiny 5k PPO chunks agai
 
 The run was stopped after two flat chunks.
 
+## Stronger Terminal Reward Microfit
+
+Run: `reports/n4_robust_tail_terminal_reward_microfit_20260611_seed2170k`.
+
+This repeated the guarded weak-block microfit with `success_bonus=50` and `failure_penalty=10`. It regressed after the first 5k chunk:
+
+| Checkpoint | Mean | P10 | CVaR | Success | Promoted |
+|---|---:|---:|---:|---:|---:|
+| start | 484.9 | 434.9 | 414.8 | 0.696 | true |
+| chunk_1 5k | 484.4 | 433.9 | 413.1 | 0.692 | false |
+
+Interpretation: stronger terminal reward alone is not enough to convert late failures; it begins to damage the current policy.
+
 ## Practical Next Moves
 
 1. Try a different action formulation before more fine-tuning: continuous action or more than 5 discrete force bins. The current failures are late near-misses where coarse action resolution may matter.
