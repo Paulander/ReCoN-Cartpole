@@ -78,6 +78,31 @@ class FailurePenaltyWrapper(gym.Wrapper):
         return obs, float(reward), terminated, truncated, info
 
 
+
+class LateSurvivalBonusWrapper(gym.Wrapper):
+    def __init__(self, env: gym.Env, bonus: float, start_fraction: float):
+        super().__init__(env)
+        self.bonus = max(0.0, float(bonus))
+        self.start_fraction = max(0.0, min(1.0, float(start_fraction)))
+        self.config = _env_config(env)
+        self.elapsed_steps = 0
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+        self.elapsed_steps = 0
+        return self.env.reset(seed=seed, options=options)
+
+    def step(self, action: Any):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        self.elapsed_steps += 1
+        if self.config is not None and self.bonus > 0.0:
+            horizon = max(1, int(self.config.horizon))
+            start_step = int(round(horizon * self.start_fraction))
+            if self.elapsed_steps >= start_step:
+                reward = float(reward) + self.bonus
+                info = {**info, "late_survival_bonus": self.bonus}
+        return obs, float(reward), terminated, truncated, info
+
+
 class HardSeedResetWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env, seeds: list[int], probability: float = 1.0):
         super().__init__(env)
@@ -229,6 +254,11 @@ def make_env(
             env = HardSeedResetWrapper(env, seeds, _arg(args, "hard_train_seed_probability", 1.0))
     if reward_mode == "upright_shaping":
         env = UprightShapingWrapper(env)
+    late_survival_bonus = float(_arg(args, "late_survival_bonus", 0.0))
+    if use_success_bonus and late_survival_bonus > 0.0:
+        env = LateSurvivalBonusWrapper(
+            env, late_survival_bonus, float(_arg(args, "late_survival_start_fraction", 0.80))
+        )
     success_bonus = float(_arg(args, "success_bonus", 0.0))
     if use_success_bonus and success_bonus > 0.0:
         env = SuccessBonusWrapper(env, success_bonus)
@@ -454,6 +484,8 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "policy_observation_mode": str(_arg(args, "policy_observation_mode", "env")),
             "success_bonus": float(_arg(args, "success_bonus", 0.0)),
             "failure_penalty": float(_arg(args, "failure_penalty", 0.0)),
+            "late_survival_bonus": float(_arg(args, "late_survival_bonus", 0.0)),
+            "late_survival_start_fraction": float(_arg(args, "late_survival_start_fraction", 0.80)),
             "vec_env": str(_arg(args, "vec_env", "dummy")),
         },
         "reward_mode": args.reward_mode,
@@ -480,6 +512,8 @@ def train_policy_terminal(args: argparse.Namespace) -> dict[str, Any]:
             "policy_observation_mode": str(_arg(args, "policy_observation_mode", "env")),
             "success_bonus": float(_arg(args, "success_bonus", 0.0)),
             "failure_penalty": float(_arg(args, "failure_penalty", 0.0)),
+            "late_survival_bonus": float(_arg(args, "late_survival_bonus", 0.0)),
+            "late_survival_start_fraction": float(_arg(args, "late_survival_start_fraction", 0.80)),
             "vec_env": str(_arg(args, "vec_env", "dummy")),
         },
         "pure_ppo_eval": ppo_eval,
@@ -513,6 +547,7 @@ def write_report_md(report: dict[str, Any], path: Path) -> None:
         f"Policy observation mode: `{report.get('ppo_config', {}).get('policy_observation_mode', 'env')}`",
         f"Success bonus: `{report.get('ppo_config', {}).get('success_bonus', 0.0)}`",
         f"Failure penalty: `{report.get('ppo_config', {}).get('failure_penalty', 0.0)}`",
+        f"Late survival bonus: `{report.get('ppo_config', {}).get('late_survival_bonus', 0.0)}` from fraction `{report.get('ppo_config', {}).get('late_survival_start_fraction', 0.8)}`",
         f"Vec env: `{report.get('ppo_config', {}).get('vec_env', 'dummy')}`",
         f"Wall-clock seconds: `{report['wall_clock_seconds']:.2f}`",
         "",
@@ -573,6 +608,18 @@ def main() -> None:
         type=float,
         default=0.0,
         help="Training-only penalty subtracted when an episode terminates before the horizon.",
+    )
+    parser.add_argument(
+        "--late-survival-bonus",
+        type=float,
+        default=0.0,
+        help="Training-only per-step bonus after late-survival-start-fraction of the horizon.",
+    )
+    parser.add_argument(
+        "--late-survival-start-fraction",
+        type=float,
+        default=0.80,
+        help="Fraction of the horizon after which late-survival-bonus is applied.",
     )
     parser.add_argument("--n-envs", type=int, default=16)
     parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="dummy")

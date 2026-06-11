@@ -346,6 +346,8 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         "policy_observation_mode": args.policy_observation_mode,
         "hard_train_seed_count": len(base_hard_seeds),
         "hard_train_seed_probability": args.hard_train_seed_probability,
+        "late_survival_bonus": args.late_survival_bonus,
+        "late_survival_start_fraction": args.late_survival_start_fraction,
         "tail_seed_refresh_count": args.tail_seed_refresh_count,
         "tail_seed_pool_limit": args.tail_seed_pool_limit,
         "validation_seed_starts": args.validation_seed_starts or [args.validation_seed_start],
@@ -376,6 +378,8 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
             "ent_coef": args.ent_coef,
             "vf_coef": args.vf_coef,
             "max_grad_norm": args.max_grad_norm,
+            "late_survival_bonus": args.late_survival_bonus,
+            "late_survival_start_fraction": args.late_survival_start_fraction,
             "vec_env": args.vec_env,
         },
         "history": history,
@@ -501,6 +505,8 @@ def main() -> None:
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
     parser.add_argument("--success-bonus", type=float, default=25.0)
     parser.add_argument("--failure-penalty", type=float, default=2.0)
+    parser.add_argument("--late-survival-bonus", type=float, default=0.0)
+    parser.add_argument("--late-survival-start-fraction", type=float, default=0.80)
     parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping")
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)

@@ -240,3 +240,35 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(pole1_finetune.collect_failure_dataset)
     assert callable(tail_curriculum.run_tail_curriculum)
     assert callable(recurrent_tail.run_recurrent_tail_curriculum)
+
+
+def test_late_survival_bonus_starts_at_threshold():
+    import gymnasium as gym
+    import numpy as np
+    from types import SimpleNamespace
+
+    class CountingEnv(gym.Env):
+        observation_space = gym.spaces.Box(-1.0, 1.0, shape=(1,), dtype=np.float32)
+        action_space = gym.spaces.Discrete(1)
+
+        def __init__(self):
+            self.config = SimpleNamespace(horizon=4)
+
+        def reset(self, *, seed=None, options=None):
+            return np.zeros(1, dtype=np.float32), {}
+
+        def step(self, action):
+            return np.zeros(1, dtype=np.float32), 1.0, False, False, {}
+
+    env = trainer.LateSurvivalBonusWrapper(CountingEnv(), bonus=0.5, start_fraction=0.75)
+    env.reset(seed=1)
+    _obs, reward_1, *_rest, info_1 = env.step(0)
+    _obs, reward_2, *_rest, info_2 = env.step(0)
+    _obs, reward_3, *_rest, info_3 = env.step(0)
+
+    assert reward_1 == 1.0
+    assert reward_2 == 1.0
+    assert reward_3 == 1.5
+    assert "late_survival_bonus" not in info_1
+    assert "late_survival_bonus" not in info_2
+    assert info_3["late_survival_bonus"] == 0.5
