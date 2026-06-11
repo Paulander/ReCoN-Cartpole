@@ -755,3 +755,44 @@ def test_policy_terminal_normalizer_is_applied(tmp_path):
 
     assert np.allclose(policy.observation, [2.0 / 2.4, 1.0, 0.0, 0.0])
     assert diagnostics["policy_terminal"]["normalizer_applied"] is True
+
+
+def test_residual_policy_terminal_bin_delta_changes_policy_force():
+    class FakeBasePolicy:
+        def predict(self, observation, deterministic=True):
+            return 2, None
+
+    class FakeResidualPolicy:
+        def __init__(self):
+            self.observation = None
+
+        def predict(self, observation, deterministic=True):
+            self.observation = np.asarray(observation, dtype=np.float32).copy()
+            return 4, None
+
+    raw = np.asarray([0.0, 0.0, 0.18, 0.0], dtype=np.float32)
+    residual = FakeResidualPolicy()
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=1,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_observation_mode="normalized_raw",
+            residual_policy_terminal_mode="bin_delta",
+            residual_policy_terminal_action_bins=5,
+            residual_policy_terminal_gate_threshold=0.0,
+        )
+    )
+    controller.policy_terminal_model = FakeBasePolicy()
+    controller.residual_policy_terminal_model = residual
+
+    force, info = controller._policy_terminal_force(raw, raw)
+
+    assert force == controller.config.force_mag
+    assert info["base_force"] == 0.0
+    assert info["residual_policy_terminal"]["available"] is True
+    assert info["residual_policy_terminal"]["mode"] == "bin_delta"
+    assert info["residual_policy_terminal"]["residual_delta"] == controller.config.force_mag
+    assert residual.observation.shape == (7,)

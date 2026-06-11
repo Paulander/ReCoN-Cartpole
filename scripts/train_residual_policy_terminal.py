@@ -77,15 +77,18 @@ class ResidualCorrectionEnv(gym.Env):
             ).astype(np.float32)
         return obs
 
-    def _base_force(self, env_obs: Any, raw: Any) -> float:
+    def _base_action_and_force(self, env_obs: Any, raw: Any) -> tuple[int | None, float]:
         action, _state = self.base_model.predict(self._base_policy_obs(env_obs, raw), deterministic=True)
         if self.args.env_action_mode == "continuous":
-            return float(np.clip(np.asarray(action, dtype=float).reshape(-1)[0], -self.args.force_mag, self.args.force_mag))
+            return None, float(np.clip(np.asarray(action, dtype=float).reshape(-1)[0], -self.args.force_mag, self.args.force_mag))
         bins = max(2, int(self.args.discrete_action_bins))
         idx = int(np.clip(int(np.asarray(action).reshape(-1)[0]), 0, bins - 1))
         if bins == 2:
-            return float(self.args.force_mag if idx == 1 else -self.args.force_mag)
-        return float(np.linspace(-self.args.force_mag, self.args.force_mag, bins)[idx])
+            return idx, float(self.args.force_mag if idx == 1 else -self.args.force_mag)
+        return idx, float(np.linspace(-self.args.force_mag, self.args.force_mag, bins)[idx])
+
+    def _base_force(self, env_obs: Any, raw: Any) -> float:
+        return self._base_action_and_force(env_obs, raw)[1]
 
     def _risk_gate(self, raw: Any) -> float:
         raw_arr = np.asarray(raw, dtype=np.float32).reshape(-1)
@@ -120,26 +123,47 @@ class ResidualCorrectionEnv(gym.Env):
     def step(self, action: Any):
         raw = self.last_raw
         assert raw is not None
-        base_force = self._base_force(self.last_env_obs if self.last_env_obs is not None else raw, raw)
-        bins = np.linspace(-self.args.max_residual_force, self.args.max_residual_force, self.action_space.n)
-        delta = float(bins[int(np.clip(int(np.asarray(action).reshape(-1)[0]), 0, self.action_space.n - 1))])
+        base_idx, base_force = self._base_action_and_force(self.last_env_obs if self.last_env_obs is not None else raw, raw)
+        action_idx = int(np.clip(int(np.asarray(action).reshape(-1)[0]), 0, self.action_space.n - 1))
         gate = self._risk_gate(raw)
-        force = float(np.clip(base_force + gate * delta, -self.args.force_mag, self.args.force_mag))
-        env_action = action_from_force(force, self.args.env_action_mode, self.args.force_mag, self.args.discrete_action_bins)
+        if self.args.residual_mode == "bin_delta" and self.args.env_action_mode == "discrete":
+            max_shift = self.action_space.n // 2
+            requested_shift = action_idx - max_shift
+            delta_idx = requested_shift if gate >= float(self.args.residual_gate_threshold) else 0
+            base_idx = int(base_idx if base_idx is not None else self.args.discrete_action_bins // 2)
+            final_idx = int(np.clip(base_idx + delta_idx, 0, int(self.args.discrete_action_bins) - 1))
+            force_bins = np.linspace(-self.args.force_mag, self.args.force_mag, int(self.args.discrete_action_bins))
+            force = float(force_bins[final_idx])
+            delta = float(force - base_force)
+            env_action = final_idx
+        else:
+            bins = np.linspace(-self.args.max_residual_force, self.args.max_residual_force, self.action_space.n)
+            delta = float(bins[action_idx])
+            force = float(np.clip(base_force + gate * delta, -self.args.force_mag, self.args.force_mag))
+            env_action = action_from_force(force, self.args.env_action_mode, self.args.force_mag, self.args.discrete_action_bins)
         env_obs, reward, terminated, truncated, info = self.env.step(env_action)
         self.step_count += 1
         self.previous_force = force
         self.last_raw = np.asarray(info.get("raw_state"), dtype=np.float32)
         self.last_env_obs = env_obs
-        change_penalty = float(self.args.low_risk_change_penalty) * abs(delta / max(self.args.max_residual_force, 1e-9)) * (1.0 - gate)
+        delta_scale = self.args.force_mag if self.args.residual_mode == "bin_delta" else self.args.max_residual_force
+        change_penalty = float(self.args.low_risk_change_penalty) * abs(delta / max(delta_scale, 1e-9)) * (1.0 - gate)
         late_bonus = float(self.args.late_survival_bonus) if self.step_count >= int(self.args.horizon * self.args.late_survival_start_fraction) else 0.0
         shaped_reward = float(reward) + late_bonus - change_penalty
-        info = {**info, "base_force": base_force, "residual_delta": delta, "risk_gate": gate, "final_force": force}
+        info = {**info, "base_force": base_force, "residual_delta": delta, "risk_gate": gate, "final_force": force, "residual_mode": self.args.residual_mode}
         return self._residual_obs(env_obs, self.last_raw), shaped_reward, terminated, truncated, info
 
 
 def make_env(args: argparse.Namespace, hard_seeds: list[int] | None = None):
     return ResidualCorrectionEnv(args, hard_seeds=hard_seeds)
+
+
+def eval_seeds(args: argparse.Namespace) -> list[int]:
+    starts = getattr(args, "eval_seed_starts", None) or [args.eval_seed_start]
+    seeds: list[int] = []
+    for start in starts:
+        seeds.extend(int(start) + idx for idx in range(int(args.eval_episodes)))
+    return seeds
 
 
 def evaluate_base(args: argparse.Namespace, seeds: list[int]) -> dict[str, Any]:
@@ -164,8 +188,8 @@ def evaluate_base(args: argparse.Namespace, seeds: list[int]) -> dict[str, Any]:
 def evaluate_residual(model: Any, args: argparse.Namespace, seeds: list[int]) -> dict[str, Any]:
     steps: list[float] = []
     deltas: list[float] = []
+    env = ResidualCorrectionEnv(args)
     for seed in seeds:
-        env = ResidualCorrectionEnv(args)
         obs, _info = env.reset(seed=seed)
         total_steps = 0
         for step in range(args.horizon):
@@ -213,42 +237,51 @@ def train_residual(args: argparse.Namespace) -> dict[str, Any]:
         from stable_baselines3.common.vec_env import SubprocVecEnv
     except Exception as exc:  # pragma: no cover
         raise RuntimeError("Install RL extras with `uv sync --extra rl`") from exc
-    hard_seeds = parse_seed_list(args.hard_train_seeds)
-    vec_env_cls = SubprocVecEnv if args.vec_env == "subproc" else None
-    train_env = make_vec_env(
-        lambda: make_env(args, hard_seeds=hard_seeds),
-        n_envs=args.n_envs,
-        seed=args.train_seed,
-        vec_env_cls=vec_env_cls,
-        vec_env_kwargs={"start_method": "fork"} if vec_env_cls is SubprocVecEnv else None,
-    )
-    policy_kwargs = {"net_arch": [int(item) for item in args.net_arch.split(",") if item.strip()]}
-    model = PPO(
-        "MlpPolicy",
-        train_env,
-        seed=args.train_seed,
-        verbose=args.verbose,
-        device=args.device,
-        learning_rate=args.learning_rate,
-        n_steps=args.n_steps,
-        batch_size=args.batch_size,
-        n_epochs=args.n_epochs,
-        gamma=args.gamma,
-        gae_lambda=args.gae_lambda,
-        clip_range=args.clip_range,
-        ent_coef=args.ent_coef,
-        policy_kwargs=policy_kwargs,
-    )
-    model.learn(total_timesteps=args.timesteps)
-    model_path = out / "residual_policy_terminal.zip"
-    model.save(str(model_path))
-    seeds = [args.eval_seed_start + idx for idx in range(args.eval_episodes)]
+    train_env = None
+    if args.residual_model_path:
+        model_path = Path(args.residual_model_path)
+        model = PPO.load(str(model_path), device=args.device)
+        status = "evaluated"
+        train_timesteps = 0
+    else:
+        hard_seeds = parse_seed_list(args.hard_train_seeds)
+        vec_env_cls = SubprocVecEnv if args.vec_env == "subproc" else None
+        train_env = make_vec_env(
+            lambda: make_env(args, hard_seeds=hard_seeds),
+            n_envs=args.n_envs,
+            seed=args.train_seed,
+            vec_env_cls=vec_env_cls,
+            vec_env_kwargs={"start_method": "fork"} if vec_env_cls is SubprocVecEnv else None,
+        )
+        policy_kwargs = {"net_arch": [int(item) for item in args.net_arch.split(",") if item.strip()]}
+        model = PPO(
+            "MlpPolicy",
+            train_env,
+            seed=args.train_seed,
+            verbose=args.verbose,
+            device=args.device,
+            learning_rate=args.learning_rate,
+            n_steps=args.n_steps,
+            batch_size=args.batch_size,
+            n_epochs=args.n_epochs,
+            gamma=args.gamma,
+            gae_lambda=args.gae_lambda,
+            clip_range=args.clip_range,
+            ent_coef=args.ent_coef,
+            policy_kwargs=policy_kwargs,
+        )
+        model.learn(total_timesteps=args.timesteps)
+        model_path = out / "residual_policy_terminal.zip"
+        model.save(str(model_path))
+        status = "completed"
+        train_timesteps = args.timesteps
+    seeds = eval_seeds(args)
     report = {
-        "status": "completed",
+        "status": status,
         "base_model_path": args.base_model_path,
         "base_normalizer_path": args.base_normalizer_path,
         "residual_model_path": str(model_path),
-        "timesteps": args.timesteps,
+        "timesteps": train_timesteps,
         "eval_seeds": seeds,
         "base_eval": evaluate_base(args, seeds),
         "residual_eval": evaluate_residual(model, args, seeds),
@@ -262,13 +295,15 @@ def train_residual(args: argparse.Namespace) -> dict[str, Any]:
     }
     (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     write_markdown(report, out / "report.md")
-    train_env.close()
+    if train_env is not None:
+        train_env.close()
     return report
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-model-path", required=True)
+    parser.add_argument("--residual-model-path", default="")
     parser.add_argument("--base-normalizer-path", default="")
     parser.add_argument("--base-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
     parser.add_argument("--n-poles", type=int, default=4)
@@ -281,7 +316,9 @@ def main() -> None:
     parser.add_argument("--initial-angle-range", type=float, default=0.05)
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
+    parser.add_argument("--residual-mode", choices=["force", "bin_delta"], default="force")
     parser.add_argument("--residual-action-bins", type=int, default=5)
+    parser.add_argument("--residual-gate-threshold", type=float, default=0.30)
     parser.add_argument("--max-residual-force", type=float, default=4.0)
     parser.add_argument("--low-risk-change-penalty", type=float, default=0.05)
     parser.add_argument("--late-survival-bonus", type=float, default=0.02)
@@ -291,6 +328,7 @@ def main() -> None:
     parser.add_argument("--timesteps", type=int, default=50_000)
     parser.add_argument("--train-seed", type=int, default=2_400_000)
     parser.add_argument("--eval-seed-start", type=int, default=1_040_000)
+    parser.add_argument("--eval-seed-starts", type=int, nargs="+", default=None)
     parser.add_argument("--eval-episodes", type=int, default=120)
     parser.add_argument("--n-envs", type=int, default=8)
     parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="subproc")

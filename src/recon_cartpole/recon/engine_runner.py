@@ -117,6 +117,11 @@ class RunnerConfig:
     policy_terminal_observation_mode: str = "env"
     policy_terminal_recurrent: bool = False
     policy_terminal_normalizer_path: str = ""
+    residual_policy_terminal_path: str = ""
+    residual_policy_terminal_mode: str = "force"
+    residual_policy_terminal_action_bins: int = 5
+    residual_policy_terminal_max_force: float = 4.0
+    residual_policy_terminal_gate_threshold: float = 0.30
     mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
     pole1_fix: Pole1FixConfig = field(default_factory=Pole1FixConfig)
     rescue: RescueConfig = field(default_factory=RescueConfig)
@@ -169,6 +174,12 @@ class ReConCartPoleController:
         if self._uses_policy_terminal() and self.config.policy_terminal_path:
             self.policy_terminal_model = self._load_policy_terminal(
                 self.config.policy_terminal_path
+            )
+        self.residual_policy_terminal_model: Any | None = None
+        self.last_residual_policy_terminal: dict[str, Any] = {}
+        if self.config.residual_policy_terminal_path:
+            self.residual_policy_terminal_model = self._load_feedforward_policy_terminal(
+                self.config.residual_policy_terminal_path
             )
         self.consolidation = ConsolidationEngine(self.config.consolidation)
         self.consolidation.init_from_graph(self.graph, list(self.plasticity_state))
@@ -509,6 +520,8 @@ class ReConCartPoleController:
                 "policy_terminal_observation_mode": self.config.policy_terminal_observation_mode,
                 "policy_terminal_recurrent": self.config.policy_terminal_recurrent,
                 "policy_terminal_normalizer_path": self.config.policy_terminal_normalizer_path,
+                "residual_policy_terminal_path": self.config.residual_policy_terminal_path,
+                "residual_policy_terminal_mode": self.config.residual_policy_terminal_mode,
                 "mingru_terminal_config": self.config.mingru_terminal.__dict__,
                 "pole1_fix_config": self.config.pole1_fix.__dict__,
                 "rescue_config": self.config.rescue.__dict__,
@@ -607,6 +620,106 @@ class ReConCartPoleController:
         normalized = (obs - mean) / np.sqrt(var + epsilon)
         return np.clip(normalized, -clip_obs, clip_obs).astype(np.float32, copy=False)
 
+    def _load_feedforward_policy_terminal(self, path: str) -> Any:
+        try:
+            from stable_baselines3 import PPO
+        except Exception as exc:  # pragma: no cover - optional dependency path
+            raise RuntimeError("residual policy terminals require stable-baselines3") from exc
+        return PPO.load(path, device="cpu")
+
+    def _residual_risk_gate(self, raw_state: Any | None) -> float:
+        raw = np.asarray(raw_state, dtype=np.float32).reshape(-1) if raw_state is not None else np.asarray([], dtype=np.float32)
+        n = int(self.config.n_poles)
+        if raw.size < 2 + 2 * n:
+            return 0.0
+        x = abs(float(raw[0])) / 2.4
+        theta = float(np.max(np.abs(raw[2 : 2 + n]))) / 0.20943951023931953
+        theta_dot = float(np.max(np.abs(raw[2 + n : 2 + 2 * n]))) / 5.0
+        late = self.episode_step / 500.0
+        return float(np.clip(max(x, theta, 0.5 * theta_dot, late if late > 0.75 else 0.0), 0.0, 1.0))
+
+    def _force_to_discrete_index(self, force: float) -> int:
+        bins = max(2, int(self.config.discrete_action_bins))
+        if bins == 2:
+            return 1 if force >= 0.0 else 0
+        values = np.linspace(-self.config.force_mag, self.config.force_mag, bins)
+        return int(np.argmin(np.abs(values - float(force))))
+
+    def _apply_residual_policy_terminal(
+        self,
+        policy_observation: np.ndarray,
+        base_force: float,
+        raw_state: Any | None,
+    ) -> tuple[float, dict[str, Any]]:
+        if self.residual_policy_terminal_model is None:
+            return base_force, {"available": False, "reason": "no_model"}
+        gate = self._residual_risk_gate(raw_state)
+        residual_obs = np.concatenate(
+            [
+                np.asarray(policy_observation, dtype=np.float32).reshape(-1),
+                np.asarray(
+                    [
+                        float(base_force) / max(float(self.config.force_mag), 1e-9),
+                        gate,
+                        (self.recent_forces[-1] if self.recent_forces else 0.0) / max(float(self.config.force_mag), 1e-9),
+                    ],
+                    dtype=np.float32,
+                ),
+            ]
+        ).astype(np.float32, copy=False)
+        action, _state = self.residual_policy_terminal_model.predict(residual_obs, deterministic=True)
+        action_idx = int(
+            np.clip(
+                int(np.asarray(action).reshape(-1)[0]),
+                0,
+                max(2, int(self.config.residual_policy_terminal_action_bins)) - 1,
+            )
+        )
+        mode = self.config.residual_policy_terminal_mode
+        final_force = float(base_force)
+        delta = 0.0
+        if mode == "bin_delta" and self.config.action_mode == "discrete":
+            action_bins = max(2, int(self.config.residual_policy_terminal_action_bins))
+            max_shift = action_bins // 2
+            requested_shift = action_idx - max_shift
+            applied_shift = (
+                requested_shift
+                if gate >= float(self.config.residual_policy_terminal_gate_threshold)
+                else 0
+            )
+            base_idx = self._force_to_discrete_index(base_force)
+            final_idx = int(
+                np.clip(base_idx + applied_shift, 0, int(self.config.discrete_action_bins) - 1)
+            )
+            values = np.linspace(
+                -self.config.force_mag, self.config.force_mag, int(self.config.discrete_action_bins)
+            )
+            final_force = float(values[final_idx])
+            delta = final_force - float(base_force)
+        else:
+            values = np.linspace(
+                -self.config.residual_policy_terminal_max_force,
+                self.config.residual_policy_terminal_max_force,
+                max(2, int(self.config.residual_policy_terminal_action_bins)),
+            )
+            requested_delta = float(values[action_idx])
+            delta = gate * requested_delta
+            final_force = float(
+                np.clip(base_force + delta, -self.config.force_mag, self.config.force_mag)
+            )
+        info = {
+            "available": True,
+            "model_path": self.config.residual_policy_terminal_path,
+            "mode": mode,
+            "observation_size": int(residual_obs.size),
+            "action": [action_idx],
+            "risk_gate": gate,
+            "base_force": float(base_force),
+            "residual_delta": float(delta),
+            "force": float(final_force),
+        }
+        return final_force, info
+
     def _load_policy_terminal(self, path: str) -> Any:
         if self.config.policy_terminal_recurrent:
             try:
@@ -688,7 +801,14 @@ class ReConCartPoleController:
             action, _state = self.policy_terminal_model.predict(
                 policy_observation, deterministic=True
             )
-        force = self._force_from_policy_action(action)
+        base_force = self._force_from_policy_action(action)
+        force = base_force
+        residual_info = {"available": False, "reason": "disabled"}
+        if self.residual_policy_terminal_model is not None:
+            force, residual_info = self._apply_residual_policy_terminal(
+                policy_observation, base_force, raw_state
+            )
+        self.last_residual_policy_terminal = dict(residual_info)
         info = {
             "available": True,
             "model_path": self.config.policy_terminal_path,
@@ -703,7 +823,9 @@ class ReConCartPoleController:
             if self.config.policy_terminal_recurrent
             else False,
             "action": np.asarray(action).reshape(-1).tolist(),
+            "base_force": base_force,
             "force": force,
+            "residual_policy_terminal": residual_info,
         }
         if context is not None:
             context["_policy_terminal_cache"] = {"force": force, "info": dict(info)}
