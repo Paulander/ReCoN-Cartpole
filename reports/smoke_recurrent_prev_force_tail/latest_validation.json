@@ -1,0 +1,53 @@
+{
+  "label": "chunk_1",
+  "checkpoint": "reports/smoke_recurrent_prev_force_tail/checkpoint_000064.zip",
+  "total_timesteps": 64,
+  "validation": {
+    "mean_survival": 441.0,
+    "p10_survival": 421.6,
+    "success_rate": 0.0,
+    "max_survival": 465.0,
+    "cvar_survival": 415.0,
+    "bottom_count": 1.0,
+    "median_survival": 442.0,
+    "returns_mean": 440.0,
+    "episodes": 4,
+    "wall_clock_seconds": 3.419230327999685,
+    "per_seed": [
+      {
+        "seed": 1230000,
+        "steps": 437,
+        "return": 436.0,
+        "success": false
+      },
+      {
+        "seed": 1230001,
+        "steps": 447,
+        "return": 446.0,
+        "success": false
+      },
+      {
+        "seed": 1240000,
+        "steps": 415,
+        "return": 414.0,
+        "success": false
+      },
+      {
+        "seed": 1240001,
+        "steps": 465,
+        "return": 464.0,
+        "success": false
+      }
+    ]
+  },
+  "score": 821.36,
+  "tail_seed_candidates": [
+    1240001,
+    1230001
+  ],
+  "validation_seed_starts": [
+    1230000,
+    1240000
+  ],
+  "validation_seed_count": 4
+}

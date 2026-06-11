@@ -603,6 +603,8 @@ class ReConCartPoleController:
             raw_state,
             self.config.n_poles,
             self.config.policy_terminal_observation_mode,
+            previous_force=self.recent_forces[-1] if self.recent_forces else 0.0,
+            force_mag=self.config.force_mag,
         )
         frame_stack = max(1, int(self.config.policy_terminal_frame_stack))
         if frame_stack <= 1:

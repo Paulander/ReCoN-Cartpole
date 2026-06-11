@@ -1,0 +1,3100 @@
+{
+  "status": "running",
+  "threshold": {
+    "mean_survival": 475.0,
+    "p10_survival": 350.0,
+    "success_rate": 0.7,
+    "episodes": 300
+  },
+  "mechanism": "RecurrentPPO policy terminal inside ReCoN",
+  "reward_mode": "upright_shaping",
+  "selection_mode": "hard_select",
+  "policy_terminal_blend": 1.0,
+  "policy_terminal_scope": "stabilize_chain",
+  "frame_stack": 2,
+  "policy_observation_mode": "normalized_raw",
+  "hard_train_seed_count": 646,
+  "hard_train_seed_probability": 0.3,
+  "tail_seed_refresh_count": 40,
+  "tail_seed_pool_limit": 900,
+  "validation_seed_starts": [
+    1190000,
+    1200000,
+    1210000
+  ],
+  "validation_episodes": 30,
+  "final_eval_episodes": 100,
+  "score_weights": {
+    "mean_survival": 0.25,
+    "p10_survival": 0.85,
+    "cvar_survival": 0.85,
+    "success_rate": 140.0
+  },
+  "promotion_gates": {
+    "max_success_regression": 0.01,
+    "max_p10_regression": 6.0,
+    "max_cvar_regression": 8.0
+  },
+  "ppo_config": {
+    "policy": "MlpLstmPolicy",
+    "net_arch": "64,64",
+    "activation": "tanh",
+    "learning_rate": 5e-05,
+    "n_steps": 512,
+    "batch_size": 256,
+    "n_epochs": 3,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip_range": 0.06,
+    "ent_coef": 0.001,
+    "vf_coef": 0.5,
+    "max_grad_norm": 0.5,
+    "lstm_hidden_size": 128,
+    "n_lstm_layers": 1,
+    "shared_lstm": false,
+    "enable_critic_lstm": true,
+    "vec_env": "subproc"
+  },
+  "history": [
+    {
+      "label": "start",
+      "checkpoint": "reports/n4_recurrent_tail_20260611_seed2130k_fs2_continue/checkpoint_000000_start.zip",
+      "total_timesteps": 0,
+      "validation": {
+        "mean_survival": 479.77777777777777,
+        "p10_survival": 432.4,
+        "success_rate": 0.5888888888888889,
+        "max_survival": 500.0,
+        "cvar_survival": 404.55555555555554,
+        "bottom_count": 9.0,
+        "median_survival": 500.0,
+        "returns_mean": 479.3666666666667,
+        "episodes": 90,
+        "wall_clock_seconds": 84.73291691200575,
+        "per_seed": [
+          {
+            "seed": 1190000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190002,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190003,
+            "steps": 463,
+            "return": 462.0,
+            "success": false
+          },
+          {
+            "seed": 1190004,
+            "steps": 464,
+            "return": 463.0,
+            "success": false
+          },
+          {
+            "seed": 1190005,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190006,
+            "steps": 472,
+            "return": 471.0,
+            "success": false
+          },
+          {
+            "seed": 1190007,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190008,
+            "steps": 473,
+            "return": 472.0,
+            "success": false
+          },
+          {
+            "seed": 1190009,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190010,
+            "steps": 480,
+            "return": 479.0,
+            "success": false
+          },
+          {
+            "seed": 1190011,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190012,
+            "steps": 456,
+            "return": 455.0,
+            "success": false
+          },
+          {
+            "seed": 1190013,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190014,
+            "steps": 471,
+            "return": 470.0,
+            "success": false
+          },
+          {
+            "seed": 1190015,
+            "steps": 392,
+            "return": 391.0,
+            "success": false
+          },
+          {
+            "seed": 1190016,
+            "steps": 447,
+            "return": 446.0,
+            "success": false
+          },
+          {
+            "seed": 1190017,
+            "steps": 419,
+            "return": 418.0,
+            "success": false
+          },
+          {
+            "seed": 1190018,
+            "steps": 433,
+            "return": 432.0,
+            "success": false
+          },
+          {
+            "seed": 1190019,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190020,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190021,
+            "steps": 483,
+            "return": 482.0,
+            "success": false
+          },
+          {
+            "seed": 1190022,
+            "steps": 399,
+            "return": 398.0,
+            "success": false
+          },
+          {
+            "seed": 1190023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190024,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190025,
+            "steps": 427,
+            "return": 426.0,
+            "success": false
+          },
+          {
+            "seed": 1190026,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190029,
+            "steps": 461,
+            "return": 460.0,
+            "success": false
+          },
+          {
+            "seed": 1200000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200002,
+            "steps": 469,
+            "return": 468.0,
+            "success": false
+          },
+          {
+            "seed": 1200003,
+            "steps": 483,
+            "return": 482.0,
+            "success": false
+          },
+          {
+            "seed": 1200004,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200005,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200006,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200007,
+            "steps": 451,
+            "return": 450.0,
+            "success": false
+          },
+          {
+            "seed": 1200008,
+            "steps": 443,
+            "return": 442.0,
+            "success": false
+          },
+          {
+            "seed": 1200009,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200010,
+            "steps": 438,
+            "return": 437.0,
+            "success": false
+          },
+          {
+            "seed": 1200011,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200012,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200013,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200014,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200015,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200016,
+            "steps": 422,
+            "return": 421.0,
+            "success": false
+          },
+          {
+            "seed": 1200017,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200018,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200019,
+            "steps": 374,
+            "return": 373.0,
+            "success": false
+          },
+          {
+            "seed": 1200020,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200021,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200022,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200024,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200025,
+            "steps": 421,
+            "return": 420.0,
+            "success": false
+          },
+          {
+            "seed": 1200026,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200029,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210002,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210003,
+            "steps": 484,
+            "return": 483.0,
+            "success": false
+          },
+          {
+            "seed": 1210004,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210005,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210006,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210007,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210008,
+            "steps": 473,
+            "return": 472.0,
+            "success": false
+          },
+          {
+            "seed": 1210009,
+            "steps": 485,
+            "return": 484.0,
+            "success": false
+          },
+          {
+            "seed": 1210010,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210011,
+            "steps": 440,
+            "return": 439.0,
+            "success": false
+          },
+          {
+            "seed": 1210012,
+            "steps": 489,
+            "return": 488.0,
+            "success": false
+          },
+          {
+            "seed": 1210013,
+            "steps": 461,
+            "return": 460.0,
+            "success": false
+          },
+          {
+            "seed": 1210014,
+            "steps": 441,
+            "return": 440.0,
+            "success": false
+          },
+          {
+            "seed": 1210015,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210016,
+            "steps": 483,
+            "return": 482.0,
+            "success": false
+          },
+          {
+            "seed": 1210017,
+            "steps": 363,
+            "return": 362.0,
+            "success": false
+          },
+          {
+            "seed": 1210018,
+            "steps": 472,
+            "return": 471.0,
+            "success": false
+          },
+          {
+            "seed": 1210019,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210020,
+            "steps": 451,
+            "return": 450.0,
+            "success": false
+          },
+          {
+            "seed": 1210021,
+            "steps": 477,
+            "return": 476.0,
+            "success": false
+          },
+          {
+            "seed": 1210022,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210024,
+            "steps": 424,
+            "return": 423.0,
+            "success": false
+          },
+          {
+            "seed": 1210025,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210026,
+            "steps": 496,
+            "return": 495.0,
+            "success": false
+          },
+          {
+            "seed": 1210027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210029,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          }
+        ]
+      },
+      "score": 913.801111111111,
+      "tail_seed_candidates": [
+        1210026,
+        1210012,
+        1210009,
+        1210003,
+        1190021,
+        1200003,
+        1210016,
+        1190010,
+        1210021,
+        1190008,
+        1210008,
+        1190006,
+        1210018,
+        1190014,
+        1200002,
+        1190004,
+        1190003,
+        1190029,
+        1210013,
+        1190012,
+        1200007,
+        1210020,
+        1190016,
+        1200008,
+        1210014,
+        1210011,
+        1200010,
+        1190018,
+        1190025,
+        1210024,
+        1200016,
+        1200025,
+        1190017,
+        1190022,
+        1190015,
+        1200019,
+        1210017
+      ],
+      "validation_seed_starts": [
+        1190000,
+        1200000,
+        1210000
+      ],
+      "validation_seed_count": 90,
+      "promoted": true
+    },
+    {
+      "label": "chunk_1",
+      "checkpoint": "reports/n4_recurrent_tail_20260611_seed2130k_fs2_continue/checkpoint_015000.zip",
+      "total_timesteps": 15000,
+      "validation": {
+        "mean_survival": 468.74444444444447,
+        "p10_survival": 398.2,
+        "success_rate": 0.5111111111111111,
+        "max_survival": 500.0,
+        "cvar_survival": 371.77777777777777,
+        "bottom_count": 9.0,
+        "median_survival": 500.0,
+        "returns_mean": 468.25555555555553,
+        "episodes": 90,
+        "wall_clock_seconds": 83.94267201299954,
+        "per_seed": [
+          {
+            "seed": 1190000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190002,
+            "steps": 440,
+            "return": 439.0,
+            "success": false
+          },
+          {
+            "seed": 1190003,
+            "steps": 463,
+            "return": 462.0,
+            "success": false
+          },
+          {
+            "seed": 1190004,
+            "steps": 464,
+            "return": 463.0,
+            "success": false
+          },
+          {
+            "seed": 1190005,
+            "steps": 431,
+            "return": 430.0,
+            "success": false
+          },
+          {
+            "seed": 1190006,
+            "steps": 467,
+            "return": 466.0,
+            "success": false
+          },
+          {
+            "seed": 1190007,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190008,
+            "steps": 473,
+            "return": 472.0,
+            "success": false
+          },
+          {
+            "seed": 1190009,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190010,
+            "steps": 480,
+            "return": 479.0,
+            "success": false
+          },
+          {
+            "seed": 1190011,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190012,
+            "steps": 456,
+            "return": 455.0,
+            "success": false
+          },
+          {
+            "seed": 1190013,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190014,
+            "steps": 389,
+            "return": 388.0,
+            "success": false
+          },
+          {
+            "seed": 1190015,
+            "steps": 391,
+            "return": 390.0,
+            "success": false
+          },
+          {
+            "seed": 1190016,
+            "steps": 447,
+            "return": 446.0,
+            "success": false
+          },
+          {
+            "seed": 1190017,
+            "steps": 371,
+            "return": 370.0,
+            "success": false
+          },
+          {
+            "seed": 1190018,
+            "steps": 389,
+            "return": 388.0,
+            "success": false
+          },
+          {
+            "seed": 1190019,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190020,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190021,
+            "steps": 483,
+            "return": 482.0,
+            "success": false
+          },
+          {
+            "seed": 1190022,
+            "steps": 399,
+            "return": 398.0,
+            "success": false
+          },
+          {
+            "seed": 1190023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190024,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190025,
+            "steps": 428,
+            "return": 427.0,
+            "success": false
+          },
+          {
+            "seed": 1190026,
+            "steps": 472,
+            "return": 471.0,
+            "success": false
+          },
+          {
+            "seed": 1190027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190029,
+            "steps": 400,
+            "return": 399.0,
+            "success": false
+          },
+          {
+            "seed": 1200000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200002,
+            "steps": 469,
+            "return": 468.0,
+            "success": false
+          },
+          {
+            "seed": 1200003,
+            "steps": 400,
+            "return": 399.0,
+            "success": false
+          },
+          {
+            "seed": 1200004,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200005,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200006,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200007,
+            "steps": 451,
+            "return": 450.0,
+            "success": false
+          },
+          {
+            "seed": 1200008,
+            "steps": 444,
+            "return": 443.0,
+            "success": false
+          },
+          {
+            "seed": 1200009,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200010,
+            "steps": 380,
+            "return": 379.0,
+            "success": false
+          },
+          {
+            "seed": 1200011,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200012,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200013,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200014,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200015,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200016,
+            "steps": 361,
+            "return": 360.0,
+            "success": false
+          },
+          {
+            "seed": 1200017,
+            "steps": 442,
+            "return": 441.0,
+            "success": false
+          },
+          {
+            "seed": 1200018,
+            "steps": 483,
+            "return": 482.0,
+            "success": false
+          },
+          {
+            "seed": 1200019,
+            "steps": 338,
+            "return": 337.0,
+            "success": false
+          },
+          {
+            "seed": 1200020,
+            "steps": 419,
+            "return": 418.0,
+            "success": false
+          },
+          {
+            "seed": 1200021,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200022,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200024,
+            "steps": 435,
+            "return": 434.0,
+            "success": false
+          },
+          {
+            "seed": 1200025,
+            "steps": 423,
+            "return": 422.0,
+            "success": false
+          },
+          {
+            "seed": 1200026,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200029,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210002,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210003,
+            "steps": 484,
+            "return": 483.0,
+            "success": false
+          },
+          {
+            "seed": 1210004,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210005,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210006,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210007,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210008,
+            "steps": 473,
+            "return": 472.0,
+            "success": false
+          },
+          {
+            "seed": 1210009,
+            "steps": 487,
+            "return": 486.0,
+            "success": false
+          },
+          {
+            "seed": 1210010,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210011,
+            "steps": 443,
+            "return": 442.0,
+            "success": false
+          },
+          {
+            "seed": 1210012,
+            "steps": 491,
+            "return": 490.0,
+            "success": false
+          },
+          {
+            "seed": 1210013,
+            "steps": 456,
+            "return": 455.0,
+            "success": false
+          },
+          {
+            "seed": 1210014,
+            "steps": 366,
+            "return": 365.0,
+            "success": false
+          },
+          {
+            "seed": 1210015,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210016,
+            "steps": 478,
+            "return": 477.0,
+            "success": false
+          },
+          {
+            "seed": 1210017,
+            "steps": 361,
+            "return": 360.0,
+            "success": false
+          },
+          {
+            "seed": 1210018,
+            "steps": 472,
+            "return": 471.0,
+            "success": false
+          },
+          {
+            "seed": 1210019,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210020,
+            "steps": 454,
+            "return": 453.0,
+            "success": false
+          },
+          {
+            "seed": 1210021,
+            "steps": 477,
+            "return": 476.0,
+            "success": false
+          },
+          {
+            "seed": 1210022,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210024,
+            "steps": 424,
+            "return": 423.0,
+            "success": false
+          },
+          {
+            "seed": 1210025,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210026,
+            "steps": 433,
+            "return": 432.0,
+            "success": false
+          },
+          {
+            "seed": 1210027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210029,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          }
+        ]
+      },
+      "score": 843.2227777777778,
+      "tail_seed_candidates": [
+        1210012,
+        1210009,
+        1210003,
+        1190021,
+        1200018,
+        1190010,
+        1210016,
+        1210021,
+        1190008,
+        1210008,
+        1190026,
+        1210018,
+        1200002,
+        1190006,
+        1190004,
+        1190003,
+        1190012,
+        1210013,
+        1210020,
+        1200007,
+        1190016,
+        1200008,
+        1210011,
+        1200017,
+        1190002,
+        1200024,
+        1210026,
+        1190005,
+        1190025,
+        1210024,
+        1200025,
+        1200020,
+        1190029,
+        1200003,
+        1190022,
+        1190015,
+        1190014,
+        1190018,
+        1200010,
+        1190017
+      ],
+      "validation_seed_starts": [
+        1190000,
+        1200000,
+        1210000
+      ],
+      "validation_seed_count": 90,
+      "promoted": false
+    },
+    {
+      "label": "chunk_2",
+      "checkpoint": "reports/n4_recurrent_tail_20260611_seed2130k_fs2_continue/checkpoint_030000.zip",
+      "total_timesteps": 30000,
+      "validation": {
+        "mean_survival": 468.5888888888889,
+        "p10_survival": 396.2,
+        "success_rate": 0.5111111111111111,
+        "max_survival": 500.0,
+        "cvar_survival": 371.1111111111111,
+        "bottom_count": 9.0,
+        "median_survival": 500.0,
+        "returns_mean": 468.1,
+        "episodes": 90,
+        "wall_clock_seconds": 84.90640254900791,
+        "per_seed": [
+          {
+            "seed": 1190000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190002,
+            "steps": 440,
+            "return": 439.0,
+            "success": false
+          },
+          {
+            "seed": 1190003,
+            "steps": 463,
+            "return": 462.0,
+            "success": false
+          },
+          {
+            "seed": 1190004,
+            "steps": 464,
+            "return": 463.0,
+            "success": false
+          },
+          {
+            "seed": 1190005,
+            "steps": 431,
+            "return": 430.0,
+            "success": false
+          },
+          {
+            "seed": 1190006,
+            "steps": 467,
+            "return": 466.0,
+            "success": false
+          },
+          {
+            "seed": 1190007,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190008,
+            "steps": 473,
+            "return": 472.0,
+            "success": false
+          },
+          {
+            "seed": 1190009,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190010,
+            "steps": 480,
+            "return": 479.0,
+            "success": false
+          },
+          {
+            "seed": 1190011,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190012,
+            "steps": 456,
+            "return": 455.0,
+            "success": false
+          },
+          {
+            "seed": 1190013,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190014,
+            "steps": 389,
+            "return": 388.0,
+            "success": false
+          },
+          {
+            "seed": 1190015,
+            "steps": 388,
+            "return": 387.0,
+            "success": false
+          },
+          {
+            "seed": 1190016,
+            "steps": 443,
+            "return": 442.0,
+            "success": false
+          },
+          {
+            "seed": 1190017,
+            "steps": 371,
+            "return": 370.0,
+            "success": false
+          },
+          {
+            "seed": 1190018,
+            "steps": 389,
+            "return": 388.0,
+            "success": false
+          },
+          {
+            "seed": 1190019,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190020,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190021,
+            "steps": 483,
+            "return": 482.0,
+            "success": false
+          },
+          {
+            "seed": 1190022,
+            "steps": 397,
+            "return": 396.0,
+            "success": false
+          },
+          {
+            "seed": 1190023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190024,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190025,
+            "steps": 428,
+            "return": 427.0,
+            "success": false
+          },
+          {
+            "seed": 1190026,
+            "steps": 472,
+            "return": 471.0,
+            "success": false
+          },
+          {
+            "seed": 1190027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190029,
+            "steps": 400,
+            "return": 399.0,
+            "success": false
+          },
+          {
+            "seed": 1200000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200002,
+            "steps": 469,
+            "return": 468.0,
+            "success": false
+          },
+          {
+            "seed": 1200003,
+            "steps": 400,
+            "return": 399.0,
+            "success": false
+          },
+          {
+            "seed": 1200004,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200005,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200006,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200007,
+            "steps": 449,
+            "return": 448.0,
+            "success": false
+          },
+          {
+            "seed": 1200008,
+            "steps": 444,
+            "return": 443.0,
+            "success": false
+          },
+          {
+            "seed": 1200009,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200010,
+            "steps": 380,
+            "return": 379.0,
+            "success": false
+          },
+          {
+            "seed": 1200011,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200012,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200013,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200014,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200015,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200016,
+            "steps": 361,
+            "return": 360.0,
+            "success": false
+          },
+          {
+            "seed": 1200017,
+            "steps": 442,
+            "return": 441.0,
+            "success": false
+          },
+          {
+            "seed": 1200018,
+            "steps": 483,
+            "return": 482.0,
+            "success": false
+          },
+          {
+            "seed": 1200019,
+            "steps": 338,
+            "return": 337.0,
+            "success": false
+          },
+          {
+            "seed": 1200020,
+            "steps": 419,
+            "return": 418.0,
+            "success": false
+          },
+          {
+            "seed": 1200021,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200022,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200024,
+            "steps": 435,
+            "return": 434.0,
+            "success": false
+          },
+          {
+            "seed": 1200025,
+            "steps": 423,
+            "return": 422.0,
+            "success": false
+          },
+          {
+            "seed": 1200026,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200029,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210002,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210003,
+            "steps": 484,
+            "return": 483.0,
+            "success": false
+          },
+          {
+            "seed": 1210004,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210005,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210006,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210007,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210008,
+            "steps": 473,
+            "return": 472.0,
+            "success": false
+          },
+          {
+            "seed": 1210009,
+            "steps": 487,
+            "return": 486.0,
+            "success": false
+          },
+          {
+            "seed": 1210010,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210011,
+            "steps": 443,
+            "return": 442.0,
+            "success": false
+          },
+          {
+            "seed": 1210012,
+            "steps": 491,
+            "return": 490.0,
+            "success": false
+          },
+          {
+            "seed": 1210013,
+            "steps": 456,
+            "return": 455.0,
+            "success": false
+          },
+          {
+            "seed": 1210014,
+            "steps": 366,
+            "return": 365.0,
+            "success": false
+          },
+          {
+            "seed": 1210015,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210016,
+            "steps": 478,
+            "return": 477.0,
+            "success": false
+          },
+          {
+            "seed": 1210017,
+            "steps": 358,
+            "return": 357.0,
+            "success": false
+          },
+          {
+            "seed": 1210018,
+            "steps": 472,
+            "return": 471.0,
+            "success": false
+          },
+          {
+            "seed": 1210019,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210020,
+            "steps": 454,
+            "return": 453.0,
+            "success": false
+          },
+          {
+            "seed": 1210021,
+            "steps": 477,
+            "return": 476.0,
+            "success": false
+          },
+          {
+            "seed": 1210022,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210024,
+            "steps": 424,
+            "return": 423.0,
+            "success": false
+          },
+          {
+            "seed": 1210025,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210026,
+            "steps": 433,
+            "return": 432.0,
+            "success": false
+          },
+          {
+            "seed": 1210027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210029,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          }
+        ]
+      },
+      "score": 840.9172222222222,
+      "tail_seed_candidates": [
+        1210012,
+        1210009,
+        1210003,
+        1190021,
+        1200018,
+        1190010,
+        1210016,
+        1210021,
+        1190008,
+        1210008,
+        1190026,
+        1210018,
+        1200002,
+        1190006,
+        1190004,
+        1190003,
+        1190012,
+        1210013,
+        1210020,
+        1200007,
+        1200008,
+        1190016,
+        1210011,
+        1200017,
+        1190002,
+        1200024,
+        1210026,
+        1190005,
+        1190025,
+        1210024,
+        1200025,
+        1200020,
+        1190029,
+        1200003,
+        1190022,
+        1190014,
+        1190018,
+        1190015,
+        1200010,
+        1190017
+      ],
+      "validation_seed_starts": [
+        1190000,
+        1200000,
+        1210000
+      ],
+      "validation_seed_count": 90,
+      "promoted": false
+    },
+    {
+      "label": "chunk_3",
+      "checkpoint": "reports/n4_recurrent_tail_20260611_seed2130k_fs2_continue/checkpoint_045000.zip",
+      "total_timesteps": 45000,
+      "validation": {
+        "mean_survival": 468.4111111111111,
+        "p10_survival": 395.3,
+        "success_rate": 0.5111111111111111,
+        "max_survival": 500.0,
+        "cvar_survival": 369.55555555555554,
+        "bottom_count": 9.0,
+        "median_survival": 500.0,
+        "returns_mean": 467.9222222222222,
+        "episodes": 90,
+        "wall_clock_seconds": 84.62786052998854,
+        "per_seed": [
+          {
+            "seed": 1190000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190002,
+            "steps": 440,
+            "return": 439.0,
+            "success": false
+          },
+          {
+            "seed": 1190003,
+            "steps": 463,
+            "return": 462.0,
+            "success": false
+          },
+          {
+            "seed": 1190004,
+            "steps": 464,
+            "return": 463.0,
+            "success": false
+          },
+          {
+            "seed": 1190005,
+            "steps": 431,
+            "return": 430.0,
+            "success": false
+          },
+          {
+            "seed": 1190006,
+            "steps": 467,
+            "return": 466.0,
+            "success": false
+          },
+          {
+            "seed": 1190007,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190008,
+            "steps": 473,
+            "return": 472.0,
+            "success": false
+          },
+          {
+            "seed": 1190009,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190010,
+            "steps": 480,
+            "return": 479.0,
+            "success": false
+          },
+          {
+            "seed": 1190011,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190012,
+            "steps": 456,
+            "return": 455.0,
+            "success": false
+          },
+          {
+            "seed": 1190013,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190014,
+            "steps": 389,
+            "return": 388.0,
+            "success": false
+          },
+          {
+            "seed": 1190015,
+            "steps": 381,
+            "return": 380.0,
+            "success": false
+          },
+          {
+            "seed": 1190016,
+            "steps": 442,
+            "return": 441.0,
+            "success": false
+          },
+          {
+            "seed": 1190017,
+            "steps": 371,
+            "return": 370.0,
+            "success": false
+          },
+          {
+            "seed": 1190018,
+            "steps": 389,
+            "return": 388.0,
+            "success": false
+          },
+          {
+            "seed": 1190019,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190020,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190021,
+            "steps": 483,
+            "return": 482.0,
+            "success": false
+          },
+          {
+            "seed": 1190022,
+            "steps": 396,
+            "return": 395.0,
+            "success": false
+          },
+          {
+            "seed": 1190023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190024,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190025,
+            "steps": 428,
+            "return": 427.0,
+            "success": false
+          },
+          {
+            "seed": 1190026,
+            "steps": 472,
+            "return": 471.0,
+            "success": false
+          },
+          {
+            "seed": 1190027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1190029,
+            "steps": 400,
+            "return": 399.0,
+            "success": false
+          },
+          {
+            "seed": 1200000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200002,
+            "steps": 469,
+            "return": 468.0,
+            "success": false
+          },
+          {
+            "seed": 1200003,
+            "steps": 400,
+            "return": 399.0,
+            "success": false
+          },
+          {
+            "seed": 1200004,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200005,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200006,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200007,
+            "steps": 449,
+            "return": 448.0,
+            "success": false
+          },
+          {
+            "seed": 1200008,
+            "steps": 444,
+            "return": 443.0,
+            "success": false
+          },
+          {
+            "seed": 1200009,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200010,
+            "steps": 380,
+            "return": 379.0,
+            "success": false
+          },
+          {
+            "seed": 1200011,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200012,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200013,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200014,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200015,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200016,
+            "steps": 361,
+            "return": 360.0,
+            "success": false
+          },
+          {
+            "seed": 1200017,
+            "steps": 442,
+            "return": 441.0,
+            "success": false
+          },
+          {
+            "seed": 1200018,
+            "steps": 483,
+            "return": 482.0,
+            "success": false
+          },
+          {
+            "seed": 1200019,
+            "steps": 338,
+            "return": 337.0,
+            "success": false
+          },
+          {
+            "seed": 1200020,
+            "steps": 419,
+            "return": 418.0,
+            "success": false
+          },
+          {
+            "seed": 1200021,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200022,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200024,
+            "steps": 435,
+            "return": 434.0,
+            "success": false
+          },
+          {
+            "seed": 1200025,
+            "steps": 423,
+            "return": 422.0,
+            "success": false
+          },
+          {
+            "seed": 1200026,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1200029,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210000,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210001,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210002,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210003,
+            "steps": 484,
+            "return": 483.0,
+            "success": false
+          },
+          {
+            "seed": 1210004,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210005,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210006,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210007,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210008,
+            "steps": 473,
+            "return": 472.0,
+            "success": false
+          },
+          {
+            "seed": 1210009,
+            "steps": 487,
+            "return": 486.0,
+            "success": false
+          },
+          {
+            "seed": 1210010,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210011,
+            "steps": 443,
+            "return": 442.0,
+            "success": false
+          },
+          {
+            "seed": 1210012,
+            "steps": 491,
+            "return": 490.0,
+            "success": false
+          },
+          {
+            "seed": 1210013,
+            "steps": 456,
+            "return": 455.0,
+            "success": false
+          },
+          {
+            "seed": 1210014,
+            "steps": 366,
+            "return": 365.0,
+            "success": false
+          },
+          {
+            "seed": 1210015,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210016,
+            "steps": 478,
+            "return": 477.0,
+            "success": false
+          },
+          {
+            "seed": 1210017,
+            "steps": 351,
+            "return": 350.0,
+            "success": false
+          },
+          {
+            "seed": 1210018,
+            "steps": 472,
+            "return": 471.0,
+            "success": false
+          },
+          {
+            "seed": 1210019,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210020,
+            "steps": 454,
+            "return": 453.0,
+            "success": false
+          },
+          {
+            "seed": 1210021,
+            "steps": 477,
+            "return": 476.0,
+            "success": false
+          },
+          {
+            "seed": 1210022,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210023,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210024,
+            "steps": 424,
+            "return": 423.0,
+            "success": false
+          },
+          {
+            "seed": 1210025,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210026,
+            "steps": 433,
+            "return": 432.0,
+            "success": false
+          },
+          {
+            "seed": 1210027,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210028,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          },
+          {
+            "seed": 1210029,
+            "steps": 500,
+            "return": 500.0,
+            "success": true
+          }
+        ]
+      },
+      "score": 838.7855555555556,
+      "tail_seed_candidates": [
+        1210012,
+        1210009,
+        1210003,
+        1190021,
+        1200018,
+        1190010,
+        1210016,
+        1210021,
+        1190008,
+        1210008,
+        1190026,
+        1210018,
+        1200002,
+        1190006,
+        1190004,
+        1190003,
+        1190012,
+        1210013,
+        1210020,
+        1200007,
+        1200008,
+        1210011,
+        1190016,
+        1200017,
+        1190002,
+        1200024,
+        1210026,
+        1190005,
+        1190025,
+        1210024,
+        1200025,
+        1200020,
+        1190029,
+        1200003,
+        1190022,
+        1190014,
+        1190018,
+        1190015,
+        1200010,
+        1190017
+      ],
+      "validation_seed_starts": [
+        1190000,
+        1200000,
+        1210000
+      ],
+      "validation_seed_count": 90,
+      "promoted": false
+    }
+  ],
+  "best": {
+    "label": "start",
+    "checkpoint": "reports/n4_recurrent_tail_20260611_seed2130k_fs2_continue/checkpoint_000000_start.zip",
+    "total_timesteps": 0,
+    "validation": {
+      "mean_survival": 479.77777777777777,
+      "p10_survival": 432.4,
+      "success_rate": 0.5888888888888889,
+      "max_survival": 500.0,
+      "cvar_survival": 404.55555555555554,
+      "bottom_count": 9.0,
+      "median_survival": 500.0,
+      "returns_mean": 479.3666666666667,
+      "episodes": 90,
+      "wall_clock_seconds": 84.73291691200575,
+      "per_seed": [
+        {
+          "seed": 1190000,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190001,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190002,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190003,
+          "steps": 463,
+          "return": 462.0,
+          "success": false
+        },
+        {
+          "seed": 1190004,
+          "steps": 464,
+          "return": 463.0,
+          "success": false
+        },
+        {
+          "seed": 1190005,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190006,
+          "steps": 472,
+          "return": 471.0,
+          "success": false
+        },
+        {
+          "seed": 1190007,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190008,
+          "steps": 473,
+          "return": 472.0,
+          "success": false
+        },
+        {
+          "seed": 1190009,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190010,
+          "steps": 480,
+          "return": 479.0,
+          "success": false
+        },
+        {
+          "seed": 1190011,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190012,
+          "steps": 456,
+          "return": 455.0,
+          "success": false
+        },
+        {
+          "seed": 1190013,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190014,
+          "steps": 471,
+          "return": 470.0,
+          "success": false
+        },
+        {
+          "seed": 1190015,
+          "steps": 392,
+          "return": 391.0,
+          "success": false
+        },
+        {
+          "seed": 1190016,
+          "steps": 447,
+          "return": 446.0,
+          "success": false
+        },
+        {
+          "seed": 1190017,
+          "steps": 419,
+          "return": 418.0,
+          "success": false
+        },
+        {
+          "seed": 1190018,
+          "steps": 433,
+          "return": 432.0,
+          "success": false
+        },
+        {
+          "seed": 1190019,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190020,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190021,
+          "steps": 483,
+          "return": 482.0,
+          "success": false
+        },
+        {
+          "seed": 1190022,
+          "steps": 399,
+          "return": 398.0,
+          "success": false
+        },
+        {
+          "seed": 1190023,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190024,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190025,
+          "steps": 427,
+          "return": 426.0,
+          "success": false
+        },
+        {
+          "seed": 1190026,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190027,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190028,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1190029,
+          "steps": 461,
+          "return": 460.0,
+          "success": false
+        },
+        {
+          "seed": 1200000,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200001,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200002,
+          "steps": 469,
+          "return": 468.0,
+          "success": false
+        },
+        {
+          "seed": 1200003,
+          "steps": 483,
+          "return": 482.0,
+          "success": false
+        },
+        {
+          "seed": 1200004,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200005,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200006,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200007,
+          "steps": 451,
+          "return": 450.0,
+          "success": false
+        },
+        {
+          "seed": 1200008,
+          "steps": 443,
+          "return": 442.0,
+          "success": false
+        },
+        {
+          "seed": 1200009,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200010,
+          "steps": 438,
+          "return": 437.0,
+          "success": false
+        },
+        {
+          "seed": 1200011,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200012,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200013,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200014,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200015,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200016,
+          "steps": 422,
+          "return": 421.0,
+          "success": false
+        },
+        {
+          "seed": 1200017,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200018,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200019,
+          "steps": 374,
+          "return": 373.0,
+          "success": false
+        },
+        {
+          "seed": 1200020,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200021,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200022,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200023,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200024,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200025,
+          "steps": 421,
+          "return": 420.0,
+          "success": false
+        },
+        {
+          "seed": 1200026,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200027,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200028,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1200029,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210000,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210001,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210002,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210003,
+          "steps": 484,
+          "return": 483.0,
+          "success": false
+        },
+        {
+          "seed": 1210004,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210005,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210006,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210007,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210008,
+          "steps": 473,
+          "return": 472.0,
+          "success": false
+        },
+        {
+          "seed": 1210009,
+          "steps": 485,
+          "return": 484.0,
+          "success": false
+        },
+        {
+          "seed": 1210010,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210011,
+          "steps": 440,
+          "return": 439.0,
+          "success": false
+        },
+        {
+          "seed": 1210012,
+          "steps": 489,
+          "return": 488.0,
+          "success": false
+        },
+        {
+          "seed": 1210013,
+          "steps": 461,
+          "return": 460.0,
+          "success": false
+        },
+        {
+          "seed": 1210014,
+          "steps": 441,
+          "return": 440.0,
+          "success": false
+        },
+        {
+          "seed": 1210015,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210016,
+          "steps": 483,
+          "return": 482.0,
+          "success": false
+        },
+        {
+          "seed": 1210017,
+          "steps": 363,
+          "return": 362.0,
+          "success": false
+        },
+        {
+          "seed": 1210018,
+          "steps": 472,
+          "return": 471.0,
+          "success": false
+        },
+        {
+          "seed": 1210019,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210020,
+          "steps": 451,
+          "return": 450.0,
+          "success": false
+        },
+        {
+          "seed": 1210021,
+          "steps": 477,
+          "return": 476.0,
+          "success": false
+        },
+        {
+          "seed": 1210022,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210023,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210024,
+          "steps": 424,
+          "return": 423.0,
+          "success": false
+        },
+        {
+          "seed": 1210025,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210026,
+          "steps": 496,
+          "return": 495.0,
+          "success": false
+        },
+        {
+          "seed": 1210027,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210028,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        },
+        {
+          "seed": 1210029,
+          "steps": 500,
+          "return": 500.0,
+          "success": true
+        }
+      ]
+    },
+    "score": 913.801111111111,
+    "tail_seed_candidates": [
+      1210026,
+      1210012,
+      1210009,
+      1210003,
+      1190021,
+      1200003,
+      1210016,
+      1190010,
+      1210021,
+      1190008,
+      1210008,
+      1190006,
+      1210018,
+      1190014,
+      1200002,
+      1190004,
+      1190003,
+      1190029,
+      1210013,
+      1190012,
+      1200007,
+      1210020,
+      1190016,
+      1200008,
+      1210014,
+      1210011,
+      1200010,
+      1190018,
+      1190025,
+      1210024,
+      1200016,
+      1200025,
+      1190017,
+      1190022,
+      1190015,
+      1200019,
+      1210017
+    ],
+    "validation_seed_starts": [
+      1190000,
+      1200000,
+      1210000
+    ],
+    "validation_seed_count": 90,
+    "promoted": true
+  },
+  "active_tail_seed_count": 681
+}

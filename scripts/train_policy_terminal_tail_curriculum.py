@@ -509,7 +509,7 @@ def main() -> None:
         choices=["stabilize_chain", "selected", "all"],
         default="stabilize_chain",
     )
-    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw"], default="normalized_raw")
+    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force"], default="normalized_raw")
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/policy_terminal_tail_curriculum")

@@ -9,6 +9,8 @@ import numpy as np
 def policy_observation_size(n_poles: int, mode: str) -> int:
     if mode == "normalized_raw":
         return 2 + 2 * int(n_poles)
+    if mode == "normalized_raw_prev_force":
+        return 3 + 2 * int(n_poles)
     return 2 + 3 * int(n_poles)
 
 
@@ -21,8 +23,10 @@ def policy_observation_from_state(
     theta_threshold: float = 12.0 * 2.0 * math.pi / 360.0,
     cart_velocity_scale: float = 5.0,
     pole_velocity_scale: float = 5.0,
+    previous_force: float = 0.0,
+    force_mag: float = 10.0,
 ) -> np.ndarray:
-    if mode != "normalized_raw":
+    if mode not in ("normalized_raw", "normalized_raw_prev_force"):
         return np.asarray(observation, dtype=np.float32).reshape(-1)
     raw = (
         np.asarray(raw_state, dtype=np.float32).reshape(-1)
@@ -40,4 +44,6 @@ def policy_observation_from_state(
     ]
     parts.extend((theta / max(float(theta_threshold), 1e-9)).tolist())
     parts.extend((theta_dot / max(float(pole_velocity_scale), 1e-9)).tolist())
+    if mode == "normalized_raw_prev_force":
+        parts.append(float(previous_force) / max(float(force_mag), 1e-9))
     return np.asarray(parts, dtype=np.float32)

@@ -109,6 +109,7 @@ class PolicyObservationWrapper(gym.Wrapper):
         super().__init__(env)
         self.mode = mode
         self.config = _env_config(env)
+        self.previous_force = 0.0
         if mode == "env":
             self.observation_space = env.observation_space
         else:
@@ -131,14 +132,19 @@ class PolicyObservationWrapper(gym.Wrapper):
             self.mode,
             x_threshold=self.config.x_threshold,
             theta_threshold=self.config.theta_threshold_radians,
+            previous_force=self.previous_force,
+            force_mag=self.config.force_mag,
         )
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+        self.previous_force = 0.0
         observation, info = self.env.reset(seed=seed, options=options)
         return self._transform(observation, info), info
 
     def step(self, action: Any):
         observation, reward, terminated, truncated, info = self.env.step(action)
+        if self.config is not None:
+            self.previous_force = _force_from_env_action(action, self.config)
         return self._transform(observation, info), reward, terminated, truncated, info
 
 
@@ -239,6 +245,16 @@ def make_env(
 
 def _arg(args: argparse.Namespace, name: str, default: Any) -> Any:
     return getattr(args, name, default)
+
+
+def _force_from_env_action(action: Any, config: Any) -> float:
+    if getattr(config, "action_mode", "discrete") == "continuous":
+        return float(np.clip(np.asarray(action, dtype=float).reshape(-1)[0], -config.force_mag, config.force_mag))
+    bins = max(2, int(config.discrete_action_bins))
+    idx = int(np.clip(int(np.asarray(action).reshape(-1)[0]), 0, bins - 1))
+    if bins == 2:
+        return float(config.force_mag if idx == 1 else -config.force_mag)
+    return float(np.linspace(-config.force_mag, config.force_mag, bins)[idx])
 
 
 def policy_kwargs(args: argparse.Namespace) -> dict[str, Any]:

@@ -496,6 +496,37 @@ def test_recurrent_policy_terminal_tracks_state_and_episode_start():
     assert third["policy_terminal"]["episode_start"] is True
 
 
+def test_policy_terminal_normalized_raw_prev_force_observation_mode():
+    class FakePolicy:
+        def __init__(self):
+            self.observations = []
+
+        def predict(self, observation, deterministic=True):
+            self.observations.append(np.asarray(observation, dtype=np.float32).copy())
+            return 4, None
+
+    raw = np.asarray([0.24, 0.5, 0.01, -0.02, 0.03, -0.04, 0.1, -0.2, 0.3, -0.4], dtype=np.float32)
+    policy = FakePolicy()
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=4,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_observation_mode="normalized_raw_prev_force",
+        )
+    )
+    controller.policy_terminal_model = policy
+
+    controller.act(raw, raw)
+    controller.act(raw, raw)
+
+    assert policy.observations[0].shape == (11,)
+    assert policy.observations[0][-1] == 0.0
+    assert policy.observations[1][-1] == 1.0
+
+
 def test_recon_policy_terminal_normalized_raw_observation_mode():
     class FakePolicy:
         def __init__(self):
