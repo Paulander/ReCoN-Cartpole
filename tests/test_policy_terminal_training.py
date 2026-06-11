@@ -150,6 +150,50 @@ def test_score_weights_are_configurable():
     ) == 100.0
 
 
+def test_tail_curriculum_scores_lower_tail_and_success():
+    tail = _load_script("train_policy_terminal_tail_curriculum")
+    summary = tail.tail_metrics([500, 500, 400, 300, 250], horizon=500, cvar_fraction=0.4)
+
+    assert summary["success_rate"] == 0.4
+    assert summary["cvar_survival"] == 275.0
+    assert tail.tail_score(
+        summary,
+        mean_weight=0.0,
+        p10_weight=0.0,
+        cvar_weight=1.0,
+        success_weight=100.0,
+    ) == 315.0
+
+
+def test_tail_curriculum_selects_near_miss_tail_seeds():
+    tail = _load_script("train_policy_terminal_tail_curriculum")
+    summary = {
+        "per_seed": [
+            {"seed": 1, "steps": 499, "success": False},
+            {"seed": 2, "steps": 200, "success": False},
+            {"seed": 3, "steps": 500, "success": True},
+            {"seed": 4, "steps": 450, "success": False},
+        ]
+    }
+
+    assert tail.tail_seed_pool(summary, limit=2, min_steps=300) == [1, 4]
+
+
+def test_tail_curriculum_promotion_rejects_tail_regression():
+    tail = _load_script("train_policy_terminal_tail_curriculum")
+    args = SimpleNamespace(max_success_regression=0.01, max_p10_regression=5.0)
+    best = {
+        "score": 1000.0,
+        "validation": {"success_rate": 0.72, "p10_survival": 440.0},
+    }
+    row = {
+        "score": 1200.0,
+        "validation": {"success_rate": 0.70, "p10_survival": 450.0},
+    }
+
+    assert tail.should_promote(row, best, args) is False
+
+
 def test_iterative_training_env_enables_hard_seed_wrapper(monkeypatch):
     calls = {}
 
@@ -183,6 +227,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     pole1 = _load_script("run_n4_pole1_robustness")
     final_gap = _load_script("run_n4_final_success_gap")
     pole1_finetune = _load_script("run_n4_pole1_policy_finetune")
+    tail_curriculum = _load_script("train_policy_terminal_tail_curriculum")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -192,3 +237,4 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(pole1.compare_outcomes)
     assert callable(final_gap.candidate_configs)
     assert callable(pole1_finetune.collect_failure_dataset)
+    assert callable(tail_curriculum.run_tail_curriculum)
