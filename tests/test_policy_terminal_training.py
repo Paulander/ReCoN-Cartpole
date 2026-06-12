@@ -298,6 +298,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     recurrent_curriculum = _load_script("train_recurrent_policy_terminal_curriculum")
     action_compare = _load_script("compare_policy_actions")
     residual_grid = _load_script("evaluate_recon_residual_grid")
+    counterfactual_gate = _load_script("train_counterfactual_action_gate")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -314,6 +315,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(recurrent_curriculum.run_curriculum)
     assert callable(action_compare.run_comparison)
     assert callable(residual_grid.run_sweep)
+    assert callable(counterfactual_gate.run)
 
 
 def test_action_comparison_summarizes_seed_deltas():
@@ -459,3 +461,33 @@ def test_tail_curriculum_final_seed_starts_expand_blocks():
     args = SimpleNamespace(final_seed_start=10, final_seed_starts=[100, 200], final_eval_episodes=2)
 
     assert tail.final_eval_seeds(args) == [100, 101, 200, 201]
+
+
+def test_counterfactual_gate_summarizes_positive_labels():
+    counterfactual_gate = _load_script("train_counterfactual_action_gate")
+    rows = [
+        {"label": 0, "chosen_survived": 10, "best_survived": 10, "chosen_score": 9.9, "best_score": 9.9},
+        {"label": 3, "chosen_survived": 8, "best_survived": 11, "chosen_score": 7.0, "best_score": 10.5},
+    ]
+
+    summary = counterfactual_gate.dataset_label_summary(rows, classes=6)
+
+    assert summary["row_count"] == 2
+    assert summary["positive_count"] == 1
+    assert summary["label_counts"]["0"] == 1
+    assert summary["label_counts"]["3"] == 1
+    assert summary["max_survival_gap"] == 3.0
+    assert summary["max_score_gap"] == 3.5
+
+
+def test_counterfactual_gate_noop_eval_resets_override_counts():
+    counterfactual_gate = _load_script("train_counterfactual_action_gate")
+    base = {"mean_survival": 500.0, "override_count": 9, "checked_steps": 100, "override_rate": 0.09}
+
+    gate = counterfactual_gate.gate_eval_from_base(base)
+
+    assert gate["mean_survival"] == 500.0
+    assert gate["override_count"] == 0
+    assert gate["checked_steps"] == 0
+    assert gate["override_rate"] == 0.0
+    assert base["override_count"] == 9

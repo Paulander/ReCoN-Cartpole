@@ -44,6 +44,8 @@ def make_controller(args: argparse.Namespace) -> ReConCartPoleController:
             reset_bandit_each_episode=False,
             policy_terminal_path=args.model_path,
             policy_terminal_blend=args.policy_terminal_blend,
+            policy_terminal_scope=args.policy_terminal_scope,
+            policy_terminal_observation_mode=args.policy_observation_mode,
         )
     )
 
@@ -219,6 +221,8 @@ def run_audit(args: argparse.Namespace) -> dict[str, Any]:
             "initial_angle_range": args.initial_angle_range,
             "force_noise": args.force_noise,
             "counterfactual_no_noise": args.counterfactual_no_noise,
+            "policy_terminal_scope": args.policy_terminal_scope,
+            "policy_observation_mode": args.policy_observation_mode,
         },
         "probe_horizon": args.probe_horizon,
         "failure_offsets": args.failure_offsets,
@@ -253,8 +257,10 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Failure offsets: `{result.get('failure_offsets', [])}`",
         f"Audited states: `{result['audited_states']}`",
         f"Mistake rate: `{result['mistake_rate']:.2f}`",
-        f"Mean survival gap: `{result['mean_survival_gap']:.1f}`",
-        f"Mean score gap: `{result.get('mean_score_gap', 0.0):.3f}`",
+        f"Mean survival gap: `{result['mean_survival_gap']:.3f}`",
+        f"P90 survival gap: `{result.get('p90_survival_gap', 0.0):.3f}`",
+        f"Mean score gap: `{result.get('mean_score_gap', 0.0):.6g}`",
+        f"P90 score gap: `{result.get('p90_score_gap', 0.0):.6g}`",
         "",
         "| episodes mean | p10 | success | max |",
         "|---:|---:|---:|---:|",
@@ -288,6 +294,8 @@ def main() -> None:
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
+    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
     parser.add_argument("--episodes", type=int, default=80)
     parser.add_argument("--seed-start", type=int, default=980_000)
     parser.add_argument("--failure-window", type=int, default=20)
