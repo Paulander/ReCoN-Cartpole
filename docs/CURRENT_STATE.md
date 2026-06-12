@@ -354,3 +354,31 @@ Bounded probes, both evaluated on held-out weak-block seeds and not solve claims
 | `reports/n4_motif_pressure_selected_residual_hardpool_20260612` | first 20 hard-pool seeds | motif/pressure blend | 84 | 0 | 0.650 | 0.650 | blended ranking still found no residual advantage in this subset |
 
 Comparison: the older 50-seed pressure-window run `reports/n4_counterfactual_residual_subchain_20260612_seed2390k` produced 170 non-noop labels over 250 rows, so the new selector has not disproven residual learning. It shows that motif-risk predicts near-failure, but pure motif-risk is not equivalent to identifying windows where a simple 5-bin residual action improves short-horizon survival. The next residual attempt should either run the blended selector on the full hard-pool budget or move to trajectory-level recovery-window PPO with motif-score as an observation/filter.
+
+## Motif-Selected Recovery-Window PPO - 2026-06-12
+
+The recovery-window residual PPO script now exposes the same motif-selection controls as the counterfactual residual labeler: `--motif-model-path`, `--motif-score-min`, `--motif-top-k`, `--motif-rank-weight`, and `--pressure-rank-weight`. `windows.json` preserves `motif_score` and `candidate_rank`, and reports record the selector settings. The deployed residual observation shape is unchanged, so trained residual policies remain compatible with normal ReCoN residual-terminal evaluation. Motif risk is used as a recovery-window filter/ranker, not as a hand-authored action rule.
+
+Focused verification:
+
+- `uv run pytest -s -q tests/test_policy_terminal_training.py::test_recovery_window_rows_preserve_motif_selection_metadata tests/test_policy_terminal_training.py::test_counterfactual_residual_can_rank_failure_states_by_motif` -> 2 passed.
+- `uv run ruff check scripts/train_recovery_window_residual_policy.py scripts/train_counterfactual_residual_terminal.py tests/test_policy_terminal_training.py` -> passed.
+
+Bounded held-out probe: `reports/n4_motif_recovery_window_residual_ppo_20260612_seed2980`
+
+Setup: frozen incumbent feedforward PPO terminal, 30 hard-pool collection episodes, 136 motif/pressure-ranked recovery windows, `subchain_diagnostics`, 5-bin residual shifts, hold steps 4, 10k PPO timesteps, held-out weak-block eval on `2100000..2100019`.
+
+| evaluator | mean | p10 | cvar | success | mean abs delta | episodes |
+|---|---:|---:|---:|---:|---:|---:|
+| frozen base | 489.5 | 468.8 | 429.5 | 0.650 | 0.000 | 20 |
+| motif recovery-window residual | 485.6 | 457.8 | 419.5 | 0.600 | 2.876 | 20 |
+
+Gate sweep: `reports/n4_motif_recovery_window_residual_ppo_gate_sweep_20260612_seed2980`
+
+| threshold | mean | p10 | cvar | success | interpretation |
+|---:|---:|---:|---:|---:|---|
+| 0.200 | 485.6 | 457.8 | 419.5 | 0.600 | too many harmful residual changes |
+| 0.600 | 489.1 | 468.8 | 428.5 | 0.650 | mostly suppresses harm, no lift |
+| 0.900 | 489.4 | 468.8 | 429.5 | 0.650 | matches base-level success, no lift |
+
+Interpretation: motif-selected recovery-window PPO gives a real trajectory-level learner, but the first bounded run learned interventions that hurt unless conservatively gated. This supports the current diagnosis: recognizing dangerous subchain motifs is feasible, but the remaining tail is not solved by simple 5-bin residual shifts trained on short recovery windows. Next attempts should either train a less intrusive residual with stronger behavior-preservation penalties, or move the motif/subchain representation into the primary recurrent policy rather than post-hoc residual overrides. No N=4 solve claim is justified.

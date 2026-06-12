@@ -1414,6 +1414,39 @@ def test_subchain_motif_vector_uses_adjacent_pairs():
     assert vector[1] == 0.5
     assert vector[2:6].tolist() == [1.0, 2.0, 0.5, 1.0]
 
+def test_recovery_window_rows_preserve_motif_selection_metadata(monkeypatch):
+    recovery = _load_script("train_recovery_window_residual_policy")
+
+    def fake_select(_args, _episode):
+        return [
+            {
+                "step": 7,
+                "raw_before": [0.0] * 10,
+                "force": 5.0,
+                "failure_offset": 3,
+                "recovery_pressure": 1.25,
+                "motif_score": 4.5,
+                "candidate_rank": 5.75,
+            }
+        ]
+
+    monkeypatch.setattr(recovery, "select_failure_states", fake_select)
+    rows = recovery.window_rows_from_episode(SimpleNamespace(), {"seed": 42, "success": False})
+
+    assert rows == [
+        {
+            "seed": 42,
+            "step": 7,
+            "raw_state": [0.0] * 10,
+            "base_force": 5.0,
+            "failure_offset": 3,
+            "recovery_pressure": 1.25,
+            "motif_score": 4.5,
+            "candidate_rank": 5.75,
+        }
+    ]
+
+
 def test_counterfactual_residual_can_rank_failure_states_by_motif():
     residual = _load_script("train_counterfactual_residual_terminal")
 

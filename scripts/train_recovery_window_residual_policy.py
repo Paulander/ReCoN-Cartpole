@@ -87,6 +87,8 @@ def window_rows_from_episode(args: argparse.Namespace, episode: dict[str, Any]) 
                 "base_force": float(state.get("force", 0.0)),
                 "failure_offset": int(state.get("failure_offset", -1)),
                 "recovery_pressure": float(state.get("recovery_pressure", 0.0)),
+                "motif_score": float(state.get("motif_score", 0.0)),
+                "candidate_rank": float(state.get("candidate_rank", state.get("motif_score", 0.0))),
             }
         )
     return rows
@@ -376,6 +378,20 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "failure_penalty": float(args.failure_penalty),
             "window_success_bonus": float(args.window_success_bonus),
         },
+        "failure_state_selection": {
+            "use_failure_window": bool(getattr(args, "use_failure_window", False)),
+            "failure_window_start": int(getattr(args, "failure_window_start", 0)),
+            "failure_window_end": int(getattr(args, "failure_window_end", 0)),
+            "failure_window_stride": int(getattr(args, "failure_window_stride", 0)),
+            "failure_window_target_offset": int(getattr(args, "failure_window_target_offset", 0)),
+            "max_window_states": int(getattr(args, "max_window_states", 0)),
+            "failure_offsets": [int(item) for item in args.failure_offsets],
+            "motif_model_path": str(getattr(args, "motif_model_path", "") or ""),
+            "motif_score_min": float(getattr(args, "motif_score_min", float("-inf"))),
+            "motif_top_k": int(getattr(args, "motif_top_k", 0)),
+            "motif_rank_weight": float(getattr(args, "motif_rank_weight", 1.0)),
+            "pressure_rank_weight": float(getattr(args, "pressure_rank_weight", 0.0)),
+        },
         "base_eval": evaluate_controller(args),
         "residual_eval": evaluate_controller(args, str(model_path)),
         "eval_seeds": eval_seed_values(args),
@@ -427,6 +443,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--failure-window-stride", type=int, default=5)
     parser.add_argument("--failure-window-target-offset", type=int, default=40)
     parser.add_argument("--max-window-states", type=int, default=14)
+    parser.add_argument("--motif-model-path", default="")
+    parser.add_argument("--motif-score-min", type=float, default=float("-inf"))
+    parser.add_argument("--motif-top-k", type=int, default=0)
+    parser.add_argument("--motif-rank-weight", type=float, default=1.0)
+    parser.add_argument("--pressure-rank-weight", type=float, default=0.0)
+    parser.add_argument("--x-threshold", type=float, default=2.4)
+    parser.add_argument("--theta-threshold", type=float, default=12.0 * 2.0 * np.pi / 360.0)
+    parser.add_argument("--cart-velocity-scale", type=float, default=5.0)
+    parser.add_argument("--pole-velocity-scale", type=float, default=5.0)
     parser.add_argument("--cycle-windows", action="store_true")
     parser.add_argument("--probe-horizon", type=int, default=100)
     parser.add_argument("--margin-weight", type=float, default=1.0)
