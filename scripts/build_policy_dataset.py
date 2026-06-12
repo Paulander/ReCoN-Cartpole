@@ -40,6 +40,20 @@ def make_env(args: argparse.Namespace) -> CartPoleNEnv:
     )
 
 
+def explicit_seeds(args: argparse.Namespace) -> list[int] | None:
+    seed_list = str(getattr(args, "seed_list", "") or "").strip()
+    if not seed_list:
+        return None
+    path = Path(seed_list)
+    raw = path.read_text(encoding="utf-8")
+    seeds: list[int] = []
+    for item in raw.replace(",", "\n").splitlines():
+        value = item.strip()
+        if value:
+            seeds.append(int(value))
+    return seeds
+
+
 def make_teacher(args: argparse.Namespace):
     if args.teacher == "heuristic":
         return None
@@ -107,8 +121,10 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     teacher = make_teacher(args)
     behavior = make_behavior(args)
     env = make_env(args)
-    for ep in range(args.episodes):
-        seed = args.seed_start + ep
+    seed_values = explicit_seeds(args)
+    if seed_values is None:
+        seed_values = [args.seed_start + ep for ep in range(args.episodes)]
+    for ep, seed in enumerate(seed_values):
         obs, info = env.reset(seed=seed)
         if teacher is not None:
             teacher.start_episode()
@@ -205,6 +221,7 @@ def main() -> None:
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--seed-start", type=int, default=710000)
+    parser.add_argument("--seed-list", default="")
     parser.add_argument("--dt", type=float, default=0.0005)
     parser.add_argument("--dynamics-mode", choices=["parallel", "serial_lagrange"], default="serial_lagrange")
     parser.add_argument("--discrete-action-bins", type=int, default=5)
@@ -237,7 +254,8 @@ def main() -> None:
     np.savez_compressed(out, **data)
     metadata = {
         "teacher": args.teacher,
-        "episodes": args.episodes,
+        "episodes": int(len(explicit_seeds(args) or [None] * args.episodes)),
+        "seed_list": args.seed_list,
         "samples": int(data["observations"].shape[0]),
         "env": {
             "n_poles": args.n_poles,

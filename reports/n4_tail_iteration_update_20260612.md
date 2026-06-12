@@ -220,3 +220,35 @@ Evaluation: best learned checkpoint `reports/n4_mingru_dagger_iter2_20260612_see
 | ReCoN minGRU passthrough | 1900000, 2000000, 2100000, 2200000 | 486.8 | 444.0 | 0.713 | 240 |
 
 The 4-block passthrough result exactly matches the pure h256 minGRU broad eval, so the ReCoN integration no longer degrades the learned recurrent controller. This is still not an N=4 solve: the 2100000 block remains the weak tail at 0.633 success.
+
+## Targeted hard-tail DAgger attempt
+
+Code change: `build_policy_dataset.py` now accepts `--seed-list`, allowing targeted DAgger collection on explicit hard seeds instead of only contiguous seed ranges.
+
+Run root: `reports/n4_mingru_hardtail_20260612_seed2300k`
+
+- Hard-seed scan policy: current best h256 minGRU from DAgger iteration 2.
+- Scan pool: 240 non-eval training seeds from seed start 2300000.
+- Scan result: mean 488.3, p10 447.7, success 0.733.
+- Selected hard/near-hard seeds: 64 seeds, chosen from failures or episodes with survival <= 475.
+- Targeted DAgger samples: 29,192 student-rollout samples on those explicit hard seeds, labeled by the feedforward ReCoN teacher.
+- Training dataset: iter2 aggregate 76,511 samples + hard-tail 29,192 samples = 105,703 samples.
+- Student: h256 seq32 no-context minGRU, 24 epochs, validation action accuracy 0.884.
+
+Held-out eval with ReCoN minGRU passthrough on seed starts 1900000, 2000000, 2100000, 2200000, 60 episodes each:
+
+| checkpoint | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| best iter2 h256 passthrough | 486.8 | 444.0 | 0.713 | 240 |
+| targeted hard-tail h256 passthrough | 485.1 | 438.9 | 0.696 | 240 |
+
+Block detail for targeted hard-tail h256:
+
+| seed start | mean | p10 | success | episodes |
+|---:|---:|---:|---:|---:|
+| 1900000 | 484.8 | 437.4 | 0.667 | 60 |
+| 2000000 | 484.0 | 443.9 | 0.683 | 60 |
+| 2100000 | 482.3 | 435.8 | 0.633 | 60 |
+| 2200000 | 489.4 | 449.9 | 0.800 | 60 |
+
+Interpretation: naive hard-tail oversampling from a separate training pool did not improve the held-out weak block and regressed overall success. Keep iter2 h256 as the current best learned N=4 checkpoint. The next hard-tail attempt should probably avoid pure oversampling and instead use either weighted sampling/mixing, a residual correction head, or collect hard seeds that specifically match the 2100000 failure signature without training on the held-out block itself.

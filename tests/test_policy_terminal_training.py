@@ -629,6 +629,15 @@ def test_policy_dataset_default_behavior_is_teacher_rollout():
     assert builder.make_behavior(SimpleNamespace()) is None
 
 
+def test_policy_dataset_explicit_seed_list(tmp_path):
+    builder = _load_script("build_policy_dataset")
+    seed_file = tmp_path / "seeds.txt"
+    seed_file.write_text("101\n202,303\n", encoding="utf-8")
+    args = SimpleNamespace(seed_list=str(seed_file))
+
+    assert builder.explicit_seeds(args) == [101, 202, 303]
+
+
 def test_recurrent_ladder_validation_seed_starts_expand_blocks():
     ladder = _load_script("train_recurrent_terminal_ladder")
     args = SimpleNamespace(validation_seed_start=10, validation_seed_starts=[100, 200], validation_episodes=2)
