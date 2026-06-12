@@ -26,6 +26,45 @@ def build_inputs(data: dict[str, np.ndarray], args: argparse.Namespace) -> np.nd
     return np.concatenate(parts, axis=1).astype(np.float32)
 
 
+def estimated_episode_survival(data: dict[str, np.ndarray]) -> np.ndarray:
+    count = int(data["teacher_actions"].shape[0])
+    if "returns_to_go" not in data:
+        return np.zeros(count, dtype=np.float32)
+    returns = data["returns_to_go"].astype(np.float32)
+    if "step_indices" in data:
+        return returns + data["step_indices"].astype(np.float32)
+    return returns
+
+
+def filter_training_data(data: dict[str, np.ndarray], args: argparse.Namespace) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+    count = int(data["teacher_actions"].shape[0])
+    min_survival = float(getattr(args, "min_sample_episode_survival", 0.0))
+    max_survival = float(getattr(args, "max_sample_episode_survival", 0.0))
+    if min_survival <= 0.0 and max_survival <= 0.0:
+        return data, {"enabled": False, "input_samples": count, "kept_samples": count}
+    survival = estimated_episode_survival(data)
+    mask = np.ones(count, dtype=bool)
+    if min_survival > 0.0:
+        mask &= survival >= min_survival
+    if max_survival > 0.0:
+        mask &= survival <= max_survival
+    if not np.any(mask):
+        raise ValueError("sample survival filter removed every row")
+    filtered: dict[str, np.ndarray] = {}
+    for key, value in data.items():
+        arr = np.asarray(value)
+        filtered[key] = arr[mask] if arr.shape[:1] == (count,) else arr
+    return filtered, {
+        "enabled": True,
+        "min_sample_episode_survival": min_survival,
+        "max_sample_episode_survival": max_survival,
+        "input_samples": count,
+        "kept_samples": int(np.sum(mask)),
+        "kept_fraction": float(np.mean(mask)),
+        "kept_survival_mean": float(np.mean(survival[mask])),
+    }
+
+
 def sequence_indices(episodes: np.ndarray, seq_len: int) -> list[list[int]]:
     seq_len = max(1, int(seq_len))
     result: list[list[int]] = []
@@ -85,6 +124,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
 
     raw = np.load(args.dataset, allow_pickle=True)
     data = {key: raw[key] for key in raw.files}
+    data, filter_report = filter_training_data(data, args)
     inputs = build_inputs(data, args)
     x, actions, returns, failures = make_sequences(inputs, data, args)
     weights = sample_weights(data, args)
@@ -182,6 +222,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "config": config.__dict__,
         "history": history,
         "device": str(device),
+        "sample_filter": filter_report,
         "sample_weighting": {
             "failure_sample_weight": max(0.0, float(getattr(args, "failure_sample_weight", 0.0))),
             "late_sample_weight": max(0.0, float(getattr(args, "late_sample_weight", 0.0))),
@@ -229,6 +270,8 @@ def main() -> None:
     parser.add_argument("--value-weight", type=float, default=0.05)
     parser.add_argument("--failure-weight", type=float, default=0.10)
     parser.add_argument("--confidence-weight", type=float, default=0.05)
+    parser.add_argument("--min-sample-episode-survival", type=float, default=0.0)
+    parser.add_argument("--max-sample-episode-survival", type=float, default=0.0)
     parser.add_argument("--failure-sample-weight", type=float, default=0.0)
     parser.add_argument("--late-sample-weight", type=float, default=0.0)
     parser.add_argument("--low-return-sample-weight", type=float, default=0.0)

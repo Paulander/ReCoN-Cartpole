@@ -529,6 +529,26 @@ def test_mingru_build_inputs_avoids_duplicate_prev_force_column():
     assert inputs.shape == (2, 11)
 
 
+def test_mingru_supervised_filter_training_data_by_episode_survival():
+    import numpy as np
+
+    supervised = _load_script("train_mingru_supervised")
+    data = {
+        "observations": np.zeros((3, 2), dtype=np.float32),
+        "teacher_actions": np.asarray([0, 1, 2], dtype=np.int64),
+        "returns_to_go": np.asarray([500.0, 100.0, 20.0], dtype=np.float32),
+        "step_indices": np.asarray([0, 300, 470], dtype=np.int64),
+    }
+    args = SimpleNamespace(min_sample_episode_survival=490.0, max_sample_episode_survival=0.0)
+
+    filtered, report = supervised.filter_training_data(data, args)
+
+    assert report["enabled"] is True
+    assert report["input_samples"] == 3
+    assert report["kept_samples"] == 2
+    assert filtered["teacher_actions"].tolist() == [0, 2]
+
+
 def test_mingru_supervised_sample_weights_emphasize_tail_states():
     import numpy as np
 

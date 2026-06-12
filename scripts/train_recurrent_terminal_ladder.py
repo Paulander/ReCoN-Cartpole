@@ -150,6 +150,8 @@ def train_supervised_candidate(args: argparse.Namespace, hidden: int, seq_len: i
             value_weight=0.05,
             failure_weight=0.10,
             confidence_weight=0.05,
+            min_sample_episode_survival=args.min_sample_episode_survival,
+            max_sample_episode_survival=args.max_sample_episode_survival,
             failure_sample_weight=args.failure_sample_weight,
             late_sample_weight=args.late_sample_weight,
             low_return_sample_weight=args.low_return_sample_weight,
@@ -293,6 +295,8 @@ def main() -> None:
     parser.add_argument("--supervised-epochs", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
+    parser.add_argument("--min-sample-episode-survival", type=float, default=0.0)
+    parser.add_argument("--max-sample-episode-survival", type=float, default=0.0)
     parser.add_argument("--failure-sample-weight", type=float, default=0.0)
     parser.add_argument("--late-sample-weight", type=float, default=0.0)
     parser.add_argument("--low-return-sample-weight", type=float, default=0.0)

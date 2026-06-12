@@ -314,3 +314,26 @@ Interpretation: the current N=4 gap is not fixed by post-hoc margin gating, simp
 
 Next likely productive move: change the data-generation objective, not just the supervised learner. The DAgger labels still come from the feedforward teacher, and the failures are not clean one-step action mistakes. A recurrent/residual objective that directly rewards late recovery, or a curriculum that collects successful recovery trajectories from easier N=4 distributions before current-noise N=4, is more plausible than more uniform teacher cloning.
 
+## Success-filtered minGRU cloning probe
+
+Code change: minGRU supervised training now supports `--min-sample-episode-survival` and `--max-sample-episode-survival`. The filter estimates each sample's episode survival as `returns_to_go + step_indices`, records the retained fraction in `report.json`, and is also exposed through the recurrent ladder.
+
+Dataset check on the iter2 DAgger dataset:
+
+| min survival | kept samples | kept fraction |
+|---:|---:|---:|
+| 450 | 64,214 | 0.839 |
+| 470 | 57,310 | 0.749 |
+| 480 | 56,352 | 0.737 |
+| 490 | 52,480 | 0.686 |
+| 500 | 50,000 | 0.654 |
+
+Run: `reports/n4_mingru_success_filter_20260612_seed2350k/supervised_h256_seq32_success500_warm`
+
+- Warm-started from the current best iter2 h256/seq32 checkpoint.
+- Trained only on full-survival samples with `min_sample_episode_survival=500`.
+- Low LR `3e-5`, 4 epochs, CUDA.
+- Weak held-out block `2100000`, 60 episodes, strict passthrough floor `0.90`: mean `482.5`, p10 `438.5`, success `0.633`.
+
+Interpretation: success-filtered cloning is also dominated by the incumbent weak-block result of `0.650`. The failure mode is not solved by cloning only trajectories that already survived; the next data objective probably needs counterfactual/rewarded recovery training rather than more teacher-action filtering.
+
