@@ -130,6 +130,16 @@ def test_counterfactual_residual_collect_seed_values_reads_hard_seed_json(tmp_pa
     assert residual.collect_seed_values(args) == [10, 20]
 
 
+def test_policy_dataset_explicit_seeds_reads_hard_seed_json(tmp_path):
+    dataset_builder = _load_script("build_policy_dataset")
+    path = tmp_path / "hard_seeds.json"
+    path.write_text('{"hard_seeds": [11, 22, 33]}', encoding="utf-8")
+    args = SimpleNamespace(seed_list=str(path), seed_start=1, episodes=2)
+
+    assert dataset_builder.explicit_seeds(args) == [11, 22, 33]
+    assert dataset_builder.collection_seeds(args) == [11, 22]
+
+
 def test_counterfactual_residual_label_summary_counts_non_noop():
     residual = _load_script("train_counterfactual_residual_terminal")
     rows = [
@@ -429,6 +439,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     action_compare = _load_script("compare_policy_actions")
     residual_grid = _load_script("evaluate_recon_residual_grid")
     counterfactual_gate = _load_script("train_counterfactual_action_gate")
+    mingru_curriculum = _load_script("train_mingru_curriculum")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -447,6 +458,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(action_compare.run_comparison)
     assert callable(residual_grid.run_sweep)
     assert callable(counterfactual_gate.run)
+    assert callable(mingru_curriculum.run)
 
 
 def test_action_comparison_summarizes_seed_deltas():
@@ -636,6 +648,77 @@ def test_recurrent_tail_final_seed_start_fallback():
     args = SimpleNamespace(final_seed_start=10, final_seed_starts=None, final_eval_episodes=2)
 
     assert recurrent_tail.recurrent_final_seeds(args) == [10, 11]
+
+
+def test_mingru_curriculum_default_stages_progress_n3_to_n4():
+    curriculum = _load_script("train_mingru_curriculum")
+    args = SimpleNamespace(
+        n3_episodes=1,
+        low_angle_episodes=2,
+        current_episodes=3,
+        tail_episodes=4,
+        n3_seed_start=10,
+        low_angle_seed_start=20,
+        current_seed_start=30,
+        tail_seed_start=40,
+        tail_seed_list="seeds.txt",
+        behavior_checkpoint_path="behavior.pt",
+        initial_angle_range=0.05,
+        force_noise=0.02,
+    )
+
+    stages = curriculum.default_stages(args)
+
+    assert [stage["name"] for stage in stages] == ["n3_stable", "n4_low_angle_no_noise", "n4_current", "n4_hard_tail"]
+    assert [stage["n_poles"] for stage in stages] == [3, 4, 4, 4]
+    assert stages[-1]["rollout_policy"] == "mingru_terminal"
+
+
+def test_mingru_curriculum_aggregate_offsets_episode_ids():
+    curriculum = _load_script("train_mingru_curriculum")
+
+    def payload(values):
+        return {key: curriculum.np.asarray(value) for key, value in values.items()}
+
+    first = {
+        "data": payload({
+            "observations": [[1.0], [2.0]],
+            "prev_forces": [0.0, 1.0],
+            "teacher_forces": [0.0, 1.0],
+            "teacher_actions": [2, 3],
+            "returns_to_go": [2.0, 1.0],
+            "failure_within_k": [0.0, 1.0],
+            "seeds": [10, 10],
+            "sources": ["teacher", "teacher"],
+            "rollout_sources": ["teacher", "teacher"],
+            "rollout_forces": [0.0, 1.0],
+            "rollout_actions": [2, 3],
+            "episodes": [0, 0],
+            "step_indices": [0, 1],
+        })
+    }
+    second = {
+        "data": payload({
+            "observations": [[3.0]],
+            "prev_forces": [0.0],
+            "teacher_forces": [0.0],
+            "teacher_actions": [2],
+            "returns_to_go": [1.0],
+            "failure_within_k": [0.0],
+            "seeds": [20],
+            "sources": ["teacher"],
+            "rollout_sources": ["teacher"],
+            "rollout_forces": [0.0],
+            "rollout_actions": [2],
+            "episodes": [0],
+            "step_indices": [0],
+        })
+    }
+
+    merged = curriculum.aggregate_stage_data([first, second])
+
+    assert merged["observations"].shape == (3, 1)
+    assert merged["episodes"].tolist() == [0, 0, 1]
 
 
 def test_subchain_observation_mode_adds_adjacent_pair_features():

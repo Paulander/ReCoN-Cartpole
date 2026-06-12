@@ -499,3 +499,39 @@ A stricter attempt with `min_survival_gain=2` produced 194 rows and 0 non-noop l
 
 Interpretation: advantage-gated labels are much more causally honest than the permissive subchain labels, but they are too sparse to move held-out control in this form. The next residual path should probably optimize trajectory-level advantage/recovery directly, or train a recurrent recovery option on selected windows, rather than fitting a point classifier to isolated rare labels. No N=4 solve claim is justified.
 
+## Explicit minGRU N3-to-N4 curriculum attempt
+
+Code changes:
+
+- Added `scripts/train_mingru_curriculum.py`, an explicit data-level recurrent curriculum wrapper. It collects stages in order: `n3_stable`, `n4_low_angle_no_noise`, `n4_current`, and `n4_hard_tail`, aggregates them with episode-id offsets, trains a minGRU terminal, and evaluates held-out N=4 seeds with pure minGRU and ReCoN+passthrough modes.
+- `build_policy_dataset.py` now accepts JSON seed-list files with `hard_seeds`, `seeds`, or `tail_seeds`, matching the hard-seed pool format used elsewhere.
+- Explicit seed-list collection is now bounded by `--episodes`; the first full curriculum launch exposed that the dataset builder otherwise attempted to consume the entire hard-tail JSON pool.
+- Added tests covering script import, curriculum stage ordering, aggregate episode offsets, JSON hard-seed parsing, and explicit seed-list episode limiting.
+
+Smoke run: `reports/smoke_mingru_curriculum_20260612`
+
+- End-to-end tiny curriculum completed successfully and produced a minGRU checkpoint.
+
+Main bounded run: `reports/n4_mingru_curriculum_20260612_seed2812k`
+
+- Warm-start: incumbent h256/seq32 no-context minGRU from DAgger iteration 2.
+- Dataset stages:
+  - N3 stable/static ReCoN: 40 episodes, 20,000 samples.
+  - N4 low angle/no noise/feedforward ReCoN teacher: 40 episodes, 20,000 samples.
+  - N4 current/feedforward ReCoN teacher: 60 episodes, 29,155 samples.
+  - N4 hard-tail behavior minGRU + feedforward ReCoN labels: 80 bounded hard seeds, 38,476 samples.
+- Aggregate dataset: 107,631 samples.
+- Training: h256 seq32, `normalized_raw4_prev_force`, no context, resumed from incumbent, 12 epochs, CUDA, weighted failure/late/low-return samples.
+- Final validation action accuracy: 0.804.
+
+Tiny held-out read on seed starts `1900000`, `2000000`, `2100000`, `2200000`, 2 episodes each:
+
+| checkpoint | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success |
+|---|---:|---:|---:|---:|---:|---:|
+| incumbent h256/seq32 | 500.0 | 500.0 | 1.000 | 500.0 | 500.0 | 1.000 |
+| curriculum h256/seq32 | 480.0 | 439.1 | 0.500 | 484.4 | 439.1 | 0.625 |
+
+A full 4x60 eval was started but stopped after training because stepwise h256/seq32 minGRU evaluation was too slow through the current pure+ReCoN ladder path. A 4x20 eval was also stopped for the same reason. The tiny 4x2 comparison is only a direction check, not solve evidence.
+
+Interpretation: the explicit N3-to-N4 curriculum infrastructure now exists and works, but this first warm-started curriculum dataset regressed relative to the incumbent on the same tiny held-out seeds. The likely issue is destructive imitation mixing: N3/static-ReCoN and low-angle teacher data diluted the incumbent N4 behavior instead of improving the hard tail. The next recurrent attempt should keep the infrastructure but change weighting/sampling: much lower N3/low-angle weight after warm-start, or use curriculum pretraining only before incumbent DAgger, not as a late fine-tune mix. No N=4 solve claim is justified.
+

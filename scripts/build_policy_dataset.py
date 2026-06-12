@@ -47,11 +47,30 @@ def explicit_seeds(args: argparse.Namespace) -> list[int] | None:
     path = Path(seed_list)
     raw = path.read_text(encoding="utf-8")
     seeds: list[int] = []
-    for item in raw.replace(",", "\n").splitlines():
-        value = item.strip()
-        if value:
-            seeds.append(int(value))
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        payload = None
+    if isinstance(payload, dict):
+        for key in ("hard_seeds", "seeds", "tail_seeds"):
+            if isinstance(payload.get(key), list):
+                seeds = [int(item) for item in payload[key]]
+                break
+    elif isinstance(payload, list):
+        seeds = [int(item) for item in payload]
+    if not seeds:
+        for item in raw.replace(",", "\n").splitlines():
+            value = item.strip()
+            if value:
+                seeds.append(int(value))
     return seeds
+
+
+def collection_seeds(args: argparse.Namespace) -> list[int]:
+    seed_values = explicit_seeds(args)
+    if seed_values is None:
+        return [int(args.seed_start) + ep for ep in range(int(args.episodes))]
+    return seed_values[: int(args.episodes)]
 
 
 def make_teacher(args: argparse.Namespace):
@@ -130,9 +149,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     teacher = make_teacher(args)
     behavior = make_behavior(args)
     env = make_env(args)
-    seed_values = explicit_seeds(args)
-    if seed_values is None:
-        seed_values = [args.seed_start + ep for ep in range(args.episodes)]
+    seed_values = collection_seeds(args)
     for ep, seed in enumerate(seed_values):
         obs, info = env.reset(seed=seed)
         if teacher is not None:
