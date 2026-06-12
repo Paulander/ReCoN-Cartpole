@@ -302,3 +302,37 @@ Interpretation: the hook works and is visible in diagnostics, but hand-tuned con
 
 Implementation note: `StepTrace` and `training.evaluate.rollout(..., trace=True)` now carry `subchain_bias` so future replays can show the pair votes.
 
+## Learned Residual And Recurrent Follow-Up - 2026-06-12
+
+Two follow-up probes were run after the static subchain-bias grid.
+
+### Subchain-Diagnostic Counterfactual Residual Probe
+
+Report: `reports/n4_subchain_counterfactual_residual_probe_20260612_seed2960`
+
+Setup: frozen PPO incumbent, `subchain_diagnostics` residual features, 5 residual bins, option hold `2`, hard-seed collection, short-horizon counterfactual labels, held-out eval on starts `980000`, `1500000`, and `1600000` with 8 episodes each.
+
+Result: the dataset produced no non-noop labels.
+
+| Rows | Non-noop labels | Base mean | Base p10 | Base success | Residual mean | Residual p10 | Residual success |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 126 | 0 | 483.5 | 447.2 | 0.625 | 483.5 | 447.2 | 0.625 |
+
+Interpretation: even with subchain diagnostics, pressure shaping, relaxed margin gates, and a 2-step option hold, short-horizon counterfactual probing did not find locally better residual actions. This supports the earlier failure-action audits: the remaining tail is not a simple near-failure one-action rescue problem.
+
+### Widened Recurrent Subchain Curriculum
+
+Report: `reports/n4_recurrent_subchain_wide_curriculum_20260612_seed2970k`
+
+Setup: RecurrentPPO terminal, `normalized_raw4_subchains_prev_force`, N=3 stable -> N=4 low-angle/no-noise -> N=4 current -> hard-tail, widened validation starts from the N=4 current stage onward.
+
+| Stage | Best mean | Best p10 | Best CVaR | Best success | Notes |
+|---|---:|---:|---:|---:|---|
+| N=3 stable | 500.0 | 500.0 | 500.0 | 1.000 | easy warmup solved |
+| N=4 low-angle/no-noise | 500.0 | 500.0 | 500.0 | 1.000 | easy transfer solved |
+| N=4 current validation | 484.4 | 435.0 | 408.0 | 0.750 | promising validation only |
+| N=4 tail validation | 484.4 | 435.0 | 408.0 | 0.750 | tail chunk not promoted |
+| Final held-out ReCoN eval | 471.1 | 394.3 | 375.2 | 0.5625 | not solved |
+
+Interpretation: recurrent curriculum learns the easy distributions and can look good on the mixed validation sample, but the final held-out block still collapses below the feedforward incumbent. This keeps the best known robust N=4 state near-solved but not solved. The next recurrent attempt should either spend materially more budget with wider validation/final blocks from the beginning, or change the recurrent objective/data path rather than relying on another short PPO curriculum slice.
+
