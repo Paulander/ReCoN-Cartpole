@@ -284,6 +284,98 @@ def test_counterfactual_residual_label_state_can_use_pressure_advantage(monkeypa
     assert row["best_pressure_gain"] == pytest.approx(0.2)
 
 
+def test_recovery_window_residual_extracts_failed_episode_windows():
+    recovery = _load_script("train_recovery_window_residual_policy")
+    states = []
+    for step in range(12):
+        raw = [0.0, 0.0, 0.01, 0.02]
+        if step == 9:
+            raw[2] = 0.20
+        states.append({"step": step, "raw_before": raw, "force": 0.0})
+    args = SimpleNamespace(
+        use_failure_window=True,
+        failure_window_start=0,
+        failure_window_end=8,
+        failure_window_stride=2,
+        failure_window_target_offset=3,
+        max_window_states=5,
+        failure_offsets=[0, 1],
+        max_failure_states=3,
+        n_poles=1,
+    )
+
+    windows = recovery.window_rows_from_episode(
+        args, {"seed": 44, "steps": 12, "return": 11.0, "success": False, "states": states}
+    )
+
+    assert len(windows) == 3
+    assert all(item["seed"] == 44 for item in windows)
+    assert all("raw_state" in item for item in windows)
+    assert any(item["step"] == 9 for item in windows)
+    assert max(item["recovery_pressure"] for item in windows) > 0.4
+
+
+def test_recovery_window_residual_env_resets_to_window_and_steps(monkeypatch):
+    recovery = _load_script("train_recovery_window_residual_policy")
+
+    class FakeController:
+        def __init__(self, _config):
+            self.starts = 0
+
+        def start_episode(self):
+            self.starts += 1
+
+        def act(self, _obs, _raw):
+            return 2, {"force": 0.0}
+
+    monkeypatch.setattr(recovery, "ReConCartPoleController", FakeController)
+    args = SimpleNamespace(
+        n_poles=1,
+        horizon=50,
+        window_horizon=3,
+        dt=0.02,
+        dynamics_mode="parallel",
+        discrete_action_bins=5,
+        force_mag=10.0,
+        initial_angle_range=0.0,
+        force_noise=0.0,
+        link_coupling=0.35,
+        base_model_path="base.zip",
+        base_normalizer_path="",
+        base_observation_mode="normalized_raw",
+        selection_mode="hard_select",
+        policy_terminal_blend=1.0,
+        policy_terminal_scope="stabilize_chain",
+        residual_feature_mode="basic",
+        residual_action_bins=5,
+        residual_gate_threshold=0.0,
+        residual_hold_steps=1,
+        cycle_windows=True,
+        shift_penalty=0.0,
+        low_risk_change_penalty=0.5,
+        pressure_drop_weight=1.0,
+        pressure_after_weight=0.0,
+        failure_penalty=0.0,
+        window_success_bonus=0.0,
+    )
+    windows = [{"seed": 7, "step": 10, "raw_state": [0.0, 0.0, 0.02, 0.0], "base_force": 0.0, "recovery_pressure": 0.1}]
+
+    env = recovery.RecoveryWindowResidualEnv(args, windows)
+    obs, info = env.reset(seed=1)
+    next_obs, reward, terminated, truncated, step_info = env.step(2)
+
+    assert obs.shape == env.observation_space.shape
+    assert next_obs.shape == env.observation_space.shape
+    assert info["window_seed"] == 7
+    assert info["window_step"] == 10
+    assert step_info["base_action"] == 2
+    assert step_info["applied_shift"] == 0
+    assert step_info["low_risk_change_penalty"] == 0.0
+    assert isinstance(reward, float)
+    assert not terminated
+    assert not truncated
+
+
 def test_residual_env_penalizes_changes_on_base_solved_episode(monkeypatch):
     residual = _load_script("train_residual_policy_terminal")
 

@@ -678,3 +678,28 @@ Loose pressure-scored run: `reports/n4_counterfactual_trajectory_pressure_loose_
 Gate sweep: `reports/n4_counterfactual_trajectory_pressure_loose_grid_20260612_seed2871k` evaluated thresholds `0.0,0.10,0.20,0.35,0.50,0.75`; every threshold tied at mean `489.5`, p10 `468.8`, cvar `429.5`, success `0.650`.
 
 Interpretation: pressure-aware scoring confirms that the current local residual action labels are not finding meaningful risk-reducing options. The active residual changes actions but not outcomes, and the best pressure gains are tiny. The next residual attempt should stop treating single residual-bin choices as labels and instead train a genuine multi-step option/policy from recovery-window resets, or shift back to recurrent curriculum/PPO sweep rather than spending more time on threshold calibration. No N=4 solve claim is justified.
+
+## Recovery-window residual PPO option
+
+Code change: added `scripts/train_recovery_window_residual_policy.py`, a closed-loop residual-policy trainer that resets directly into non-held-out near-failure recovery windows and trains a small PPO residual policy over multiple ticks. This is different from the earlier counterfactual residual labelers: the residual policy acts repeatedly inside the recovery window, receives pressure-drop/survival shaping, and is evaluated only through normal ReCoN residual-terminal integration on held-out seeds. The script writes `windows.json`, `report.json`, and `report.md`, and records mechanisms so the run cannot be mistaken for gain mutation or a train-seed solve claim.
+
+Test coverage: `uv run pytest tests/test_policy_terminal_training.py -k recovery_window -s` passed `2 passed`; full suite `uv run pytest -s` passed `106 passed`.
+
+Smoke: `reports/n4_recovery_window_residual_ppo_smoke_20260612`, 4 collection episodes, 40 windows, 128 PPO timesteps, 4 held-out eval seeds. It completed end-to-end and saved a PPO residual terminal.
+
+Bounded weak-block run: `reports/n4_recovery_window_residual_ppo_20260612_seed2900k`, collecting 270 windows from 30 non-held-out hard-pool episodes, window horizon `120`, 5k PPO timesteps, held-out eval seeds `2100000..2100019`.
+
+| variant | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|
+| frozen PPO/ReCoN base | 489.5 | 468.8 | 429.5 | 0.650 | 0.000 |
+| recovery-window residual PPO | 485.1 | 467.0 | 416.5 | 0.550 | 5.296 |
+
+Gate sweep: `reports/n4_recovery_window_residual_ppo_grid_20260612_seed2900k` showed that increasing deployment threshold recovers the base but does not improve it. Threshold `0.98` tied the base at mean `489.5`, p10 `468.8`, cvar `429.5`, success `0.650`; lower thresholds were harmful.
+
+Guarded run: `reports/n4_recovery_window_residual_ppo_guarded_20260612_seed2901k` added stronger intervention costs (`shift_penalty=0.08`, `low_risk_change_penalty=1.0`) and used deployment/training gate `0.50`.
+
+| variant | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|
+| guarded recovery-window residual PPO | 489.4 | 468.8 | 429.0 | 0.650 | 1.059 |
+
+Interpretation: a genuine multi-step recovery-window residual policy is now implemented and causally active. The first unguarded version over-intervenes and damages two base-success seeds; the guarded version is much safer but only ties the frozen base. This suggests the residual option needs either stronger preserve-success training examples/windows or a higher-level trigger learned from motif-risk before it can help the N=4 tail. No N=4 solve claim is justified.
