@@ -382,3 +382,31 @@ Gate sweep: `reports/n4_motif_recovery_window_residual_ppo_gate_sweep_20260612_s
 | 0.900 | 489.4 | 468.8 | 429.5 | 0.650 | matches base-level success, no lift |
 
 Interpretation: motif-selected recovery-window PPO gives a real trajectory-level learner, but the first bounded run learned interventions that hurt unless conservatively gated. This supports the current diagnosis: recognizing dangerous subchain motifs is feasible, but the remaining tail is not solved by simple 5-bin residual shifts trained on short recovery windows. Next attempts should either train a less intrusive residual with stronger behavior-preservation penalties, or move the motif/subchain representation into the primary recurrent policy rather than post-hoc residual overrides. No N=4 solve claim is justified.
+
+## Success-Preservation Recovery Residual Update - 2026-06-12
+
+The recovery-window residual PPO path now supports explicit base-behavior preservation windows from solved collection episodes. Enable with `--preserve-success-stride`; cap per solved episode with `--max-success-preservation-windows`. Preservation windows keep the normal residual observation shape but carry `preserve_success=true` in `windows.json`. During training, pressure-drop shaping is disabled for these windows, requested non-noop residual shifts can be penalized with `--preserve-success-shift-penalty`, and no-op choices can receive `--preserve-success-noop-bonus`. This is intended to stop residual PPO from learning broad, harmful overrides on states the frozen base already handles.
+
+Focused verification:
+
+- `uv run pytest -s -q tests/test_policy_terminal_training.py::test_recovery_window_rows_preserve_motif_selection_metadata tests/test_policy_terminal_training.py::test_recovery_window_rows_can_add_success_preservation_windows` -> 2 passed.
+- `uv run ruff check scripts/train_recovery_window_residual_policy.py tests/test_policy_terminal_training.py` -> passed.
+
+Bounded held-out probe: `reports/n4_preserve_motif_recovery_window_residual_ppo_20260612_seed2981`
+
+Setup: frozen incumbent feedforward PPO terminal, 40 hard-pool collection episodes, 176 recovery windows plus 72 success-preservation windows, motif/pressure-ranked recovery selection, `subchain_diagnostics`, 5-bin residual shifts, hold steps 4, 10k PPO timesteps, held-out weak-block eval on `2100000..2100019`.
+
+| evaluator | mean | p10 | cvar | success | mean abs delta | episodes |
+|---|---:|---:|---:|---:|---:|---:|
+| frozen base | 489.5 | 468.8 | 429.5 | 0.650 | 0.000 | 20 |
+| preservation residual | 484.7 | 458.9 | 420.0 | 0.500 | 3.352 | 20 |
+
+Gate sweep: `reports/n4_preserve_motif_recovery_window_residual_ppo_gate_sweep_20260612_seed2981`
+
+| threshold | mean | p10 | cvar | success | interpretation |
+|---:|---:|---:|---:|---:|---|
+| 0.200 | 484.7 | 458.9 | 420.0 | 0.500 | residual remains too intervention-heavy |
+| 0.400 | 488.6 | 468.8 | 426.5 | 0.650 | suppresses most harm, no lift |
+| 0.900 | 489.4 | 468.8 | 429.0 | 0.650 | matches base-level success, no lift |
+
+Interpretation: adding solved-episode preservation windows was the right guardrail, but this PPO residual formulation still learned harmful residual shifts. The residual path is now better instrumented, yet the evidence argues against spending more short-run budget on post-hoc residual overrides. The higher-signal next path is to put subchain/motif information into the primary recurrent policy or to train a much more conservative residual objective with explicit no-op class imbalance. No N=4 solve claim is justified.

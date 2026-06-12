@@ -1443,8 +1443,29 @@ def test_recovery_window_rows_preserve_motif_selection_metadata(monkeypatch):
             "recovery_pressure": 1.25,
             "motif_score": 4.5,
             "candidate_rank": 5.75,
+            "preserve_success": False,
         }
     ]
+
+
+def test_recovery_window_rows_can_add_success_preservation_windows():
+    recovery = _load_script("train_recovery_window_residual_policy")
+    args = SimpleNamespace(
+        n_poles=4,
+        preserve_success_stride=2,
+        max_success_preservation_windows=2,
+    )
+    states = [
+        {"step": idx, "raw_before": [0.01 * idx] * 10, "force": float(idx)}
+        for idx in range(6)
+    ]
+
+    rows = recovery.window_rows_from_episode(args, {"seed": 99, "success": True, "states": states})
+
+    assert [row["step"] for row in rows] == [2, 4]
+    assert all(row["preserve_success"] is True for row in rows)
+    assert all(row["failure_offset"] == -1 for row in rows)
+    assert rows[0]["base_force"] == 2.0
 
 
 def test_counterfactual_residual_can_rank_failure_states_by_motif():

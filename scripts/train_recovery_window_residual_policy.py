@@ -74,9 +74,39 @@ def make_base_controller(args: argparse.Namespace, residual_model_path: str = ""
     )
 
 
+def success_preservation_rows(args: argparse.Namespace, episode: dict[str, Any]) -> list[dict[str, Any]]:
+    stride = int(getattr(args, "preserve_success_stride", 0))
+    if stride <= 0:
+        return []
+    states = list(episode.get("states", []))
+    if not states:
+        return []
+    stride = max(1, stride)
+    selected = states[::stride]
+    max_windows = int(getattr(args, "max_success_preservation_windows", 0))
+    if max_windows > 0:
+        selected = selected[-max_windows:]
+    rows: list[dict[str, Any]] = []
+    for state in selected:
+        rows.append(
+            {
+                "seed": int(episode["seed"]),
+                "step": int(state["step"]),
+                "raw_state": list(state["raw_before"]),
+                "base_force": float(state.get("force", 0.0)),
+                "failure_offset": -1,
+                "recovery_pressure": recovery_pressure(state["raw_before"], int(args.n_poles)),
+                "motif_score": 0.0,
+                "candidate_rank": 0.0,
+                "preserve_success": True,
+            }
+        )
+    return rows
+
+
 def window_rows_from_episode(args: argparse.Namespace, episode: dict[str, Any]) -> list[dict[str, Any]]:
     if bool(episode.get("success", False)):
-        return []
+        return success_preservation_rows(args, episode)
     rows: list[dict[str, Any]] = []
     for state in select_failure_states(args, episode):
         rows.append(
@@ -89,6 +119,7 @@ def window_rows_from_episode(args: argparse.Namespace, episode: dict[str, Any]) 
                 "recovery_pressure": float(state.get("recovery_pressure", 0.0)),
                 "motif_score": float(state.get("motif_score", 0.0)),
                 "candidate_rank": float(state.get("candidate_rank", state.get("motif_score", 0.0))),
+                "preserve_success": False,
             }
         )
     return rows
@@ -192,6 +223,7 @@ class RecoveryWindowResidualEnv(gym.Env):
             "window_seed": int(self.current_window.get("seed", -1)),
             "window_step": int(self.current_window.get("step", -1)),
             "window_pressure": float(self.current_window.get("recovery_pressure", 0.0)),
+            "preserve_success": bool(self.current_window.get("preserve_success", False)),
         }
         return self._residual_obs(), info
 
@@ -210,15 +242,32 @@ class RecoveryWindowResidualEnv(gym.Env):
         self.local_step += 1
         pressure_after = recovery_pressure(info.get("raw_state", []), int(self.args.n_poles))
         pressure_drop = float(pressure_before - pressure_after)
+        preserve_success = bool(self.current_window.get("preserve_success", False))
         shift_size = abs(float(applied_shift))
+        requested_shift_size = abs(float(requested_shift))
         shift_penalty = float(self.args.shift_penalty) * shift_size
         low_risk_change_penalty = float(getattr(self.args, "low_risk_change_penalty", 0.0)) * shift_size * max(0.0, 1.0 - gate)
+        preservation_shift_penalty = (
+            float(getattr(self.args, "preserve_success_shift_penalty", 0.0)) * requested_shift_size
+            if preserve_success
+            else 0.0
+        )
+        preservation_noop_bonus = (
+            float(getattr(self.args, "preserve_success_noop_bonus", 0.0))
+            if preserve_success and requested_shift == 0
+            else 0.0
+        )
+        pressure_reward = 0.0 if preserve_success else (
+            float(self.args.pressure_drop_weight) * pressure_drop
+            - float(self.args.pressure_after_weight) * pressure_after
+        )
         reward = (
             float(env_reward)
-            + float(self.args.pressure_drop_weight) * pressure_drop
-            - float(self.args.pressure_after_weight) * pressure_after
+            + pressure_reward
+            + preservation_noop_bonus
             - shift_penalty
             - low_risk_change_penalty
+            - preservation_shift_penalty
         )
         if terminated:
             reward -= float(self.args.failure_penalty)
@@ -246,6 +295,9 @@ class RecoveryWindowResidualEnv(gym.Env):
             "pressure_drop": pressure_drop,
             "shift_penalty": float(shift_penalty),
             "low_risk_change_penalty": float(low_risk_change_penalty),
+            "preservation_shift_penalty": float(preservation_shift_penalty),
+            "preservation_noop_bonus": float(preservation_noop_bonus),
+            "preserve_success": bool(preserve_success),
             "final_force": final_force,
         }
         return next_obs, float(reward), bool(terminated), bool(truncated), info
@@ -302,6 +354,7 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"Status: `{report['status']}`",
         f"Residual model: `{report['residual_model_path']}`",
         f"Windows: `{report['window_count']}` from `{report['collection_episode_count']}` collection episodes",
+        f"Window types: `{report.get('window_type_counts', {})}`",
         f"Window horizon: `{report['window_horizon']}`; residual feature mode: `{report['residual_feature_mode']}`",
         f"Reward config: `{report.get('reward_config', {})}`",
         "",
@@ -330,7 +383,11 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     windows = collected["windows"]
     if not windows:
         raise ValueError("no recovery windows collected")
-    (out / "windows.json").write_text(json.dumps({"windows": windows, "episodes": collected["episodes"]}, indent=2), encoding="utf-8")
+    window_type_counts = {
+        "preserve_success": sum(1 for item in windows if bool(item.get("preserve_success", False))),
+        "recovery": sum(1 for item in windows if not bool(item.get("preserve_success", False))),
+    }
+    (out / "windows.json").write_text(json.dumps({"windows": windows, "episodes": collected["episodes"], "window_type_counts": window_type_counts}, indent=2), encoding="utf-8")
     if args.residual_model_path:
         model_path = Path(args.residual_model_path)
         model = PPO.load(str(model_path), device=args.device)
@@ -367,6 +424,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "residual_model_path": str(model_path),
         "timesteps": timesteps,
         "window_count": len(windows),
+        "window_type_counts": window_type_counts,
         "collection_episode_count": len(collected["episodes"]),
         "window_horizon": int(args.window_horizon),
         "residual_feature_mode": args.residual_feature_mode,
@@ -377,6 +435,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "low_risk_change_penalty": float(getattr(args, "low_risk_change_penalty", 0.0)),
             "failure_penalty": float(args.failure_penalty),
             "window_success_bonus": float(args.window_success_bonus),
+            "preserve_success_shift_penalty": float(getattr(args, "preserve_success_shift_penalty", 0.0)),
+            "preserve_success_noop_bonus": float(getattr(args, "preserve_success_noop_bonus", 0.0)),
         },
         "failure_state_selection": {
             "use_failure_window": bool(getattr(args, "use_failure_window", False)),
@@ -391,6 +451,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "motif_top_k": int(getattr(args, "motif_top_k", 0)),
             "motif_rank_weight": float(getattr(args, "motif_rank_weight", 1.0)),
             "pressure_rank_weight": float(getattr(args, "pressure_rank_weight", 0.0)),
+            "preserve_success_stride": int(getattr(args, "preserve_success_stride", 0)),
+            "max_success_preservation_windows": int(getattr(args, "max_success_preservation_windows", 0)),
         },
         "base_eval": evaluate_controller(args),
         "residual_eval": evaluate_controller(args, str(model_path)),
@@ -452,6 +514,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--theta-threshold", type=float, default=12.0 * 2.0 * np.pi / 360.0)
     parser.add_argument("--cart-velocity-scale", type=float, default=5.0)
     parser.add_argument("--pole-velocity-scale", type=float, default=5.0)
+    parser.add_argument("--preserve-success-stride", type=int, default=0)
+    parser.add_argument("--max-success-preservation-windows", type=int, default=0)
+    parser.add_argument("--preserve-success-shift-penalty", type=float, default=0.0)
+    parser.add_argument("--preserve-success-noop-bonus", type=float, default=0.0)
     parser.add_argument("--cycle-windows", action="store_true")
     parser.add_argument("--probe-horizon", type=int, default=100)
     parser.add_argument("--margin-weight", type=float, default=1.0)
