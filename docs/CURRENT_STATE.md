@@ -459,3 +459,33 @@ Verification for the code fix:
 - `uv run ruff check src/recon_cartpole/recon/mingru_terminal.py tests/test_policy_terminal_training.py` -> passed.
 
 Next best move: stop adding motif scalars and continue with distribution-aware learning. The strongest path is either another DAgger/on-policy loop that explicitly mines the remaining held-out failures, or a true recurrent PPO/fine-tuning step initialized from DAgger4/5. The current supervised DAgger loop appears useful but is flattening just under the target band.
+
+
+## Recurrent Failure-Mining DAgger Branch - 2026-06-13
+
+Added `scripts/collect_mingru_hard_seeds.py` to mine fresh hard seeds for trained minGRU recurrent terminals. The collector supports `pure_mingru_policy` and `recon_mingru_terminal`, records per-seed survival/failure taxonomy, and writes `hard_seeds.json`, `hard_seeds.txt`, and `hard_seeds.md`. This makes recurrent DAgger tail selection reproducible instead of hand-copying failure lists.
+
+Fresh mining run: `reports/n4_mingru_dagger5_hardseed_mine_20260613_seed5200k`
+
+Setup: DAgger5 checkpoint, ReCoN-wrapped minGRU, N=4 serial Lagrange, 5-bin actions, horizon 500, fresh seeds `5200000..5200399`, min hard survival 350, not part of the 80-seed held-out reporting block.
+
+| scan | episodes | mean | p10 | success | hard seeds | failure counts |
+|---|---:|---:|---:|---:|---:|---|
+| DAgger5 fresh mining block | 400 | 484.1 | 435.0 | 0.710 | 116 | `pole_1_angle`: 66, `pole_2_angle`: 50 |
+
+Targeted refinements evaluated on the unchanged 80 held-out mixed seeds from starts `1900000`, `2000000`, `2100000`, and `2200000`:
+
+| run | tail data | samples | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `reports/n4_mingru_curriculum_subchain_motif_dagger5_20260612_seed4810k` | previous broad student-tail DAgger | 53507 | 487.4 | 443.8 | 0.675 | 487.4 | 443.8 | 0.675 |
+| `reports/n4_mingru_curriculum_subchain_motif_mined_dagger6_20260613_seed5200k` | 116 mined failure/near-miss seeds only | 67015 | 486.0 | 439.7 | 0.675 | 486.0 | 439.7 | 0.675 |
+| `reports/n4_mingru_curriculum_subchain_motif_balanced_dagger7_20260613_seed5200k` | 116 mined failures plus 116 success-preservation seeds | 125086 | 486.8 | 444.9 | 0.675 | 486.8 | 444.9 | 0.675 |
+
+Interpretation: fresh-seed mining confirms the current DAgger5 recurrent policy can exceed 0.70 on one independent 400-seed block, but targeted training on that mined pool did not improve the standing 80-seed held-out block. Mined-only DAgger slightly hurt mean/p10; balanced hard/success preservation recovered p10 but still plateaued at 0.675. More supervised DAgger with the same architecture/objective is unlikely to crack the remaining gap by itself.
+
+Next best move: use DAgger5 or DAgger7 as initialization for a true on-policy fine-tuning objective, or switch to explicit residual/on-policy learning over the remaining failure taxonomy. The persistent failures are now mostly `pole_1_angle` and `pole_2_angle`, so future training should optimize late failure recovery directly rather than only imitating teacher labels on more collected states. No N=4 solve claim is justified from this branch.
+
+Verification for the collector code:
+
+- `uv run ruff check scripts/collect_mingru_hard_seeds.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs -q -s` -> passed.

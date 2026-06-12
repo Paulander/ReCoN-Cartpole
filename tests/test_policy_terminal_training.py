@@ -683,6 +683,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     residual_grid = _load_script("evaluate_recon_residual_grid")
     counterfactual_gate = _load_script("train_counterfactual_action_gate")
     mingru_curriculum = _load_script("train_mingru_curriculum")
+    mingru_hard_seeds = _load_script("collect_mingru_hard_seeds")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -702,6 +703,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(residual_grid.run_sweep)
     assert callable(counterfactual_gate.run)
     assert callable(mingru_curriculum.run)
+    assert callable(mingru_hard_seeds.run_collect)
 
 
 def test_action_comparison_summarizes_seed_deltas():
