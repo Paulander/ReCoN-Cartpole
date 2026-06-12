@@ -168,3 +168,40 @@ DAgger-style one-pass run: `reports/n4_mingru_dagger_20260612_seed2740k`
 | recon_mingru_terminal | 483.1 | 437.8 | 0.683 | 120 |
 
 Interpretation: the first DAgger-style aggregation is the strongest recurrent result so far. ReCoN+minGRU now roughly matches the feedforward ReCoN terminal on this 1900k/2000k held-out slice, but it still does not exceed the best feedforward result or solve N=4. This is real learned recurrent behavior rather than a new hand-coded script node, and the next credible step is iterative DAgger/residual recurrent training, not another direct from-scratch recurrent PPO run.
+
+## Iterative DAgger minGRU follow-up
+
+Run root: `reports/n4_mingru_dagger_iter2_20260612_seed2760k`
+
+Second DAgger pass:
+
+- Behavior policy: first-pass h128 no-context minGRU.
+- New behavior rollout data: 60 episodes from seed start 1760000, 28,433 samples.
+- Aggregated dataset: original teacher rollout + two student-rollout sets = 76,511 samples.
+- Held-out eval blocks: 1900000, 2000000, 2100000, 2200000, 60 episodes each.
+
+| candidate | train acc | val acc | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|---:|---:|
+| iter2 h128 pure minGRU | 0.864 | 0.862 | 486.0 | 443.9 | 0.708 | 240 |
+| iter2 h256 pure minGRU | 0.895 | 0.895 | 486.8 | 444.0 | 0.713 | 240 |
+
+Block detail for the best learned policy, iter2 h256:
+
+| seed start | mean | p10 | success | episodes |
+|---:|---:|---:|---:|---:|
+| 1900000 | 486.8 | 445.7 | 0.700 | 60 |
+| 2000000 | 485.9 | 444.9 | 0.717 | 60 |
+| 2100000 | 483.8 | 439.9 | 0.633 | 60 |
+| 2200000 | 490.9 | 461.8 | 0.800 | 60 |
+
+ReCoN-wrapper check on the same iter2 h128 checkpoint still trailed the pure learned terminal: ReCoN + minGRU stayed at success 0.683 over 120 episodes, while pure minGRU reached 0.700. Changing minGRU scope from `stabilize_chain` to `all` did not change the wrapper result, so the gap is not a simple scope setting; it is likely proposal arbitration/confidence interaction or fallback behavior.
+
+Third DAgger pass:
+
+- Behavior policy: iter2 h256 no-context minGRU.
+- New behavior rollout data: 80 episodes from seed start 1780000, 38,971 samples.
+- Aggregated dataset: original teacher rollout + three student-rollout sets = 115,482 samples.
+- Third-pass h256 validation action accuracy fell to 0.871.
+- Broad held-out eval: mean 485.8, p10 445.0, success 0.708 over the same 240 episodes.
+
+Interpretation: iterative DAgger is now the strongest learned-control path, and h256 iter2 is the current best learned N=4 artifact. It beats the prior feedforward ReCoN baseline on broad 4-block pure-policy success in this comparison, but it is not a solve and the 2100000 block remains the weak tail. A naive third aggregation pass did not help, suggesting the next step should be targeted hard-tail data selection or a ReCoN integration change that lets a high-confidence learned terminal control directly when it is empirically stronger than arbitration.
