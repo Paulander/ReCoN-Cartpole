@@ -205,3 +205,18 @@ Third DAgger pass:
 - Broad held-out eval: mean 485.8, p10 445.0, success 0.708 over the same 240 episodes.
 
 Interpretation: iterative DAgger is now the strongest learned-control path, and h256 iter2 is the current best learned N=4 artifact. It beats the prior feedforward ReCoN baseline on broad 4-block pure-policy success in this comparison, but it is not a solve and the 2100000 block remains the weak tail. A naive third aggregation pass did not help, suggesting the next step should be targeted hard-tail data selection or a ReCoN integration change that lets a high-confidence learned terminal control directly when it is empirically stronger than arbitration.
+
+## ReCoN minGRU passthrough integration
+
+Code change: `MinGRUTerminalConfig` now has an explicit, default-off high-confidence passthrough path: `passthrough_enabled` and `passthrough_confidence_floor`. ReCoN still runs proposal generation and arbitration, but when passthrough is enabled a valid minGRU terminal prediction can replace the final force after arbitration. The trace records `mingru_passthrough`, including whether it applied and the base proposal it overrode.
+
+Motivation: the learned h256 minGRU policy from DAgger iteration 2 was stronger than the ReCoN-wrapped minGRU proposal path. The previous wrapper averaged/arbitrated away some of the learned policy's advantage.
+
+Evaluation: best learned checkpoint `reports/n4_mingru_dagger_iter2_20260612_seed2760k/supervised_h256_seq32_noctx/mingru_terminal.pt`, `passthrough_enabled=True`, `passthrough_confidence_floor=0.05`.
+
+| mode | seed blocks | mean | p10 | success | episodes |
+|---|---|---:|---:|---:|---:|
+| ReCoN minGRU passthrough | 1900000, 2000000 | 486.3 | 444.9 | 0.708 | 120 |
+| ReCoN minGRU passthrough | 1900000, 2000000, 2100000, 2200000 | 486.8 | 444.0 | 0.713 | 240 |
+
+The 4-block passthrough result exactly matches the pure h256 minGRU broad eval, so the ReCoN integration no longer degrades the learned recurrent controller. This is still not an N=4 solve: the 2100000 block remains the weak tail at 0.633 success.

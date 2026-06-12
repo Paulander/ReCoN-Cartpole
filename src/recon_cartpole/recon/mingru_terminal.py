@@ -20,6 +20,8 @@ class MinGRUTerminalConfig:
     blend: float = 1.0
     scope: str = "stabilize_chain"
     confidence_floor: float = 0.05
+    passthrough_enabled: bool = False
+    passthrough_confidence_floor: float = 0.05
     checkpoint_path: str = ""
 
 

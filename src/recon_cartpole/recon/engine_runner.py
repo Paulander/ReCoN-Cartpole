@@ -417,6 +417,7 @@ class ReConCartPoleController:
             "mlp_terminal": dict(self.last_mlp_terminal),
             "policy_terminal": dict(self.last_policy_terminal),
             "mingru_terminal": dict(self.last_mingru_terminal),
+            "mingru_passthrough": dict(context.get("mingru_passthrough", {})),
             "bandit": snapshot_bandit(self.bandit_state),
             "graph_nodes": {nid: node.state.name for nid, node in self.graph.nodes.items()},
             "graph_ticks": graph_ticks,
@@ -1204,9 +1205,53 @@ class ReConCartPoleController:
 
     def _arbitrate_force(self, _node, env):
         proposal = arbitrate_force(env.get("proposals", []), self.config.force_mag)
+        proposal = self._maybe_apply_mingru_passthrough(proposal, env)
         env["selected_proposal"] = proposal
         env["force"] = proposal.force
         return True, True
+
+    def _maybe_apply_mingru_passthrough(self, proposal: ForceProposal, env: dict[str, Any]) -> ForceProposal:
+        cfg = self.config.mingru_terminal
+        if not (self._uses_mingru_terminal() and cfg.passthrough_enabled):
+            return proposal
+        prediction, mingru_info = self._mingru_terminal_force(
+            env["observation"], env.get("raw_state"), env
+        )
+        confidence = max(0.0, min(1.0, float(prediction.confidence)))
+        floor = max(0.0, min(1.0, float(cfg.passthrough_confidence_floor)))
+        applied = bool(prediction.valid and prediction.force is not None and confidence >= floor)
+        mingru_info["passthrough_enabled"] = True
+        mingru_info["passthrough_confidence_floor"] = floor
+        mingru_info["passthrough_applied"] = applied
+        mingru_info["passthrough_base_proposal"] = asdict(proposal)
+        if not applied:
+            self.last_mingru_terminal = mingru_info
+            env["mingru_passthrough"] = dict(mingru_info)
+            return proposal
+        terminal_force = float(np.clip(prediction.force, -self.config.force_mag, self.config.force_mag))
+        passthrough = ForceProposal(
+            source_node="mingru_terminal",
+            force=terminal_force,
+            confidence=max(confidence, proposal.confidence),
+            urgency=proposal.urgency,
+            reason=f"mingru_terminal_passthrough; base={proposal.source_node}",
+            score=max(proposal.score, max(0.01, confidence) * (1.0 + proposal.urgency)),
+            raw_confidence=confidence,
+            raw_urgency=proposal.raw_urgency,
+            select_edge_weight=proposal.select_edge_weight,
+            proposal_edge_weight=proposal.proposal_edge_weight,
+            bandit_score=proposal.bandit_score,
+            selection_multiplier=proposal.selection_multiplier,
+            selected=proposal.selected,
+            suppressed=False,
+            selection_mode=proposal.selection_mode,
+        )
+        mingru_info["passthrough_force"] = terminal_force
+        mingru_info["passthrough_base_force"] = proposal.force
+        mingru_info["passthrough_proposal"] = asdict(passthrough)
+        self.last_mingru_terminal = mingru_info
+        env["mingru_passthrough"] = dict(mingru_info)
+        return passthrough
 
     def _apply_force(self, _node, env):
         env["action"] = action_from_force(

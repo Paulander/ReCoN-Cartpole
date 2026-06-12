@@ -299,6 +299,66 @@ def test_recon_mingru_terminal_low_confidence_is_traced_and_downweighted():
     assert diagnostics["mingru_terminal"]["confidence"] == 0.1
 
 
+def test_recon_mingru_terminal_passthrough_can_override_final_action():
+    raw = [0.0, 0.0, 0.01, 0.04, 0.12, -0.03, 0.0, 0.0, 0.0, 0.0]
+    controller = _controller_with_fake_mingru(
+        RunnerConfig(
+            n_poles=4,
+            mode="static_recon",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            mingru_terminal=MinGRUTerminalConfig(
+                enabled=True,
+                scope="stabilize_chain",
+                blend=0.0,
+                confidence_floor=0.05,
+                passthrough_enabled=True,
+                passthrough_confidence_floor=0.8,
+            ),
+        )
+    )
+    controller.mingru_terminal = FakeMinGRUTerminal(force=-10.0, confidence=0.95)
+
+    action, diagnostics = controller.act(raw, raw)
+
+    assert action == 0
+    assert diagnostics["force"] == -controller.config.force_mag
+    assert diagnostics["proposal"]["source_node"] == "mingru_terminal"
+    assert "mingru_terminal_passthrough" in diagnostics["proposal"]["reason"]
+    assert diagnostics["mingru_passthrough"]["passthrough_applied"] is True
+    assert diagnostics["mingru_passthrough"]["passthrough_base_proposal"]["source_node"] == "stabilize_chain"
+
+
+def test_recon_mingru_terminal_passthrough_respects_confidence_floor():
+    raw = [0.0, 0.0, 0.01, 0.04, 0.12, -0.03, 0.0, 0.0, 0.0, 0.0]
+    controller = _controller_with_fake_mingru(
+        RunnerConfig(
+            n_poles=4,
+            mode="static_recon",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            mingru_terminal=MinGRUTerminalConfig(
+                enabled=True,
+                scope="stabilize_chain",
+                blend=1.0,
+                confidence_floor=0.5,
+                passthrough_enabled=True,
+                passthrough_confidence_floor=0.9,
+            ),
+        )
+    )
+    controller.mingru_terminal = FakeMinGRUTerminal(force=-10.0, confidence=0.1)
+
+    _action, diagnostics = controller.act(raw, raw)
+
+    assert diagnostics["proposal"]["source_node"] == "stabilize_chain"
+    assert "mingru_terminal_passthrough" not in diagnostics["proposal"]["reason"]
+    assert diagnostics["mingru_passthrough"]["passthrough_applied"] is False
+    assert diagnostics["mingru_passthrough"]["passthrough_confidence_floor"] == 0.9
+
+
 def test_recon_mingru_terminal_scope_all_caches_one_prediction_and_resets():
     raw = [0.0, 0.0, 0.02, 0.0]
     controller = _controller_with_fake_mingru(
