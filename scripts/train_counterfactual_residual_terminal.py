@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from recon_cartpole.control.policy_observation import policy_observation_from_state
+from recon_cartpole.control.policy_observation import adjacent_subchain_features, policy_observation_from_state
 from recon_cartpole.control.residual_features import residual_aux_features
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
@@ -97,6 +97,97 @@ def recovery_pressure(raw_state: Any, n_poles: int) -> float:
     angle = float(np.max(np.abs(raw[2 : 2 + n]))) / 0.20943951023931953
     velocity = float(np.max(np.abs(raw[2 + n : 2 + 2 * n]))) / 5.0
     return float(np.clip(0.35 * cart + 0.45 * angle + 0.20 * velocity, 0.0, 2.0))
+
+
+def load_motif_model(args: argparse.Namespace) -> dict[str, Any] | None:
+    path = str(getattr(args, "motif_model_path", "") or "").strip()
+    if not path:
+        return None
+    cached = getattr(args, "_motif_model_cache", None)
+    if cached is not None:
+        return cached
+    model = json.loads(Path(path).read_text(encoding="utf-8"))
+    args._motif_model_cache = model
+    return model
+
+
+def motif_feature_vector(args: argparse.Namespace, raw_state: Any, base_force: float, model: dict[str, Any]) -> np.ndarray:
+    raw = np.asarray(raw_state, dtype=np.float32).reshape(-1)
+    n = int(args.n_poles)
+    needed = 2 + 2 * n
+    if raw.size < needed:
+        raise ValueError("raw_state is too short for motif features")
+    theta_threshold = float(getattr(args, "theta_threshold", 12.0 * 2.0 * np.pi / 360.0))
+    theta = raw[2 : 2 + n] / max(theta_threshold, 1e-9)
+    theta_dot = raw[2 + n : 2 + 2 * n] / max(float(getattr(args, "pole_velocity_scale", 5.0)), 1e-9)
+    cart = [
+        float(raw[0]) / max(float(getattr(args, "x_threshold", 2.4)), 1e-9),
+        float(raw[1]) / max(float(getattr(args, "cart_velocity_scale", 5.0)), 1e-9),
+    ]
+    values = cart + adjacent_subchain_features(theta, theta_dot, max(4, n))
+    target_dim = len(model.get("scale", values))
+    if target_dim > len(values):
+        diagnostics = [
+            float(base_force) / max(float(args.force_mag), 1e-9),
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        ]
+        values.extend(diagnostics[: target_dim - len(values)])
+    if len(values) < target_dim:
+        values.extend([0.0] * (target_dim - len(values)))
+    return np.asarray(values[:target_dim], dtype=np.float32)
+
+
+def motif_score_for_state(args: argparse.Namespace, model: dict[str, Any], state: dict[str, Any]) -> float:
+    vector = motif_feature_vector(args, state["raw_before"], float(state.get("force", 0.0)), model)
+    pos = np.asarray(model["positive_mean"], dtype=np.float32)
+    neg = np.asarray(model["negative_mean"], dtype=np.float32)
+    scale = np.maximum(np.asarray(model["scale"], dtype=np.float32), 1e-6)
+    z = vector / scale
+    p = pos / scale
+    n = neg / scale
+    d_pos = float(np.mean((z - p) ** 2))
+    d_neg = float(np.mean((z - n) ** 2))
+    return d_neg - d_pos
+
+
+def rank_failure_candidates(args: argparse.Namespace, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    model = load_motif_model(args)
+    if model is None or not candidates:
+        return candidates
+    scored: list[dict[str, Any]] = []
+    for item in candidates:
+        candidate = dict(item)
+        try:
+            candidate["motif_score"] = motif_score_for_state(args, model, candidate)
+        except ValueError:
+            candidate["motif_score"] = float("-inf")
+        scored.append(candidate)
+    min_score = float(getattr(args, "motif_score_min", float("-inf")))
+    scored = [item for item in scored if float(item.get("motif_score", float("-inf"))) >= min_score]
+    motif_weight = float(getattr(args, "motif_rank_weight", 1.0))
+    pressure_weight = float(getattr(args, "pressure_rank_weight", 0.0))
+    for item in scored:
+        item["candidate_rank"] = (
+            motif_weight * float(item.get("motif_score", float("-inf")))
+            + pressure_weight * float(item.get("recovery_pressure", 0.0))
+        )
+    top_k = int(getattr(args, "motif_top_k", 0))
+    scored.sort(
+        key=lambda item: (
+            float(item.get("candidate_rank", float("-inf"))),
+            float(item.get("motif_score", float("-inf"))),
+            float(item.get("recovery_pressure", 0.0)),
+            -abs(int(item.get("failure_offset", 0)) - int(getattr(args, "failure_window_target_offset", 40))),
+        ),
+        reverse=True,
+    )
+    if top_k > 0:
+        scored = scored[:top_k]
+    return scored
 
 
 def residual_observation(args: argparse.Namespace, raw_state: Any, base_force: float, step: int) -> np.ndarray:
@@ -295,8 +386,11 @@ def select_failure_states(args: argparse.Namespace, episode: dict[str, Any]) -> 
                 candidate["recovery_pressure"] = recovery_pressure(candidate["raw_before"], int(args.n_poles))
                 candidates.append(candidate)
         target = int(getattr(args, "failure_window_target_offset", 40))
+        candidates = rank_failure_candidates(args, candidates)
         candidates.sort(
             key=lambda item: (
+                float(item.get("candidate_rank", item.get("motif_score", 0.0))),
+                float(item.get("motif_score", 0.0)),
                 float(item.get("recovery_pressure", 0.0)),
                 -abs(int(item.get("failure_offset", 0)) - target),
             ),
@@ -315,8 +409,11 @@ def select_failure_states(args: argparse.Namespace, episode: dict[str, Any]) -> 
     cap = max(1, int(args.max_failure_states))
     if len(selected) > cap:
         target = int(getattr(args, "failure_window_target_offset", 40))
+        selected = rank_failure_candidates(args, selected)
         selected.sort(
             key=lambda item: (
+                float(item.get("candidate_rank", item.get("motif_score", 0.0))),
+                float(item.get("motif_score", 0.0)),
                 float(item.get("recovery_pressure", 0.0)),
                 -abs(int(item.get("failure_offset", 0)) - target),
                 int(item.get("step", 0)),
@@ -539,6 +636,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "failure_window_target_offset": int(getattr(args, "failure_window_target_offset", 0)),
             "max_window_states": int(getattr(args, "max_window_states", 0)),
             "failure_offsets": [int(item) for item in args.failure_offsets],
+            "motif_model_path": str(getattr(args, "motif_model_path", "") or ""),
+            "motif_score_min": float(getattr(args, "motif_score_min", float("-inf"))),
+            "motif_top_k": int(getattr(args, "motif_top_k", 0)),
+            "motif_rank_weight": float(getattr(args, "motif_rank_weight", 1.0)),
+            "pressure_rank_weight": float(getattr(args, "pressure_rank_weight", 0.0)),
         },
         "label_gates": {
             "min_score_gap": float(args.min_score_gap),
@@ -620,6 +722,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--failure-window-stride", type=int, default=5)
     parser.add_argument("--failure-window-target-offset", type=int, default=40)
     parser.add_argument("--max-window-states", type=int, default=18)
+    parser.add_argument("--motif-model-path", default="")
+    parser.add_argument("--motif-score-min", type=float, default=float("-inf"))
+    parser.add_argument("--motif-top-k", type=int, default=0)
+    parser.add_argument("--motif-rank-weight", type=float, default=1.0)
+    parser.add_argument("--pressure-rank-weight", type=float, default=0.0)
+    parser.add_argument("--x-threshold", type=float, default=2.4)
+    parser.add_argument("--theta-threshold", type=float, default=12.0 * 2.0 * np.pi / 360.0)
+    parser.add_argument("--cart-velocity-scale", type=float, default=5.0)
+    parser.add_argument("--pole-velocity-scale", type=float, default=5.0)
     parser.add_argument("--success-negative-stride", type=int, default=80)
     parser.add_argument("--max-success-states", type=int, default=3)
     parser.add_argument("--probe-horizon", type=int, default=100)

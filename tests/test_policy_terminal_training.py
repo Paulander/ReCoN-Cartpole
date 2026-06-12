@@ -1414,6 +1414,50 @@ def test_subchain_motif_vector_uses_adjacent_pairs():
     assert vector[1] == 0.5
     assert vector[2:6].tolist() == [1.0, 2.0, 0.5, 1.0]
 
+def test_counterfactual_residual_can_rank_failure_states_by_motif():
+    residual = _load_script("train_counterfactual_residual_terminal")
+
+    model = {
+        "positive_mean": [0.0] * 14,
+        "negative_mean": [10.0] * 14,
+        "scale": [1.0] * 14,
+    }
+    args = SimpleNamespace(
+        n_poles=4,
+        force_mag=10.0,
+        x_threshold=2.4,
+        theta_threshold=1.0,
+        cart_velocity_scale=5.0,
+        pole_velocity_scale=5.0,
+        motif_model_path="cached",
+        _motif_model_cache=model,
+        motif_score_min=float("-inf"),
+        motif_top_k=0,
+        use_failure_window=True,
+        failure_window_start=0,
+        failure_window_end=5,
+        failure_window_stride=5,
+        failure_window_target_offset=0,
+        max_window_states=2,
+        max_failure_states=1,
+        failure_offsets=[],
+    )
+    motif_match = [0.0] * 10
+    pressure_match = [1.0, 0.0, 2.0, 2.0, 2.0, 2.0, 4.0, 4.0, 4.0, 4.0]
+    episode = {
+        "seed": 123,
+        "states": [
+            {"step": idx, "raw_before": motif_match if idx == 0 else pressure_match, "force": 0.0}
+            for idx in range(6)
+        ],
+    }
+
+    selected = residual.select_failure_states(args, episode)
+
+    assert [item["step"] for item in selected] == [0]
+    assert "motif_score" in selected[0]
+
+
 def test_motif_gated_passthrough_can_suppress_to_base_force():
     gate = _load_script("evaluate_motif_gated_passthrough")
     args = SimpleNamespace(force_mag=10.0, discrete_action_bins=5)

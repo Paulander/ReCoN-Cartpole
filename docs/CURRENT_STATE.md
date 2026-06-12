@@ -336,3 +336,21 @@ Setup: RecurrentPPO terminal, `normalized_raw4_subchains_prev_force`, N=3 stable
 
 Interpretation: recurrent curriculum learns the easy distributions and can look good on the mixed validation sample, but the final held-out block still collapses below the feedforward incumbent. This keeps the best known robust N=4 state near-solved but not solved. The next recurrent attempt should either spend materially more budget with wider validation/final blocks from the beginning, or change the recurrent objective/data path rather than relying on another short PPO curriculum slice.
 
+## Motif-Selected Residual Window Update - 2026-06-12
+
+The residual counterfactual collector now accepts an optional motif prototype via `--motif-model-path`. When enabled, failed-episode recovery-window candidates get a `motif_score` from the adjacent-subchain prototype representation and a blended `candidate_rank = motif_rank_weight * motif_score + pressure_rank_weight * recovery_pressure`. This lets future residual runs use learned motif recognition to choose which windows receive counterfactual labels, without hard-coding a recovery action. The report records the motif path and rank weights under `failure_state_selection`.
+
+Focused verification:
+
+- `uv run pytest -s -q tests/test_policy_terminal_training.py::test_counterfactual_residual_can_rank_failure_states_by_motif tests/test_policy_terminal_training.py::test_subchain_motif_prototype_scores_separate_classes tests/test_policy_terminal_training.py::test_subchain_motif_vector_uses_adjacent_pairs` -> 3 passed.
+- `uv run ruff check scripts/train_counterfactual_residual_terminal.py tests/test_policy_terminal_training.py` -> passed.
+
+Bounded probes, both evaluated on held-out weak-block seeds and not solve claims:
+
+| run | collection | selector | rows | non-noop labels | base success | residual success | interpretation |
+|---|---|---|---:|---:|---:|---:|---|
+| `reports/n4_motif_selected_residual_smoke_20260612` | 8 seeds from `2420000` | pure motif top-k | 20 | 0 | 0.625 | 0.625 | motif-selected states had no short-horizon residual advantage |
+| `reports/n4_motif_selected_residual_hardpool_20260612` | first 20 hard-pool seeds | pure motif top-k | 84 | 0 | 0.650 | 0.650 | danger motifs were recognizable but not actionable by this residual labeler |
+| `reports/n4_motif_pressure_selected_residual_hardpool_20260612` | first 20 hard-pool seeds | motif/pressure blend | 84 | 0 | 0.650 | 0.650 | blended ranking still found no residual advantage in this subset |
+
+Comparison: the older 50-seed pressure-window run `reports/n4_counterfactual_residual_subchain_20260612_seed2390k` produced 170 non-noop labels over 250 rows, so the new selector has not disproven residual learning. It shows that motif-risk predicts near-failure, but pure motif-risk is not equivalent to identifying windows where a simple 5-bin residual action improves short-horizon survival. The next residual attempt should either run the blended selector on the full hard-pool budget or move to trajectory-level recovery-window PPO with motif-score as an observation/filter.
