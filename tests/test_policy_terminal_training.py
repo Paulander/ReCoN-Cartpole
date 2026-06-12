@@ -192,6 +192,65 @@ def test_counterfactual_residual_label_state_respects_advantage_gates(monkeypatc
     assert allowed["chosen_survival_gain"] == 1
 
 
+def test_residual_env_penalizes_changes_on_base_solved_episode(monkeypatch):
+    residual = _load_script("train_residual_policy_terminal")
+
+    class FakeController:
+        def __init__(self, _config):
+            self.starts = 0
+
+        def start_episode(self):
+            self.starts += 1
+
+        def act(self, env_obs, raw):
+            return 2, {"force": 0.0}
+
+    monkeypatch.setattr(residual, "ReConCartPoleController", FakeController)
+    args = SimpleNamespace(
+        n_poles=1,
+        horizon=1,
+        dt=0.02,
+        dynamics_mode="parallel",
+        env_action_mode="discrete",
+        discrete_action_bins=5,
+        force_mag=10.0,
+        initial_angle_range=0.0,
+        force_noise=0.0,
+        link_coupling=0.35,
+        base_model_path="base.zip",
+        device="cpu",
+        residual_base_controller="recon_policy_terminal",
+        selection_mode="hard_select",
+        policy_terminal_blend=1.0,
+        policy_terminal_scope="stabilize_chain",
+        base_observation_mode="normalized_raw",
+        base_normalizer_path="",
+        residual_feature_mode="basic",
+        residual_mode="bin_delta",
+        residual_action_bins=5,
+        residual_gate_threshold=0.0,
+        max_residual_force=4.0,
+        hard_seed_probability=0.0,
+        preserve_base_success_penalty=0.5,
+        low_risk_change_penalty=0.0,
+        late_survival_bonus=0.0,
+        late_survival_start_fraction=0.8,
+        recovery_progress_weight=0.0,
+        failure_penalty=0.0,
+        success_bonus=0.0,
+    )
+
+    env = residual.ResidualCorrectionEnv(args)
+    _obs, info = env.reset(seed=7)
+    _next_obs, reward, _terminated, truncated, step_info = env.step(4)
+
+    assert info["base_episode_success"] is True
+    assert truncated is True
+    assert step_info["base_episode_success"] is True
+    assert step_info["preserve_base_success_penalty"] == pytest.approx(0.5)
+    assert reward == pytest.approx(0.5)
+
+
 def test_residual_recovery_pressure_increases_with_state_risk():
     import numpy as np
 

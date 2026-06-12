@@ -602,3 +602,34 @@ Bounded exact-corner run: `reports/n4_ppo_exact_corner_sweep_20260612_seed2831k`
 | 255 | 1.0e-5 | 0.050 | 1024 | 0.98 | 0.001 | 256,128 | true | 0.05 | 481.5 | 432.2 | 0.500 |
 
 Best selected checkpoint remained `checkpoint_000000_start.zip` for every candidate, meaning no 5k PPO chunk beat the frozen start model under the promotion gates. This is not a solve attempt and the final eval is intentionally tiny, but it is useful evidence that short corner sweeps over these PPO knobs are action-equivalent or too weak to move the N=4 tail. The PPO path probably needs longer chunks, different reward/teacher anchoring, or a recovery-specific objective before it is worth spending larger compute.
+
+
+## Preserve-success residual PPO slice
+
+Code changes:
+
+- `scripts/train_residual_policy_terminal.py` now supports `--preserve-base-success-penalty`.
+- On seeded residual-training episodes, the env first rolls out the frozen base controller. If the base would solve that episode, residual force/bin changes receive an additional normalized penalty.
+- Residual traces now expose `base_episode_success`, `base_episode_steps`, and `preserve_base_success_penalty`, making it clear when the learner is being discouraged from rewriting successful behavior.
+- Added a unit test proving that residual changes on a base-solved episode are penalized and traced.
+
+Smoke run: `reports/smoke_residual_preserve_success_20260612`
+
+- Verified end-to-end residual PPO training/evaluation with the preservation penalty enabled.
+
+Bounded weak-block run: `reports/n4_residual_preserve_success_20260612_seed2841k`
+
+- Frozen base: current best PPO terminal inside ReCoN, `reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip`.
+- Residual learner: PPO, 5-bin `bin_delta`, `subchain_diagnostics`, risk gate `0.45`, 5k timesteps.
+- Training seeds: existing hard-tail pool from `reports/n4_targetkl_survival_tail_20260612_seed2650k/tail_seed_pool.json` with probability `0.70`.
+- Reward shaping: low-risk change penalty `0.10`, preserve-base-success penalty `0.25`, late survival bonus `0.02`, recovery-progress weight `0.25`, failure penalty `1.0`, success bonus `5.0`.
+- Held-out eval: weak block `2100000..2100019`, 20 episodes.
+
+| evaluator | mean | p10 | cvar | success | mean abs residual delta | episodes |
+|---|---:|---:|---:|---:|---:|---:|
+| residual_env_frozen_base | 489.5 | 468.8 | 429.5 | 0.650 | 0.000 | 20 |
+| residual_env_specialist | 489.4 | 467.9 | 429.5 | 0.650 | 0.752 | 20 |
+| recon_frozen_base | 489.5 | 468.8 | 429.5 | 0.650 | 0.000 | 20 |
+| recon_residual_specialist | 489.4 | 467.9 | 429.5 | 0.650 | 0.937 | 20 |
+
+Interpretation: this is a more faithful learned residual setup than earlier permissive counterfactual labels: the base is frozen, residuals see risk/proposal/subchain diagnostics, and successful base behavior is explicitly protected. It still does not improve the held-out weak block after a 5k PPO slice. The residual path is not dead, but this result argues that simple residual PPO over whole episodes is too diffuse; a future residual attempt should train from selected recovery windows or optimize a trajectory-level recovery objective rather than hoping sparse late failures dominate normal rollout training. No N=4 solve claim is justified.

@@ -76,6 +76,9 @@ class ResidualCorrectionEnv(gym.Env):
         self.step_count = 0
         self.last_raw: np.ndarray | None = None
         self.last_env_obs: Any | None = None
+        self.episode_seed: int | None = None
+        self.base_episode_success = False
+        self.base_episode_steps = 0
         self.action_space = gym.spaces.Discrete(max(2, int(args.residual_action_bins)))
         base_size = policy_observation_size(args.n_poles, args.base_observation_mode)
         self.observation_space = gym.spaces.Box(
@@ -153,17 +156,62 @@ class ResidualCorrectionEnv(gym.Env):
         )
         return np.concatenate([base_obs, aux]).astype(np.float32, copy=False)
 
+    def _base_rollout_result(self, seed: int | None) -> tuple[bool, int]:
+        if seed is None or float(getattr(self.args, "preserve_base_success_penalty", 0.0)) <= 0.0:
+            return False, 0
+        env = CartPoleNEnv(
+            CartPoleNConfig(
+                n_poles=self.args.n_poles,
+                horizon=self.args.horizon,
+                dt=self.args.dt,
+                dynamics_mode=self.args.dynamics_mode,
+                action_mode=self.args.env_action_mode,
+                discrete_action_bins=self.args.discrete_action_bins,
+                force_mag=self.args.force_mag,
+                initial_angle_range=self.args.initial_angle_range,
+                force_noise=self.args.force_noise,
+                link_coupling=self.args.link_coupling,
+            )
+        )
+        env_obs, info = env.reset(seed=seed)
+        if self.base_controller is not None:
+            self.base_controller.start_episode()
+        previous_force = self.previous_force
+        steps = 0
+        try:
+            for step in range(self.args.horizon):
+                raw = np.asarray(info.get("raw_state"), dtype=np.float32)
+                action, force = self._base_action_and_force(env_obs, raw)
+                env_action = action if action is not None else action_from_force(
+                    force,
+                    self.args.env_action_mode,
+                    self.args.force_mag,
+                    self.args.discrete_action_bins,
+                )
+                env_obs, _reward, terminated, truncated, info = env.step(env_action)
+                steps = step + 1
+                if terminated or truncated:
+                    return bool(truncated and not terminated and steps >= self.args.horizon), steps
+            return steps >= self.args.horizon, steps
+        finally:
+            self.previous_force = previous_force
+            if self.base_controller is not None:
+                self.base_controller.start_episode()
+
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         self.previous_force = 0.0
         self.step_count = 0
         if self.hard_seeds and self.np_random.random() < float(self.args.hard_seed_probability):
             seed = self.hard_seeds[self.seed_index % len(self.hard_seeds)]
             self.seed_index += 1
+        self.episode_seed = None if seed is None else int(seed)
+        self.base_episode_success, self.base_episode_steps = self._base_rollout_result(self.episode_seed)
         env_obs, info = self.env.reset(seed=seed, options=options)
         if self.base_controller is not None:
             self.base_controller.start_episode()
         self.last_raw = np.asarray(info.get("raw_state"), dtype=np.float32)
         self.last_env_obs = env_obs
+        info = {**info, "base_episode_success": self.base_episode_success, "base_episode_steps": self.base_episode_steps}
         return self._residual_obs(env_obs, self.last_raw), info
 
     def step(self, action: Any):
@@ -196,12 +244,18 @@ class ResidualCorrectionEnv(gym.Env):
         pressure_after = recovery_pressure(self.last_raw, self.args.n_poles)
         recovery_progress = float(pressure_before - pressure_after)
         delta_scale = self.args.force_mag if self.args.residual_mode == "bin_delta" else self.args.max_residual_force
-        change_penalty = float(self.args.low_risk_change_penalty) * abs(delta / max(delta_scale, 1e-9)) * (1.0 - gate)
+        normalized_delta = abs(delta / max(delta_scale, 1e-9))
+        change_penalty = float(self.args.low_risk_change_penalty) * normalized_delta * (1.0 - gate)
+        preserve_success_penalty = (
+            float(getattr(self.args, "preserve_base_success_penalty", 0.0)) * normalized_delta
+            if self.base_episode_success
+            else 0.0
+        )
         late_bonus = float(self.args.late_survival_bonus) if self.step_count >= int(self.args.horizon * self.args.late_survival_start_fraction) else 0.0
         recovery_bonus = float(self.args.recovery_progress_weight) * recovery_progress
         failure_penalty = float(self.args.failure_penalty) if terminated else 0.0
         success_bonus = float(self.args.success_bonus) if truncated and not terminated else 0.0
-        shaped_reward = float(reward) + late_bonus + recovery_bonus + success_bonus - change_penalty - failure_penalty
+        shaped_reward = float(reward) + late_bonus + recovery_bonus + success_bonus - change_penalty - preserve_success_penalty - failure_penalty
         info = {
             **info,
             "base_force": base_force,
@@ -212,9 +266,13 @@ class ResidualCorrectionEnv(gym.Env):
             "recovery_pressure_before": pressure_before,
             "recovery_pressure_after": pressure_after,
             "recovery_progress": recovery_progress,
+            "base_episode_success": self.base_episode_success,
+            "base_episode_steps": self.base_episode_steps,
         }
         if abs(recovery_bonus) > 1e-12:
             info["recovery_progress_bonus"] = recovery_bonus
+        if preserve_success_penalty:
+            info["preserve_base_success_penalty"] = preserve_success_penalty
         if failure_penalty:
             info["failure_penalty"] = failure_penalty
         if success_bonus:
@@ -418,7 +476,7 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         "",
         "## Mechanisms",
         "",
-        "The base PPO terminal is frozen. The residual learner sees base force, previous force, risk gate, and optionally proposal-diagnostic features; low-risk changes are penalized so the specialist focuses on late/tail failures rather than rewriting successful behavior.",
+        "The base PPO terminal is frozen. The residual learner sees base force, previous force, risk gate, and optionally proposal-diagnostic features; low-risk changes and changes on base-solved episodes are penalized so the specialist focuses on late/tail failures rather than rewriting successful behavior.",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -490,7 +548,9 @@ def train_residual(args: argparse.Namespace) -> dict[str, Any]:
             "residual_base_controller": args.residual_base_controller,
             "learned_residual_policy": True,
             "risk_gate": True,
-            "proposal_diagnostics": args.residual_feature_mode == "proposal_diagnostics",
+            "proposal_diagnostics": args.residual_feature_mode in ("proposal_diagnostics", "subchain_diagnostics"),
+            "subchain_diagnostics": args.residual_feature_mode == "subchain_diagnostics",
+            "preserve_base_success_penalty": float(getattr(args, "preserve_base_success_penalty", 0.0)) > 0.0,
             "recon_integration_eval": True,
             "gain_mutation": False,
         },
@@ -529,6 +589,7 @@ def main() -> None:
     parser.add_argument("--residual-gate-threshold", type=float, default=0.30)
     parser.add_argument("--max-residual-force", type=float, default=4.0)
     parser.add_argument("--low-risk-change-penalty", type=float, default=0.05)
+    parser.add_argument("--preserve-base-success-penalty", type=float, default=0.0)
     parser.add_argument("--late-survival-bonus", type=float, default=0.02)
     parser.add_argument("--late-survival-start-fraction", type=float, default=0.80)
     parser.add_argument("--recovery-progress-weight", type=float, default=0.0)
