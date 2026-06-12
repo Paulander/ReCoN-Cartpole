@@ -418,3 +418,16 @@ Experiments:
 | subchain-feature h256/seq32 partial-warm success500 | 2100000 | 482.1 | 435.8 | 0.617 | new local-chain features work technically but simple imitation regressed |
 
 Interpretation: the infrastructure now supports multi-tick residual options, rollout-label self-imitation, and explicit adjacent-subchain inputs. None of these variants cracked the N=4 weak block. This strengthens the diagnosis that the next useful ReCoN move is not more cloning, but an explicit subchain prototype/gating objective: learn reusable successful/failing local phase motifs and use them to gate or bias the global minGRU/ReCoN action only when the motif evidence is strong. No N=4 solve claim is justified; the best held-out broad result remains the incumbent h256/seq32 minGRU strict passthrough at about 0.721 over the 1900000/2000000/2100000/2200000 blocks.
+
+## Subchain motif prototype diagnostic
+
+Code change: added `scripts/train_subchain_motif_gate.py`, a diagnostic-only learner that extracts adjacent-subchain phase motifs from traced N=4 rollouts, labels rows that are within a configurable future failure window, fits positive/negative prototypes, and evaluates held-out AUC. It can run with pure local subchain features or append ReCoN-visible controller diagnostics: force, minGRU confidence, failure probability, value, hidden norm, and passthrough logit margin. The script writes `report.json`, `prototype_model.json`, and `report.md`, and marks `control_policy_changed=false` so it cannot be mistaken for a solve attempt.
+
+Runs used the current incumbent h256/seq32 minGRU strict passthrough checkpoint, training motifs on non-held-out seeds `2420000..2420079` and evaluating on weak held-out block `2100000..2100059`, sample stride 5, failure window 80.
+
+| feature set | train AUC | held-out AUC | held-out positive rows | held-out success | interpretation |
+|---|---:|---:|---:|---:|---|
+| local subchain phase only | 0.606 | 0.570 | 336 | 0.650 | weak reusable signal, not enough for a gate |
+| subchain + ReCoN/minGRU diagnostics | 0.897 | 0.835 | 336 | 0.650 | strong near-failure detector; suitable candidate for a future learned gate/rescue trigger |
+
+Interpretation: this is the first strong evidence that reusable local N=4 structure exists when combined with the recurrent terminal's own uncertainty/value signals. The detector does not yet affect control, so no performance improvement or solve claim is made. The next control-facing experiment should use this score conservatively: trigger additional recovery data collection, adjust passthrough only under high motif-risk, or train a residual option conditioned on motif-risk instead of applying a hand-coded rescue.

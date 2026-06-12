@@ -928,3 +928,38 @@ def test_recurrent_ladder_terminal_config_exposes_passthrough():
     assert config.passthrough_confidence_floor == 0.90
     assert config.passthrough_logit_margin_floor == 0.10
     assert config.checkpoint_path == "candidate.pt"
+
+def test_subchain_motif_prototype_scores_separate_classes():
+    motif = _load_script("train_subchain_motif_gate")
+    import numpy as np
+
+    x = np.asarray([[0.0, 0.0], [0.1, 0.0], [2.0, 2.0], [2.1, 2.0]], dtype=np.float32)
+    y = np.asarray([0, 0, 1, 1], dtype=np.int64)
+
+    model = motif.fit_prototypes(x, y)
+    scores = motif.motif_scores(model, x)
+
+    assert scores[y == 1].mean() > scores[y == 0].mean()
+    assert motif.roc_auc(y, scores) == 1.0
+
+
+def test_subchain_motif_vector_uses_adjacent_pairs():
+    motif = _load_script("train_subchain_motif_gate")
+    import numpy as np
+
+    args = SimpleNamespace(
+        n_poles=4,
+        theta_threshold=1.0,
+        pole_velocity_scale=1.0,
+        x_threshold=2.0,
+        cart_velocity_scale=5.0,
+    )
+    raw = np.asarray([1.0, 2.5, 0.0, 1.0, 3.0, 6.0, 0.0, 2.0, 4.0, 8.0], dtype=np.float32)
+
+    vector = motif.subchain_vector(raw, args)
+
+    assert vector.shape == (14,)
+    assert vector[0] == 0.5
+    assert vector[1] == 0.5
+    assert vector[2:6].tolist() == [1.0, 2.0, 0.5, 1.0]
+
