@@ -265,3 +265,19 @@ Saved validation evidence:
 
 Interpretation: preservation-first feedforward continuation did not show an early positive signal and was too slow with the current teacher wrapper. The next high-signal path is structural: shared/recurrent subchain composition rather than more flat feedforward tail microfits.
 
+## Shared Subchain Control Hook - 2026-06-12
+
+A first structural ReCoN subchain control hook has been implemented:
+
+- New controller mode: `recon_subchain_terminal`.
+- New config: `SubchainBiasConfig` on `RunnerConfig`.
+- The hook reuses the same adjacent-pair calculation for each pair `(i, i+1)` and can bias `stabilize_chain` force proposals.
+- Diagnostics now include `subchain_bias` with per-pair votes, pair pressure, base force, subchain force, blend, and final proposal force.
+- The hook is disabled by default and does not make a solve claim. It is intended as a compositional ReCoN control path for the next curriculum/recurrent experiments.
+
+Verification:
+
+- `uv run pytest -s -q tests/test_controller.py::test_subchain_bias_is_default_off_for_static_recon tests/test_controller.py::test_subchain_bias_mode_changes_stabilize_chain_force_and_reports_votes tests/test_controller.py::test_recon_controller_reports_adjacent_subchain_sensor_values` -> 3 passed.
+- `uv run ruff check src/recon_cartpole/recon/engine_runner.py src/recon_cartpole/control/controllers.py tests/test_controller.py` -> passed.
+- `uv run pytest -s -q` -> 110 passed.
+

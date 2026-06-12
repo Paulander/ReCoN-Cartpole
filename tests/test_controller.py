@@ -11,6 +11,7 @@ from recon_cartpole.recon.engine_runner import (
     ReConCartPoleController,
     RescueConfig,
     RunnerConfig,
+    SubchainBiasConfig,
 )
 from recon_cartpole.recon.mingru_terminal import MinGRUPrediction, MinGRUTerminalConfig
 from recon_cartpole.training.evaluate import rollout
@@ -608,6 +609,57 @@ def test_recon_controller_reports_adjacent_subchain_sensor_values():
     assert subchains["1_2"]["delta_velocity"] == pytest.approx(1.3)
     assert subchains["2_3"]["mean_angle"] == pytest.approx(-0.005)
 
+
+
+def test_subchain_bias_is_default_off_for_static_recon():
+    raw = np.asarray([0.0, 0.0, 0.01, 0.12, -0.01, 0.0, 0.0, 0.0], dtype=np.float32)
+    controller = ReConCartPoleController(
+        RunnerConfig(n_poles=3, mode="static_recon", discrete_action_bins=5, selection_mode="hard_select", learn=False)
+    )
+
+    _action, diagnostics = controller.act(raw, raw)
+
+    assert diagnostics["selected_regime"] == "stabilize_chain"
+    assert diagnostics["subchain_bias"] == {}
+    assert "subchain_bias" not in diagnostics["proposal"]["reason"]
+    assert controller.learning_mechanisms()["subchain_terminal"] is False
+
+
+def test_subchain_bias_mode_changes_stabilize_chain_force_and_reports_votes():
+    raw = np.asarray([0.0, 0.0, 0.01, 0.12, -0.01, 0.0, 0.0, 0.0], dtype=np.float32)
+    plain = ReConCartPoleController(
+        RunnerConfig(n_poles=3, mode="static_recon", discrete_action_bins=5, selection_mode="hard_select", learn=False)
+    )
+    biased = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=3,
+            mode="recon_subchain_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            subchain_bias=SubchainBiasConfig(
+                blend=1.0,
+                mean_angle_gain=0.0,
+                mean_velocity_gain=0.0,
+                delta_angle_gain=100.0,
+                delta_velocity_gain=0.0,
+                confidence_boost=0.0,
+                urgency_boost=0.0,
+            ),
+        )
+    )
+
+    _plain_action, plain_diag = plain.act(raw, raw)
+    biased_action, biased_diag = biased.act(raw, raw)
+
+    assert biased.learning_mechanisms()["subchain_terminal"] is True
+    assert biased_diag["selected_regime"] == "stabilize_chain"
+    assert "subchain_bias" in biased_diag["proposal"]["reason"]
+    assert biased_diag["force"] != pytest.approx(plain_diag["force"])
+    assert biased_diag["force"] == pytest.approx(biased_diag["subchain_bias"]["subchain_force"])
+    assert biased_diag["subchain_bias"]["applied"] is True
+    assert [vote["pair"] for vote in biased_diag["subchain_bias"]["votes"]] == [0, 1]
+    assert biased_action in range(5)
 
 def test_policy_terminal_normalized_raw_prev_force_observation_mode():
     class FakePolicy:

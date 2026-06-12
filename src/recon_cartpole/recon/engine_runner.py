@@ -130,6 +130,22 @@ class RescueConfig:
 
 
 @dataclass
+class SubchainBiasConfig:
+    enabled: bool = False
+    blend: float = 0.25
+    mean_angle_gain: float = 14.0
+    mean_velocity_gain: float = 3.0
+    delta_angle_gain: float = 10.0
+    delta_velocity_gain: float = 2.0
+    outer_pair_weight: float = 0.20
+    confidence_boost: float = 0.08
+    urgency_boost: float = 0.15
+    min_pair_pressure: float = 0.02
+    max_force_fraction: float = 1.0
+    regimes: tuple[str, ...] = ("stabilize_chain",)
+
+
+@dataclass
 class RunnerConfig:
     n_poles: int = 1
     mode: ControllerMode = "static_recon"
@@ -165,6 +181,7 @@ class RunnerConfig:
     mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
     pole1_fix: Pole1FixConfig = field(default_factory=Pole1FixConfig)
     rescue: RescueConfig = field(default_factory=RescueConfig)
+    subchain_bias: SubchainBiasConfig = field(default_factory=SubchainBiasConfig)
 
 
 class ReConCartPoleController:
@@ -187,6 +204,8 @@ class ReConCartPoleController:
             self.config.mlp_terminal.enabled = True
         if self._uses_pole1_fix() and not self.config.pole1_fix.enabled:
             self.config.pole1_fix.enabled = True
+        if self._uses_subchain_bias() and not self.config.subchain_bias.enabled:
+            self.config.subchain_bias.enabled = True
         self.mlp_terminal_state = MlpTerminalState.create(
             self.config.n_poles, self.config.mlp_terminal.hidden_size
         )
@@ -238,6 +257,7 @@ class ReConCartPoleController:
         self.residual_option_shift = 0
         self.residual_option_remaining = 0
         self.last_rescue: dict[str, Any] = {}
+        self.last_subchain_bias: dict[str, Any] = {}
 
     def _uses_fast_plasticity(self) -> bool:
         return self.config.mode in (
@@ -303,6 +323,9 @@ class ReConCartPoleController:
     def _uses_pole1_fix(self) -> bool:
         return self.config.mode == "recon_feedforward_terminal_with_pole1_fix"
 
+    def _uses_subchain_bias(self) -> bool:
+        return self.config.mode == "recon_subchain_terminal" or bool(self.config.subchain_bias.enabled)
+
     def learning_mechanisms(self) -> dict[str, bool]:
         return {
             "edge_plasticity": self._uses_fast_plasticity(),
@@ -314,6 +337,7 @@ class ReConCartPoleController:
             "recurrent_policy_terminal": self._uses_policy_terminal()
             and self.config.policy_terminal_recurrent,
             "minGRU_terminal": self._uses_mingru_terminal(),
+            "subchain_terminal": self._uses_subchain_bias(),
             "pole1_fix": self.config.pole1_fix.enabled or self._uses_pole1_fix(),
             "rescue_patches": self.config.rescue.enabled,
             "gain_mutation": self.config.mode
@@ -340,6 +364,7 @@ class ReConCartPoleController:
         self.last_policy_terminal = {}
         self.last_mingru_terminal = {}
         self.last_rescue = {}
+        self.last_subchain_bias = {}
         self.episode_step = 0
         self.recent_forces = []
         if self.mingru_terminal is not None:
@@ -464,6 +489,7 @@ class ReConCartPoleController:
             "graph_nodes": {nid: node.state.name for nid, node in self.graph.nodes.items()},
             "graph_ticks": graph_ticks,
             "subchain_sensors": dict(context.get("subchain_sensor_values", {})),
+            "subchain_bias": dict(context.get("subchain_bias", self.last_subchain_bias)),
             "rescue": dict(context.get("rescue", {})),
         }
         self.last_rescue = dict(context.get("rescue", {}))
@@ -558,6 +584,7 @@ class ReConCartPoleController:
                 "proposal_gains": self.config.proposal_gains.to_dict(),
                 "node_params_config": self.config.node_params.__dict__,
                 "consolidation_config": self.config.consolidation.__dict__,
+                "subchain_bias_config": self.config.subchain_bias.__dict__,
                 "mlp_terminal_config": self.config.mlp_terminal.__dict__,
                 "policy_terminal_path": self.config.policy_terminal_path,
                 "policy_terminal_blend": self.config.policy_terminal_blend,
@@ -1114,6 +1141,93 @@ class ReConCartPoleController:
         return proposal
 
 
+    def _apply_subchain_bias(self, proposal: ForceProposal, env: dict[str, Any]) -> ForceProposal:
+        cfg = self.config.subchain_bias
+        if not self._uses_subchain_bias():
+            return proposal
+        if proposal.source_node not in set(cfg.regimes):
+            return proposal
+        features = env.get("features")
+        if features is None or len(features.poles) < 2:
+            return proposal
+        votes: list[dict[str, float | int]] = []
+        total_signal = 0.0
+        total_weight = 0.0
+        max_pressure = 0.0
+        theta_scale = 0.21
+        velocity_scale = 5.0
+        for idx, (left, right) in enumerate(zip(features.poles, features.poles[1:])):
+            delta_angle = float(right.theta - left.theta)
+            delta_velocity = float(right.theta_dot - left.theta_dot)
+            mean_angle = float(0.5 * (left.theta + right.theta))
+            mean_velocity = float(0.5 * (left.theta_dot + right.theta_dot))
+            weight = max(0.0, 1.0 + float(cfg.outer_pair_weight) * idx)
+            signal = weight * (
+                float(cfg.mean_angle_gain) * mean_angle
+                + float(cfg.mean_velocity_gain) * mean_velocity
+                + float(cfg.delta_angle_gain) * delta_angle
+                + float(cfg.delta_velocity_gain) * delta_velocity
+            )
+            pressure = max(
+                abs(mean_angle) / theta_scale,
+                abs(delta_angle) / theta_scale,
+                abs(mean_velocity) / velocity_scale,
+                abs(delta_velocity) / velocity_scale,
+            )
+            total_signal += signal
+            total_weight += weight
+            max_pressure = max(max_pressure, pressure)
+            votes.append(
+                {
+                    "pair": idx,
+                    "weight": float(weight),
+                    "delta_angle": delta_angle,
+                    "delta_velocity": delta_velocity,
+                    "mean_angle": mean_angle,
+                    "mean_velocity": mean_velocity,
+                    "signal": float(signal),
+                    "pressure": float(pressure),
+                }
+            )
+        if total_weight <= 0.0:
+            return proposal
+        force_limit = self.config.force_mag * max(0.0, min(1.0, float(cfg.max_force_fraction)))
+        subchain_force = float(np.clip(total_signal / total_weight, -force_limit, force_limit))
+        applied = bool(max_pressure >= float(cfg.min_pair_pressure) and abs(subchain_force) > 1e-9)
+        info = {
+            "enabled": True,
+            "applied": applied,
+            "regime": proposal.source_node,
+            "base_force": float(proposal.force),
+            "subchain_force": subchain_force,
+            "blend": max(0.0, min(1.0, float(cfg.blend))),
+            "max_pressure": float(max_pressure),
+            "votes": votes,
+        }
+        if not applied:
+            info["proposal_force"] = float(proposal.force)
+            env["subchain_bias"] = info
+            self.last_subchain_bias = info
+            return proposal
+        blend = info["blend"]
+        proposal.force = float(
+            np.clip(
+                proposal.force + blend * (subchain_force - proposal.force),
+                -self.config.force_mag,
+                self.config.force_mag,
+            )
+        )
+        pressure_scale = min(1.0, max_pressure)
+        proposal.confidence = min(1.0, proposal.confidence + float(cfg.confidence_boost) * pressure_scale)
+        proposal.urgency = min(1.5, proposal.urgency + float(cfg.urgency_boost) * pressure_scale)
+        proposal.reason = f"{proposal.reason}; subchain_bias"
+        info["proposal_force"] = float(proposal.force)
+        info["confidence"] = float(proposal.confidence)
+        info["urgency"] = float(proposal.urgency)
+        env["subchain_bias"] = info
+        self.last_subchain_bias = info
+        return proposal
+
     def _apply_pole1_fix(self, proposal: ForceProposal, env: dict[str, Any]) -> ForceProposal:
         cfg = self.config.pole1_fix
         if not cfg.enabled or self.config.n_poles < 2 or len(env["features"].poles) < 2:
@@ -1255,6 +1369,7 @@ class ReConCartPoleController:
             )
             env["_mingru_terminal_applied_regimes"] = mingru_info["applied_regimes"]
             self.last_mingru_terminal = mingru_info
+        proposal = self._apply_subchain_bias(proposal, env)
         proposal = self._apply_pole1_emergency_guard(proposal, env)
         proposal = self._apply_pole1_fix(proposal, env)
         proposal.raw_confidence = proposal.confidence

@@ -23,6 +23,7 @@ ControllerMode = Literal[
     "recon_feedforward_terminal_frozen",
     "recon_feedforward_terminal_plus_recon_learning",
     "recon_feedforward_terminal_with_pole1_fix",
+    "recon_subchain_terminal",
     "recon_mingru_terminal",
     "recon_mingru_terminal_plus_recon_learning",
 ]
