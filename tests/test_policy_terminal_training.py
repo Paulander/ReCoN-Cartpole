@@ -181,7 +181,7 @@ def test_tail_curriculum_selects_near_miss_tail_seeds():
 
 def test_tail_curriculum_promotion_rejects_tail_regression():
     tail = _load_script("train_policy_terminal_tail_curriculum")
-    args = SimpleNamespace(max_success_regression=0.01, max_p10_regression=5.0)
+    args = SimpleNamespace(max_success_regression=0.01, max_p10_regression=5.0, max_cvar_regression=8.0, promotion_mode="score")
     best = {
         "score": 1000.0,
         "validation": {"success_rate": 0.72, "p10_survival": 440.0},
@@ -315,3 +315,40 @@ def test_observation_normalizer_wrapper_applies_stats(tmp_path):
     obs, _info = env.reset(seed=0)
 
     assert np.allclose(obs, [1.0, 2.0])
+
+
+def test_tail_curriculum_lexicographic_promotion_prefers_success_over_score():
+    tail = _load_script("train_policy_terminal_tail_curriculum")
+    args = SimpleNamespace(
+        max_success_regression=0.0,
+        max_p10_regression=2.0,
+        max_cvar_regression=2.0,
+        promotion_mode="lexicographic_success",
+    )
+    best = {
+        "score": 900.0,
+        "validation": {
+            "success_rate": 0.696,
+            "p10_survival": 434.9,
+            "cvar_survival": 414.8,
+            "mean_survival": 484.9,
+        },
+    }
+    row = {
+        "score": 897.0,
+        "validation": {
+            "success_rate": 0.700,
+            "p10_survival": 434.0,
+            "cvar_survival": 414.8,
+            "mean_survival": 484.9,
+        },
+    }
+
+    assert tail.should_promote(row, best, args) is True
+
+
+def test_tail_curriculum_final_seed_starts_expand_blocks():
+    tail = _load_script("train_policy_terminal_tail_curriculum")
+    args = SimpleNamespace(final_seed_start=10, final_seed_starts=[100, 200], final_eval_episodes=2)
+
+    assert tail.final_eval_seeds(args) == [100, 101, 200, 201]

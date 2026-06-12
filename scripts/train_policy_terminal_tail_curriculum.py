@@ -64,6 +64,34 @@ def tail_score(
     )
 
 
+def _metric_value(row: dict[str, Any], metric: str) -> float:
+    if metric == "score":
+        return float(row.get("score", 0.0))
+    return float(row.get("validation", {}).get(metric, 0.0))
+
+
+def promotion_key(row: dict[str, Any], args: argparse.Namespace) -> tuple[float, ...]:
+    mode = str(getattr(args, "promotion_mode", "score"))
+    if mode == "lexicographic_success":
+        validation = row.get("validation", {})
+        return (
+            float(validation.get("success_rate", 0.0)),
+            float(validation.get("p10_survival", 0.0)),
+            float(validation.get("cvar_survival", 0.0)),
+            float(validation.get("mean_survival", 0.0)),
+            float(row.get("score", 0.0)),
+        )
+    return (float(row.get("score", 0.0)),)
+
+
+def final_eval_seeds(args: argparse.Namespace) -> list[int]:
+    starts = getattr(args, "final_seed_starts", None) or [args.final_seed_start]
+    seeds: list[int] = []
+    for start in starts:
+        seeds.extend(int(start) + idx for idx in range(args.final_eval_episodes))
+    return seeds
+
+
 def validation_seeds(args: argparse.Namespace) -> list[int]:
     starts = args.validation_seed_starts or [args.validation_seed_start]
     seeds: list[int] = []
@@ -227,7 +255,11 @@ def should_promote(row: dict[str, Any], best: dict[str, Any] | None, args: argpa
         best_validation["p10_survival"]
     ):
         return False
-    return float(row["score"]) > float(best["score"])
+    if float(validation.get("cvar_survival", 0.0)) + args.max_cvar_regression < float(
+        best_validation.get("cvar_survival", 0.0)
+    ):
+        return False
+    return promotion_key(row, args) > promotion_key(best, args)
 
 
 def write_markdown(result: dict[str, Any], path: Path) -> None:
@@ -242,6 +274,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Adaptive tail seed refresh: `{result.get('tail_seed_refresh_count', 0)}` seeds/chunk",
         f"Validation seed starts: `{', '.join(str(seed) for seed in result.get('validation_seed_starts', []))}`",
         f"Validation episodes per start: `{result.get('validation_episodes', '')}`",
+        f"Promotion mode: `{result.get('promotion_mode', 'score')}`",
         f"Score weights: mean `{result.get('score_weights', {}).get('mean_survival', '')}`, p10 `{result.get('score_weights', {}).get('p10_survival', '')}`, CVaR `{result.get('score_weights', {}).get('cvar_survival', '')}`, success `{result.get('score_weights', {}).get('success_rate', '')}`",
         "",
         "| checkpoint | timesteps | score | mean | p10 | cvar | success | tail seeds | promoted |",
@@ -380,6 +413,8 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         "validation_episodes": args.validation_episodes,
         "validation_seed_count": len(validation_seeds(args)),
         "final_eval_episodes": args.final_eval_episodes,
+        "final_seed_starts": args.final_seed_starts or [args.final_seed_start],
+        "promotion_mode": args.promotion_mode,
         "score_weights": {
             "mean_survival": args.score_mean_weight,
             "p10_survival": args.score_p10_weight,
@@ -389,6 +424,7 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         "promotion_gates": {
             "max_success_regression": args.max_success_regression,
             "max_p10_regression": args.max_p10_regression,
+            "max_cvar_regression": args.max_cvar_regression,
         },
         "ppo_config": {
             "policy": args.policy,
@@ -461,7 +497,7 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         final_args = eval_args(args, args.final_seed_start, args.final_eval_episodes)
         final_args.policy_terminal_normalizer_path = str(best.get("normalizer_path", ""))
         model_for_eval = PPO.load(str(best_path), device=args.device)
-        seeds = final_seeds(args)
+        seeds = final_eval_seeds(args)
         final_eval = {
             "checkpoint": str(best_path),
             "pure_ppo_eval": evaluate_model(model_for_eval, final_args, seeds),
@@ -521,7 +557,10 @@ def main() -> None:
     parser.add_argument("--score-success-weight", type=float, default=130.0)
     parser.add_argument("--max-success-regression", type=float, default=0.01)
     parser.add_argument("--max-p10-regression", type=float, default=6.0)
+    parser.add_argument("--max-cvar-regression", type=float, default=8.0)
+    parser.add_argument("--promotion-mode", choices=["score", "lexicographic_success"], default="score")
     parser.add_argument("--final-seed-start", type=int, default=1_040_000)
+    parser.add_argument("--final-seed-starts", type=int, nargs="+", default=None)
     parser.add_argument("--final-eval-episodes", type=int, default=300)
     parser.add_argument("--n-envs", type=int, default=12)
     parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="subproc")
