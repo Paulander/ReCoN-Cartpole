@@ -22,6 +22,7 @@ class MinGRUTerminalConfig:
     confidence_floor: float = 0.05
     passthrough_enabled: bool = False
     passthrough_confidence_floor: float = 0.05
+    passthrough_logit_margin_floor: float = 0.0
     checkpoint_path: str = ""
 
 

@@ -55,6 +55,26 @@ def make_sequences(inputs: np.ndarray, data: dict[str, np.ndarray], args: argpar
     return x, actions, returns, failures
 
 
+def sample_weights(data: dict[str, np.ndarray], args: argparse.Namespace) -> np.ndarray:
+    count = int(data["teacher_actions"].shape[0])
+    weights = np.ones(count, dtype=np.float32)
+    failure_weight = max(0.0, float(getattr(args, "failure_sample_weight", 0.0)))
+    late_weight = max(0.0, float(getattr(args, "late_sample_weight", 0.0)))
+    low_return_weight = max(0.0, float(getattr(args, "low_return_sample_weight", 0.0)))
+    if failure_weight and "failure_within_k" in data:
+        weights += failure_weight * np.clip(data["failure_within_k"].astype(np.float32), 0.0, 1.0)
+    if late_weight and "step_indices" in data:
+        horizon = max(1.0, float(getattr(args, "horizon", 500)))
+        progress = np.clip(data["step_indices"].astype(np.float32) / horizon, 0.0, 1.0)
+        weights += late_weight * progress
+    if low_return_weight and "returns_to_go" in data:
+        horizon = max(1.0, float(getattr(args, "horizon", 500)))
+        low_return = 1.0 - np.clip(data["returns_to_go"].astype(np.float32) / horizon, 0.0, 1.0)
+        weights += low_return_weight * low_return
+    weights /= max(1e-6, float(np.mean(weights)))
+    return weights.astype(np.float32)
+
+
 def train(args: argparse.Namespace) -> dict[str, Any]:
     started = time.perf_counter()
     try:
@@ -67,6 +87,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     data = {key: raw[key] for key in raw.files}
     inputs = build_inputs(data, args)
     x, actions, returns, failures = make_sequences(inputs, data, args)
+    weights = sample_weights(data, args)
     rng = np.random.default_rng(args.seed)
     order = rng.permutation(x.shape[0])
     split = int(x.shape[0] * (1.0 - args.validation_fraction))
@@ -87,6 +108,11 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     terminal = MinGRUTerminal(args.n_poles, args.force_mag, args.discrete_action_bins, config)
     model = terminal.model
     assert model is not None
+    requested_device = str(getattr(args, "device", "auto") or "auto")
+    if requested_device == "auto":
+        requested_device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device(requested_device)
+    model.to(device)
     resume_checkpoint = str(getattr(args, "resume_checkpoint", "") or "")
     if resume_checkpoint:
         checkpoint = torch.load(resume_checkpoint, map_location="cpu")
@@ -95,17 +121,19 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     def batch_loss(batch_idx: np.ndarray, train_mode: bool) -> tuple[torch.Tensor, dict[str, float]]:
-        xb = torch.as_tensor(x[batch_idx], dtype=torch.float32)
-        y = torch.as_tensor(actions[batch_idx], dtype=torch.long)
-        rtg = torch.as_tensor(returns[batch_idx], dtype=torch.float32).unsqueeze(1)
-        fail = torch.as_tensor(failures[batch_idx], dtype=torch.float32).unsqueeze(1)
-        hidden = torch.zeros(xb.shape[0], args.hidden_size, dtype=torch.float32)
+        xb = torch.as_tensor(x[batch_idx], dtype=torch.float32, device=device)
+        y = torch.as_tensor(actions[batch_idx], dtype=torch.long, device=device)
+        rtg = torch.as_tensor(returns[batch_idx], dtype=torch.float32, device=device).unsqueeze(1)
+        fail = torch.as_tensor(failures[batch_idx], dtype=torch.float32, device=device).unsqueeze(1)
+        weight = torch.as_tensor(weights[batch_idx], dtype=torch.float32, device=device)
+        hidden = torch.zeros(xb.shape[0], args.hidden_size, dtype=torch.float32, device=device)
         logits, value, failure, confidence, _hidden = model(xb, hidden)
-        ce = F.cross_entropy(logits, y)
-        value_loss = F.mse_loss(value, rtg)
-        failure_loss = F.binary_cross_entropy(failure, fail)
+        ce_each = F.cross_entropy(logits, y, reduction="none")
+        ce = torch.mean(ce_each * weight)
+        value_loss = torch.mean(F.mse_loss(value, rtg, reduction="none") * weight.unsqueeze(1))
+        failure_loss = torch.mean(F.binary_cross_entropy(failure, fail, reduction="none") * weight.unsqueeze(1))
         confidence_target = 1.0 - fail
-        confidence_loss = F.binary_cross_entropy(confidence, confidence_target)
+        confidence_loss = torch.mean(F.binary_cross_entropy(confidence, confidence_target, reduction="none") * weight.unsqueeze(1))
         loss = ce + args.value_weight * value_loss + args.failure_weight * failure_loss + args.confidence_weight * confidence_loss
         if train_mode:
             optimizer.zero_grad()
@@ -153,6 +181,14 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "validation_samples": int(len(val_idx)),
         "config": config.__dict__,
         "history": history,
+        "device": str(device),
+        "sample_weighting": {
+            "failure_sample_weight": max(0.0, float(getattr(args, "failure_sample_weight", 0.0))),
+            "late_sample_weight": max(0.0, float(getattr(args, "late_sample_weight", 0.0))),
+            "low_return_sample_weight": max(0.0, float(getattr(args, "low_return_sample_weight", 0.0))),
+            "mean_weight": float(np.mean(weights)),
+            "max_weight": float(np.max(weights)) if weights.size else 0.0,
+        },
         "mechanisms": {
             "minGRU_terminal": True,
             "supervised_imitation": True,
@@ -193,7 +229,11 @@ def main() -> None:
     parser.add_argument("--value-weight", type=float, default=0.05)
     parser.add_argument("--failure-weight", type=float, default=0.10)
     parser.add_argument("--confidence-weight", type=float, default=0.05)
+    parser.add_argument("--failure-sample-weight", type=float, default=0.0)
+    parser.add_argument("--late-sample-weight", type=float, default=0.0)
+    parser.add_argument("--low-return-sample-weight", type=float, default=0.0)
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
+    parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=9117)
     args = parser.parse_args()
     report = train(args)

@@ -3,6 +3,8 @@ from pathlib import Path
 import sys
 from types import SimpleNamespace
 
+import pytest
+
 
 def _load_trainer():
     path = Path(__file__).resolve().parents[1] / "scripts" / "train_policy_terminal.py"
@@ -525,6 +527,31 @@ def test_mingru_build_inputs_avoids_duplicate_prev_force_column():
     inputs = supervised.build_inputs(data, args)
 
     assert inputs.shape == (2, 11)
+
+
+def test_mingru_supervised_sample_weights_emphasize_tail_states():
+    import numpy as np
+
+    supervised = _load_script("train_mingru_supervised")
+    data = {
+        "teacher_actions": np.asarray([0, 1, 2], dtype=np.int64),
+        "failure_within_k": np.asarray([0.0, 1.0, 0.0], dtype=np.float32),
+        "step_indices": np.asarray([0, 250, 500], dtype=np.int64),
+        "returns_to_go": np.asarray([500.0, 100.0, 0.0], dtype=np.float32),
+    }
+    args = SimpleNamespace(
+        horizon=500,
+        failure_sample_weight=2.0,
+        late_sample_weight=1.0,
+        low_return_sample_weight=1.0,
+    )
+
+    weights = supervised.sample_weights(data, args)
+
+    assert weights.shape == (3,)
+    assert weights[1] > weights[0]
+    assert weights[2] > weights[0]
+    assert float(np.mean(weights)) == pytest.approx(1.0)
 
 
 def test_mingru_supervised_resume_checkpoint_records_source(tmp_path):

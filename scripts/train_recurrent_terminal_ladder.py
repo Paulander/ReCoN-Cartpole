@@ -150,7 +150,11 @@ def train_supervised_candidate(args: argparse.Namespace, hidden: int, seq_len: i
             value_weight=0.05,
             failure_weight=0.10,
             confidence_weight=0.05,
+            failure_sample_weight=args.failure_sample_weight,
+            late_sample_weight=args.late_sample_weight,
+            low_return_sample_weight=args.low_return_sample_weight,
             max_grad_norm=1.0,
+            device=args.device,
             seed=args.train_seed,
         )
     )
@@ -289,6 +293,10 @@ def main() -> None:
     parser.add_argument("--supervised-epochs", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
+    parser.add_argument("--failure-sample-weight", type=float, default=0.0)
+    parser.add_argument("--late-sample-weight", type=float, default=0.0)
+    parser.add_argument("--low-return-sample-weight", type=float, default=0.0)
+    parser.add_argument("--device", default="auto")
     parser.add_argument("--train-seed", type=int, default=9117)
     parser.add_argument("--validation-seed-start", type=int, default=820000)
     parser.add_argument("--validation-seed-starts", type=int, nargs="+", default=None)

@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import pytest
 
 from recon_lite import LinkType
 from recon_lite.plasticity import ConsolidationConfig, assign_reward
@@ -210,9 +211,10 @@ def test_recon_mlp_terminal_affects_chain_proposal_and_updates():
 
 
 class FakeMinGRUTerminal:
-    def __init__(self, force=10.0, confidence=1.0):
+    def __init__(self, force=10.0, confidence=1.0, logits=None):
         self.force = force
         self.confidence = confidence
+        self.logits = list(logits) if logits is not None else [-1.0, 0.0, 1.0]
         self.calls = 0
         self.reset_calls = 0
         self.loaded_checkpoint = "fake.pt"
@@ -226,7 +228,7 @@ class FakeMinGRUTerminal:
             failure_probability=0.1,
             hidden_norm=1.5,
             sequence_length=4,
-            logits=[-1.0, 0.0, 1.0],
+            logits=list(self.logits),
         )
 
     def reset(self):
@@ -357,6 +359,41 @@ def test_recon_mingru_terminal_passthrough_respects_confidence_floor():
     assert "mingru_terminal_passthrough" not in diagnostics["proposal"]["reason"]
     assert diagnostics["mingru_passthrough"]["passthrough_applied"] is False
     assert diagnostics["mingru_passthrough"]["passthrough_confidence_floor"] == 0.9
+
+
+def test_recon_mingru_terminal_passthrough_respects_logit_margin_floor():
+    raw = [0.0, 0.0, 0.01, 0.04, 0.12, -0.03, 0.0, 0.0, 0.0, 0.0]
+    controller = _controller_with_fake_mingru(
+        RunnerConfig(
+            n_poles=4,
+            mode="static_recon",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            mingru_terminal=MinGRUTerminalConfig(
+                enabled=True,
+                scope="stabilize_chain",
+                blend=1.0,
+                confidence_floor=0.5,
+                passthrough_enabled=True,
+                passthrough_confidence_floor=0.9,
+                passthrough_logit_margin_floor=0.2,
+            ),
+        )
+    )
+    controller.mingru_terminal = FakeMinGRUTerminal(
+        force=-10.0,
+        confidence=0.99,
+        logits=[0.0, 1.0, 1.05],
+    )
+
+    _action, diagnostics = controller.act(raw, raw)
+
+    assert diagnostics["proposal"]["source_node"] == "stabilize_chain"
+    assert "mingru_terminal_passthrough" not in diagnostics["proposal"]["reason"]
+    assert diagnostics["mingru_passthrough"]["passthrough_applied"] is False
+    assert diagnostics["mingru_passthrough"]["passthrough_logit_margin"] == pytest.approx(0.05)
+    assert diagnostics["mingru_passthrough"]["passthrough_logit_margin_floor"] == 0.2
 
 
 def test_recon_mingru_terminal_scope_all_caches_one_prediction_and_resets():

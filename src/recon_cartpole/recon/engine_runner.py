@@ -1210,6 +1210,14 @@ class ReConCartPoleController:
         env["force"] = proposal.force
         return True, True
 
+    @staticmethod
+    def _prediction_logit_margin(prediction: MinGRUPrediction) -> float:
+        logits = [float(value) for value in prediction.logits if np.isfinite(float(value))]
+        if len(logits) < 2:
+            return 0.0
+        top_two = sorted(logits, reverse=True)[:2]
+        return float(top_two[0] - top_two[1])
+
     def _maybe_apply_mingru_passthrough(self, proposal: ForceProposal, env: dict[str, Any]) -> ForceProposal:
         cfg = self.config.mingru_terminal
         if not (self._uses_mingru_terminal() and cfg.passthrough_enabled):
@@ -1219,9 +1227,18 @@ class ReConCartPoleController:
         )
         confidence = max(0.0, min(1.0, float(prediction.confidence)))
         floor = max(0.0, min(1.0, float(cfg.passthrough_confidence_floor)))
-        applied = bool(prediction.valid and prediction.force is not None and confidence >= floor)
+        margin = self._prediction_logit_margin(prediction)
+        margin_floor = max(0.0, float(cfg.passthrough_logit_margin_floor))
+        applied = bool(
+            prediction.valid
+            and prediction.force is not None
+            and confidence >= floor
+            and margin >= margin_floor
+        )
         mingru_info["passthrough_enabled"] = True
         mingru_info["passthrough_confidence_floor"] = floor
+        mingru_info["passthrough_logit_margin"] = margin
+        mingru_info["passthrough_logit_margin_floor"] = margin_floor
         mingru_info["passthrough_applied"] = applied
         mingru_info["passthrough_base_proposal"] = asdict(proposal)
         if not applied:

@@ -291,3 +291,26 @@ Broad held-out eval with best iter2 h256 and `passthrough_confidence_floor=0.90`
 | total | 486.9 | 444.9 | 0.721 | 240 |
 
 Interpretation: the learned confidence head is useful only at a high threshold, but a strict passthrough floor improves the integrated ReCoN+minGRU result from 0.713 to 0.721 success over the broad held-out comparison. This is the current best N=4 result, still not a solve. The next productive path is likely learning a better gate/residual around the minGRU policy, not more feedforward-teacher hard-tail cloning.
+
+## MinGRU gate, weighting, and capacity probes
+
+Code changes:
+
+- Added `passthrough_logit_margin_floor` to the minGRU terminal config. ReCoN passthrough traces now record the recurrent policy logit margin and the configured margin floor, so the viewer/report can show whether passthrough happened because the learned terminal was confident and decisive.
+- Added supervised minGRU sample weighting knobs: `--failure-sample-weight`, `--late-sample-weight`, and `--low-return-sample-weight`. Defaults are zero, so existing training behavior is unchanged unless explicitly enabled.
+- Added `--device` support to minGRU supervised training and the recurrent ladder; CUDA is visible in this environment as an RTX 3090.
+
+Focused weak-block gate: all candidates below were evaluated on held-out seed start `2100000`, 60 episodes, horizon 500, strict ReCoN minGRU passthrough with `passthrough_confidence_floor=0.90`.
+
+| candidate | mean | p10 | success | note |
+|---|---:|---:|---:|---|
+| current best iter2 h256 seq32 | 483.8 | 439.9 | 0.650 | incumbent weak-block result |
+| margin floor 0.05/0.10/0.20/0.35 | 483.3 | 439.9-440.3 | 0.633 | filtering by logit margin removed useful saves |
+| weighted warm-start h256 seq32 | 482.4 | 437.6 | 0.633 | higher imitation accuracy did not transfer to control |
+| h512 seq32 from scratch | 482.4 | 436.7 | 0.633 | extra capacity did not improve tail control |
+| h256 seq64 from scratch | 482.4 | 436.7 | 0.617 | longer recurrent history regressed |
+
+Interpretation: the current N=4 gap is not fixed by post-hoc margin gating, simple tail-weighted imitation, larger hidden state, or longer sequence length. The best checkpoint remains `reports/n4_mingru_dagger_iter2_20260612_seed2760k/supervised_h256_seq32_noctx/mingru_terminal.pt` with strict passthrough floor `0.90`, broad held-out success `0.721` over seed starts 1900000, 2000000, 2100000, and 2200000. No N=4 solve claim is justified.
+
+Next likely productive move: change the data-generation objective, not just the supervised learner. The DAgger labels still come from the feedforward teacher, and the failures are not clean one-step action mistakes. A recurrent/residual objective that directly rewards late recovery, or a curriculum that collects successful recovery trajectories from easier N=4 distributions before current-noise N=4, is more plausible than more uniform teacher cloning.
+
