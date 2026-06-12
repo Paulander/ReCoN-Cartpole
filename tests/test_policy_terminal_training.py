@@ -636,6 +636,57 @@ def test_counterfactual_gate_noop_eval_resets_override_counts():
     assert base["override_count"] == 9
 
 
+def test_ppo_sweep_candidate_grid_can_select_exact_indices():
+    ppo_sweep = _load_script("run_ppo_sweep")
+    args = SimpleNamespace(
+        learning_rates="1e-6,2e-6",
+        clip_ranges="0.01",
+        n_steps_values="512",
+        n_epochs_values="2",
+        gae_lambdas="0.9",
+        ent_coefs="0.0",
+        net_arch_values="64,64;128,128",
+        vec_normalize_values="false,true",
+        late_survival_bonus_values="0.0,0.02",
+        candidate_indices="0,15,13",
+        shuffle_stride=1,
+        candidate_offset=0,
+        max_candidates=0,
+    )
+
+    rows = ppo_sweep.candidate_grid(args)
+
+    assert [row["grid_index"] for row in rows] == [0, 15, 13]
+    assert rows[0]["learning_rate"] == pytest.approx(1e-6)
+    assert rows[1]["learning_rate"] == pytest.approx(2e-6)
+    assert rows[1]["net_arch"] == "128,128"
+    assert rows[1]["vec_normalize"] is True
+    assert rows[1]["late_survival_bonus"] == pytest.approx(0.02)
+
+
+def test_ppo_sweep_candidate_grid_keeps_grid_index_under_stride():
+    ppo_sweep = _load_script("run_ppo_sweep")
+    args = SimpleNamespace(
+        learning_rates="1e-6,2e-6,3e-6",
+        clip_ranges="0.01",
+        n_steps_values="512",
+        n_epochs_values="2",
+        gae_lambdas="0.9",
+        ent_coefs="0.0",
+        net_arch_values="64,64",
+        vec_normalize_values="false",
+        late_survival_bonus_values="0.0",
+        candidate_indices="",
+        shuffle_stride=2,
+        candidate_offset=0,
+        max_candidates=2,
+    )
+
+    rows = ppo_sweep.candidate_grid(args)
+
+    assert [row["grid_index"] for row in rows] == [0, 2]
+
+
 def test_recurrent_tail_final_seed_starts_expand_blocks():
     recurrent_tail = _load_script("train_recurrent_policy_terminal_tail_curriculum")
     args = SimpleNamespace(final_seed_start=10, final_seed_starts=[100, 200], final_eval_episodes=2)

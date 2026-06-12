@@ -570,3 +570,35 @@ Weak-block held-out read for weighted curriculum on seeds `2100000..2100019`:
 | ReCoN minGRU passthrough | 488.6 | 464.1 | 0.600 | 20 |
 
 Interpretation: stage weighting prevents the obvious destructive-regression seen in the unweighted curriculum, so the curriculum machinery is now safer for warm-start experiments. It still does not close the 2100000 weak-block tail; success remains around 0.60 on this 20-seed read. No N=4 solve claim is justified. The next performance move should shift from broad curriculum mixing toward targeted recovery-window learning or a stronger recurrent objective that directly optimizes weak-block trajectories rather than imitating the feedforward teacher on mixed stages.
+
+## Exact-corner PPO sweep harness and bounded run
+
+Code changes:
+
+- `scripts/run_ppo_sweep.py` now preserves each candidate's original `grid_index` from the full Cartesian sweep.
+- Added `--candidate-indices`, allowing exact grid points to be run in a deliberate order instead of relying only on stride/offset sampling.
+- Fixed duplicate `final_seed_starts` reporting in intermediate summaries and updated markdown to show multi-block final seed starts.
+- Added tests for exact-index candidate selection and grid-index preservation under strided candidate ordering.
+
+Smoke run: `reports/smoke_ppo_exact_index_sweep_20260612`
+
+- Verified the exact-index CLI path on N=4 with a 64-timestep candidate.
+- Summary recorded `grid_index=0` and completed without a solve claim.
+
+Bounded exact-corner run: `reports/n4_ppo_exact_corner_sweep_20260612_seed2831k`
+
+- Start model: frozen current best PPO terminal `reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip`.
+- Environment: current 5-bin N=4 serial-lagrange setup, `dt=0.0005`, `force_noise=0.02`, `link_coupling=12`, `normalized_raw` policy observations.
+- Validation starts: `1500000`, `1600000`, `2100000`, 5 episodes each.
+- Final starts: `1900000`, `2100000`, 5 episodes each.
+- Candidate grid corners selected from LR/clip/n_steps/GAE/entropy/net/VecNormalize/late-survival axes: `0`, `85`, `170`, `255`.
+- Each candidate used one 5k PPO chunk, CPU/subproc, hard-select ReCoN terminal evaluation.
+
+| grid | lr | clip | n_steps | gae | ent | net | vecnorm | late bonus | final mean | final p10 | final success |
+|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---:|
+| 0 | 2.5e-6 | 0.015 | 512 | 0.90 | 0.000 | 64,64 | false | 0.00 | 481.5 | 432.2 | 0.500 |
+| 85 | 2.5e-6 | 0.050 | 512 | 0.98 | 0.000 | 256,128 | false | 0.05 | 481.5 | 432.2 | 0.500 |
+| 170 | 1.0e-5 | 0.015 | 1024 | 0.90 | 0.001 | 64,64 | true | 0.00 | 481.5 | 432.2 | 0.500 |
+| 255 | 1.0e-5 | 0.050 | 1024 | 0.98 | 0.001 | 256,128 | true | 0.05 | 481.5 | 432.2 | 0.500 |
+
+Best selected checkpoint remained `checkpoint_000000_start.zip` for every candidate, meaning no 5k PPO chunk beat the frozen start model under the promotion gates. This is not a solve attempt and the final eval is intentionally tiny, but it is useful evidence that short corner sweeps over these PPO knobs are action-equivalent or too weak to move the N=4 tail. The PPO path probably needs longer chunks, different reward/teacher anchoring, or a recovery-specific objective before it is worth spending larger compute.

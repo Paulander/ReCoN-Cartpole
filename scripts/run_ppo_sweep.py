@@ -36,6 +36,10 @@ def _bools(text: str) -> list[bool]:
     return out
 
 
+def _indices(text: str) -> list[int]:
+    return [int(item) for item in str(text or "").split(",") if item.strip()]
+
+
 def candidate_grid(args: argparse.Namespace) -> list[dict[str, Any]]:
     raw = itertools.product(
         _floats(args.learning_rates),
@@ -50,6 +54,7 @@ def candidate_grid(args: argparse.Namespace) -> list[dict[str, Any]]:
     )
     rows = [
         {
+            "grid_index": int(grid_index),
             "learning_rate": lr,
             "clip_range": clip,
             "n_steps": n_steps,
@@ -60,9 +65,14 @@ def candidate_grid(args: argparse.Namespace) -> list[dict[str, Any]]:
             "vec_normalize": vec_norm,
             "late_survival_bonus": late_bonus,
         }
-        for lr, clip, n_steps, n_epochs, gae, ent, arch, vec_norm, late_bonus in raw
+        for grid_index, (lr, clip, n_steps, n_epochs, gae, ent, arch, vec_norm, late_bonus) in enumerate(raw)
     ]
-    if args.shuffle_stride > 1 and rows:
+    selected_indices = _indices(getattr(args, "candidate_indices", ""))
+    if selected_indices:
+        wanted = set(selected_indices)
+        rows = [row for row in rows if int(row["grid_index"]) in wanted]
+        rows.sort(key=lambda row: selected_indices.index(int(row["grid_index"])))
+    elif args.shuffle_stride > 1 and rows:
         stride = max(1, int(args.shuffle_stride))
         rows = rows[::stride] + [row for idx, row in enumerate(rows) if idx % stride != 0]
     start = max(0, int(args.candidate_offset))
@@ -173,16 +183,16 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Status: `{result.get('status', 'running')}`",
         f"N poles: `{result.get('n_poles')}`",
         f"Validation seed starts: `{', '.join(str(s) for s in result.get('validation_seed_starts', []))}`",
-        f"Final seed start: `{result.get('final_seed_start')}`",
+        f"Final seed starts: `{', '.join(str(s) for s in result.get('final_seed_starts', [result.get('final_seed_start')]))}`",
         "",
-        "| idx | status | lr | clip | steps | epochs | gae | ent | net | vecnorm | late bonus | mean | p10 | cvar | success | score |",
-        "|---:|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---:|---:|---:|",
+        "| idx | grid | status | lr | clip | steps | epochs | gae | ent | net | vecnorm | late bonus | mean | p10 | cvar | success | score |",
+        "|---:|---:|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---:|---:|---:|",
     ]
     for row in result.get("candidates", []):
         cfg = row["candidate"]
         val = row.get("final_eval") or row.get("validation") or {}
         lines.append(
-            f"| {row['index']} | {row.get('status', '')} | {cfg['learning_rate']} | {cfg['clip_range']} | "
+            f"| {row['index']} | {cfg.get('grid_index', row['index'])} | {row.get('status', '')} | {cfg['learning_rate']} | {cfg['clip_range']} | "
             f"{cfg['n_steps']} | {cfg['n_epochs']} | {cfg['gae_lambda']} | {cfg['ent_coef']} | "
             f"{cfg['net_arch']} | {cfg['vec_normalize']} | {cfg['late_survival_bonus']} | "
             f"{val.get('mean_survival', 0.0):.1f} | {val.get('p10_survival', 0.0):.1f} | "
@@ -233,7 +243,6 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
             "n_poles": args.n_poles,
             "validation_seed_starts": args.validation_seed_starts or [args.validation_seed_start],
             "final_seed_start": args.final_seed_start,
-        "final_seed_starts": args.final_seed_starts or [args.final_seed_start],
             "final_seed_starts": args.final_seed_starts or [args.final_seed_start],
             "candidates": rows,
             "best": best,
@@ -347,6 +356,7 @@ def main() -> None:
     parser.add_argument("--late-survival-bonus-values", default="0.0,0.02,0.05")
     parser.add_argument("--max-candidates", type=int, default=8)
     parser.add_argument("--candidate-offset", type=int, default=0)
+    parser.add_argument("--candidate-indices", default="", help="Comma-separated original grid indices to run in this order.")
     parser.add_argument("--shuffle-stride", type=int, default=7)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/ppo_terminal_sweep")
