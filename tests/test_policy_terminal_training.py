@@ -121,6 +121,31 @@ def test_residual_env_can_use_recon_base_controller(monkeypatch):
     assert force == 10.0
 
 
+def test_counterfactual_residual_collect_seed_values_reads_hard_seed_json(tmp_path):
+    residual = _load_script("train_counterfactual_residual_terminal")
+    path = tmp_path / "hard_seeds.json"
+    path.write_text('{"hard_seeds": [10, 20, 30]}', encoding="utf-8")
+    args = SimpleNamespace(collect_seed_list=str(path), collect_seed_start=1, collect_episodes=2)
+
+    assert residual.collect_seed_values(args) == [10, 20]
+
+
+def test_counterfactual_residual_label_summary_counts_non_noop():
+    residual = _load_script("train_counterfactual_residual_terminal")
+    rows = [
+        {"label": 2, "score_gap": 0.0},
+        {"label": 1, "score_gap": 0.5},
+        {"label": 3, "score_gap": 0.25},
+    ]
+
+    summary = residual.label_summary(rows, classes=5)
+
+    assert summary["row_count"] == 3
+    assert summary["label_counts"]["2"] == 1
+    assert summary["non_noop_count"] == 2
+    assert summary["max_score_gap"] == 0.5
+
+
 def test_residual_recovery_pressure_increases_with_state_risk():
     import numpy as np
 
@@ -359,6 +384,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     recurrent_tail = _load_script("train_recurrent_policy_terminal_tail_curriculum")
     ppo_sweep = _load_script("run_ppo_sweep")
     residual = _load_script("train_residual_policy_terminal")
+    counterfactual_residual = _load_script("train_counterfactual_residual_terminal")
     recurrent_curriculum = _load_script("train_recurrent_policy_terminal_curriculum")
     action_compare = _load_script("compare_policy_actions")
     residual_grid = _load_script("evaluate_recon_residual_grid")
@@ -376,6 +402,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(recurrent_tail.run_recurrent_tail_curriculum)
     assert callable(ppo_sweep.run_sweep)
     assert callable(residual.train_residual)
+    assert callable(counterfactual_residual.run)
     assert callable(recurrent_curriculum.run_curriculum)
     assert callable(action_compare.run_comparison)
     assert callable(residual_grid.run_sweep)

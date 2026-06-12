@@ -58,6 +58,43 @@ from .node_params import (
 )
 
 
+
+
+class TorchResidualPolicy:
+    def __init__(self, path: str):
+        try:
+            import torch
+            import torch.nn as nn
+        except Exception as exc:  # pragma: no cover - optional dependency path
+            raise RuntimeError("torch residual policy terminals require torch") from exc
+        payload = torch.load(path, map_location="cpu", weights_only=False)
+        meta = dict(payload.get("meta", {}))
+        input_size = int(meta.get("input_size", 0))
+        hidden_size = int(meta.get("hidden_size", 64))
+        classes = int(meta.get("classes", 0))
+        if input_size <= 0 or classes <= 0:
+            raise ValueError(f"invalid torch residual terminal metadata in {path}")
+        self.torch = torch
+        self.meta = meta
+        self.model = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, classes),
+        )
+        self.model.load_state_dict(payload["state_dict"])
+        self.model.eval()
+
+    def predict(self, observation: Any, deterministic: bool = True):
+        obs = np.asarray(observation, dtype=np.float32).reshape(1, -1)
+        expected = int(self.meta["input_size"])
+        if obs.shape[1] != expected:
+            raise ValueError(f"torch residual terminal observation size mismatch: obs={obs.shape[1]} expected={expected}")
+        with self.torch.no_grad():
+            logits = self.model(self.torch.as_tensor(obs, dtype=self.torch.float32))
+            action = int(self.torch.argmax(logits, dim=1).cpu().numpy()[0])
+        return action, None
+
+
 @dataclass
 class Pole1FixConfig:
     enabled: bool = False
@@ -625,6 +662,8 @@ class ReConCartPoleController:
         return np.clip(normalized, -clip_obs, clip_obs).astype(np.float32, copy=False)
 
     def _load_feedforward_policy_terminal(self, path: str) -> Any:
+        if str(path).endswith(".pt"):
+            return TorchResidualPolicy(path)
         try:
             from stable_baselines3 import PPO
         except Exception as exc:  # pragma: no cover - optional dependency path

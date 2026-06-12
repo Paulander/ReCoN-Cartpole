@@ -375,3 +375,25 @@ Gate sweep over thresholds `0.30`, `0.45`, `0.60`, `0.75` found no improvement. 
 
 Interpretation: recovery-shaped residual learning is now better aligned and no longer obviously harmful, but it has not cracked the N=4 weak block. The pure-PPO-base residual learned real corrections for pure PPO, yet those corrections were redundant or harmful once ReCoN arbitration was present. The ReCoN-base residual learned to be conservative. The next residual attempt should likely use an explicit advantage-style objective over paired base-vs-residual rollouts or train on saved near-failure states with short-horizon counterfactual rollouts, rather than ordinary PPO survival reward.
 
+## Counterfactual residual terminal probe
+
+Code changes:
+
+- ReCoN residual terminals can now load Torch `.pt` classifiers in addition to SB3 PPO `.zip` policies. The classifier exposes the same `predict()` shape as the PPO residual policy, so it uses the existing residual terminal path and trace fields rather than an external action override.
+- Added `scripts/train_counterfactual_residual_terminal.py`. It collects near-failure states from a frozen ReCoN+PPO controller, probes residual bin shifts (`-2..+2`) for a short horizon, trains a no-op/shift classifier, then evaluates the learned residual through normal ReCoN residual-terminal integration.
+- The script supports contiguous collection seeds or an explicit `--collect-seed-list` JSON/text file so it can target known hard-seed pools without using held-out evaluation blocks.
+
+Easy contiguous collection run: `reports/n4_counterfactual_residual_20260612_seed2380k`
+
+- Collection seeds: `2380000..2380079`.
+- Dataset: 321 rows, 27 failing episodes, 0 non-noop residual labels.
+- Held-out weak block `2100000`, 60 episodes: base success `0.633`, residual success `0.633`.
+
+Hard-pool collection run: `reports/n4_counterfactual_residual_hardpool_20260612_seed2381k`
+
+- Collection seeds: first 80 seeds from `reports/n4_targetkl_survival_tail_20260612_seed2650k/tail_seed_pool.json`.
+- Dataset: 411 rows, 57 failing episodes, 1 non-noop residual label.
+- Held-out weak block `2100000`, 60 episodes: base success `0.633`, residual success `0.633`.
+
+Interpretation: the counterfactual residual infrastructure works, but one-step residual bin shifts almost never produce a clear short-horizon advantage under the current ReCoN+PPO base. This supports the earlier audit result: remaining N=4 failures are not usually clean one-tick action mistakes. A useful residual probably needs multi-step/options-style correction, a value/advantage target over trajectories, or a recurrent terminal trained with an objective that directly optimizes recovery instead of labeling isolated first actions.
+

@@ -895,6 +895,38 @@ def test_residual_policy_terminal_proposal_diagnostics_feature_mode_expands_obse
     assert residual_info["observation_size"] > residual_info["aux_feature_size"]
 
 
+def test_torch_residual_policy_terminal_can_be_loaded(tmp_path):
+    import torch
+    import torch.nn as nn
+
+    model = nn.Sequential(nn.Linear(7, 4), nn.ReLU(), nn.Linear(4, 5))
+    with torch.no_grad():
+        for param in model.parameters():
+            param.zero_()
+        model[2].bias[4] = 1.0
+    path = tmp_path / "residual.pt"
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "meta": {"input_size": 7, "hidden_size": 4, "classes": 5},
+        },
+        path,
+    )
+
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=1,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            residual_policy_terminal_path=str(path),
+        )
+    )
+
+    action, _state = controller.residual_policy_terminal_model.predict(np.zeros(7, dtype=np.float32))
+
+    assert int(action) == 4
+
+
 def test_residual_policy_terminal_bin_delta_changes_policy_force():
     class FakeBasePolicy:
         def predict(self, observation, deterministic=True):
