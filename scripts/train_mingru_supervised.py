@@ -94,6 +94,35 @@ def make_sequences(inputs: np.ndarray, data: dict[str, np.ndarray], args: argpar
     return x, actions, returns, failures
 
 
+def adapt_state_dict_for_input_expansion(model_state: dict[str, Any], checkpoint_state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    adapted = {key: value.clone() for key, value in model_state.items()}
+    copied: list[str] = []
+    partial: list[dict[str, Any]] = []
+    skipped: list[str] = []
+    for key, source in checkpoint_state.items():
+        if key not in adapted:
+            skipped.append(key)
+            continue
+        target = adapted[key]
+        if tuple(target.shape) == tuple(source.shape):
+            adapted[key] = source.clone()
+            copied.append(key)
+        elif target.ndim == source.ndim == 2 and target.shape[0] == source.shape[0]:
+            widened = target.clone()
+            cols = min(int(target.shape[1]), int(source.shape[1]))
+            widened[:, :cols] = source[:, :cols]
+            adapted[key] = widened
+            partial.append({
+                "key": key,
+                "source_shape": list(source.shape),
+                "target_shape": list(target.shape),
+                "copied_columns": cols,
+            })
+        else:
+            skipped.append(key)
+    return adapted, {"copied": copied, "partial": partial, "skipped": skipped}
+
+
 def sample_weights(data: dict[str, np.ndarray], args: argparse.Namespace) -> np.ndarray:
     count = int(data["teacher_actions"].shape[0])
     weights = np.ones(count, dtype=np.float32)
@@ -154,10 +183,17 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     device = torch.device(requested_device)
     model.to(device)
     resume_checkpoint = str(getattr(args, "resume_checkpoint", "") or "")
+    resume_report: dict[str, Any] = {"enabled": bool(resume_checkpoint), "partial_input": False}
     if resume_checkpoint:
         checkpoint = torch.load(resume_checkpoint, map_location="cpu")
         state_dict = checkpoint.get("model_state_dict", checkpoint) if isinstance(checkpoint, dict) else checkpoint
-        model.load_state_dict(state_dict)
+        if bool(getattr(args, "resume_partial_input", False)):
+            adapted, resume_report = adapt_state_dict_for_input_expansion(model.state_dict(), state_dict)
+            resume_report.update({"enabled": True, "partial_input": True, "checkpoint": resume_checkpoint})
+            model.load_state_dict(adapted)
+        else:
+            model.load_state_dict(state_dict)
+            resume_report.update({"checkpoint": resume_checkpoint})
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     def batch_loss(batch_idx: np.ndarray, train_mode: bool) -> tuple[torch.Tensor, dict[str, float]]:
@@ -216,6 +252,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "checkpoint_path": str(checkpoint_path),
         "dataset": args.dataset,
         "resume_checkpoint": resume_checkpoint,
+        "resume_load": resume_report,
         "samples": int(x.shape[0]),
         "train_samples": int(len(train_idx)),
         "validation_samples": int(len(val_idx)),
@@ -248,12 +285,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--resume-checkpoint", default="")
+    parser.add_argument("--resume-partial-input", action="store_true", default=False)
     parser.add_argument("--out", default="reports/mingru_supervised")
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--force-mag", type=float, default=10.0)
     parser.add_argument("--discrete-action-bins", type=int, default=5)
-    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force", "normalized_raw4_subchains", "normalized_raw4_subchains_prev_force"], default="normalized_raw")
     parser.add_argument("--hidden-size", type=int, default=64)
     parser.add_argument("--sequence-length", type=int, default=8)
     parser.add_argument("--include-prev-force", action="store_true", default=True)

@@ -161,6 +161,7 @@ class RunnerConfig:
     residual_policy_terminal_max_force: float = 4.0
     residual_policy_terminal_gate_threshold: float = 0.30
     residual_policy_terminal_feature_mode: str = "basic"
+    residual_policy_terminal_hold_steps: int = 1
     mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
     pole1_fix: Pole1FixConfig = field(default_factory=Pole1FixConfig)
     rescue: RescueConfig = field(default_factory=RescueConfig)
@@ -216,6 +217,8 @@ class ReConCartPoleController:
             )
         self.residual_policy_terminal_model: Any | None = None
         self.last_residual_policy_terminal: dict[str, Any] = {}
+        self.residual_option_shift = 0
+        self.residual_option_remaining = 0
         if self.config.residual_policy_terminal_path:
             self.residual_policy_terminal_model = self._load_feedforward_policy_terminal(
                 self.config.residual_policy_terminal_path
@@ -232,6 +235,8 @@ class ReConCartPoleController:
         self.last_proposal = ForceProposal("none", 0.0, 0.0, 0.0, "not run")
         self.episode_step = 0
         self.recent_forces: list[float] = []
+        self.residual_option_shift = 0
+        self.residual_option_remaining = 0
         self.last_rescue: dict[str, Any] = {}
 
     def _uses_fast_plasticity(self) -> bool:
@@ -725,15 +730,29 @@ class ReConCartPoleController:
         mode = self.config.residual_policy_terminal_mode
         final_force = float(base_force)
         delta = 0.0
+        requested_shift = 0
+        applied_shift = 0
+        option_reused = False
+        hold_steps = max(1, int(self.config.residual_policy_terminal_hold_steps))
         if mode == "bin_delta" and self.config.action_mode == "discrete":
             action_bins = max(2, int(self.config.residual_policy_terminal_action_bins))
             max_shift = action_bins // 2
             requested_shift = action_idx - max_shift
-            applied_shift = (
-                requested_shift
-                if gate >= float(self.config.residual_policy_terminal_gate_threshold)
-                else 0
-            )
+            if self.residual_option_remaining > 0 and self.residual_option_shift != 0:
+                applied_shift = int(self.residual_option_shift)
+                self.residual_option_remaining -= 1
+                option_reused = True
+            elif gate >= float(self.config.residual_policy_terminal_gate_threshold):
+                applied_shift = requested_shift
+                if applied_shift != 0 and hold_steps > 1:
+                    self.residual_option_shift = int(applied_shift)
+                    self.residual_option_remaining = hold_steps - 1
+                else:
+                    self.residual_option_shift = 0
+                    self.residual_option_remaining = 0
+            else:
+                self.residual_option_shift = 0
+                self.residual_option_remaining = 0
             base_idx = self._force_to_discrete_index(base_force)
             final_idx = int(
                 np.clip(base_idx + applied_shift, 0, int(self.config.discrete_action_bins) - 1)
@@ -763,6 +782,11 @@ class ReConCartPoleController:
             "observation_size": int(residual_obs.size),
             "action": [action_idx],
             "risk_gate": gate,
+            "requested_shift": int(requested_shift),
+            "applied_shift": int(applied_shift),
+            "hold_steps": int(hold_steps),
+            "option_reused": bool(option_reused),
+            "option_remaining": int(self.residual_option_remaining),
             "base_force": float(base_force),
             "residual_delta": float(delta),
             "force": float(final_force),

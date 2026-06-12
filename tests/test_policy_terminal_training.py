@@ -598,6 +598,32 @@ def test_recurrent_tail_final_seed_start_fallback():
     assert recurrent_tail.recurrent_final_seeds(args) == [10, 11]
 
 
+def test_subchain_observation_mode_adds_adjacent_pair_features():
+    from recon_cartpole.control.policy_observation import (
+        adjacent_subchain_features,
+        policy_observation_from_state,
+        policy_observation_size,
+    )
+    import numpy as np
+
+    raw = np.asarray([0.0, 1.0, 0.01, -0.02, 0.03, -0.04, 0.5, -0.6, 0.7, -0.8], dtype=np.float32)
+
+    obs = policy_observation_from_state(
+        raw,
+        raw,
+        4,
+        "normalized_raw4_subchains_prev_force",
+        previous_force=5.0,
+        force_mag=10.0,
+    )
+
+    assert obs.shape == (policy_observation_size(4, "normalized_raw4_subchains_prev_force"),)
+    assert obs.shape == (23,)
+    assert obs[-1] == 0.5
+    pair = adjacent_subchain_features(obs[2:6], obs[6:10], 4)
+    assert np.allclose(obs[10:22], pair)
+
+
 def test_mingru_build_inputs_avoids_duplicate_prev_force_column():
     import numpy as np
 
@@ -661,6 +687,31 @@ def test_mingru_supervised_sample_weights_emphasize_tail_states():
     assert weights[1] > weights[0]
     assert weights[2] > weights[0]
     assert float(np.mean(weights)) == pytest.approx(1.0)
+
+
+def test_mingru_partial_input_resume_copies_shared_columns():
+    import torch
+
+    supervised = _load_script("train_mingru_supervised")
+    source = {
+        "input_proj.weight": torch.ones((3, 4)),
+        "input_proj.bias": torch.ones(3),
+        "other.weight": torch.ones((2, 2)),
+    }
+    target = {
+        "input_proj.weight": torch.zeros((3, 6)),
+        "input_proj.bias": torch.zeros(3),
+        "other.weight": torch.zeros((2, 3)),
+    }
+
+    adapted, report = supervised.adapt_state_dict_for_input_expansion(target, source)
+
+    assert torch.all(adapted["input_proj.weight"][:, :4] == 1.0)
+    assert torch.all(adapted["input_proj.weight"][:, 4:] == 0.0)
+    assert torch.all(adapted["input_proj.bias"] == 1.0)
+    assert report["partial"][0]["key"] == "input_proj.weight"
+    assert report["partial"][0]["copied_columns"] == 4
+    assert report["partial"][1]["key"] == "other.weight"
 
 
 def test_mingru_supervised_resume_checkpoint_records_source(tmp_path):
@@ -828,6 +879,19 @@ def test_policy_dataset_default_behavior_is_teacher_rollout():
     assert builder.make_behavior(SimpleNamespace()) is None
 
 
+def test_policy_dataset_label_source_can_use_rollout_action():
+    builder = _load_script("build_policy_dataset")
+    args = SimpleNamespace(label_source="rollout")
+
+    action, force, source = builder.label_action_and_force(
+        args, teacher_action=1, teacher_force=-5.0, rollout_action=4, rollout_force=10.0
+    )
+
+    assert action == 4
+    assert force == 10.0
+    assert source == "rollout"
+
+
 def test_policy_dataset_explicit_seed_list(tmp_path):
     builder = _load_script("build_policy_dataset")
     seed_file = tmp_path / "seeds.txt"
@@ -842,3 +906,25 @@ def test_recurrent_ladder_validation_seed_starts_expand_blocks():
     args = SimpleNamespace(validation_seed_start=10, validation_seed_starts=[100, 200], validation_episodes=2)
 
     assert ladder.ladder_validation_seeds(args) == [100, 101, 200, 201]
+
+
+def test_recurrent_ladder_terminal_config_exposes_passthrough():
+    ladder = _load_script("train_recurrent_terminal_ladder")
+    args = SimpleNamespace(
+        observation_mode="normalized_raw4_prev_force",
+        include_prev_force=True,
+        include_context=False,
+        blend=1.0,
+        scope="stabilize_chain",
+        confidence_floor=0.05,
+        passthrough_enabled=True,
+        passthrough_confidence_floor=0.90,
+        passthrough_logit_margin_floor=0.10,
+    )
+
+    config = ladder.terminal_config(args, "candidate.pt", hidden=256, seq_len=32)
+
+    assert config.passthrough_enabled is True
+    assert config.passthrough_confidence_floor == 0.90
+    assert config.passthrough_logit_margin_floor == 0.10
+    assert config.checkpoint_path == "candidate.pt"

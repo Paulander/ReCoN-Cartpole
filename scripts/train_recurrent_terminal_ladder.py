@@ -56,6 +56,9 @@ def terminal_config(args: argparse.Namespace, checkpoint_path: str, hidden: int,
         blend=args.blend,
         scope=args.scope,
         confidence_floor=args.confidence_floor,
+        passthrough_enabled=bool(getattr(args, "passthrough_enabled", False)),
+        passthrough_confidence_floor=float(getattr(args, "passthrough_confidence_floor", 0.05)),
+        passthrough_logit_margin_floor=float(getattr(args, "passthrough_logit_margin_floor", 0.0)),
         checkpoint_path=checkpoint_path,
     )
 
@@ -199,6 +202,9 @@ def run_ladder(args: argparse.Namespace) -> dict[str, Any]:
             "scope": args.scope,
             "selection_mode": args.selection_mode,
             "observation_mode": args.observation_mode,
+            "passthrough_enabled": bool(getattr(args, "passthrough_enabled", False)),
+            "passthrough_confidence_floor": float(getattr(args, "passthrough_confidence_floor", 0.05)),
+            "passthrough_logit_margin_floor": float(getattr(args, "passthrough_logit_margin_floor", 0.0)),
         }
         cid = config_hash(c_payload)
         candidate_out = out / f"candidate_{idx:02d}_{cid}"
@@ -282,10 +288,13 @@ def main() -> None:
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
-    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force", "normalized_raw4_subchains", "normalized_raw4_subchains_prev_force"], default="normalized_raw")
     parser.add_argument("--scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
     parser.add_argument("--blend", type=float, default=1.0)
     parser.add_argument("--confidence-floor", type=float, default=0.05)
+    parser.add_argument("--passthrough-enabled", action="store_true", default=False)
+    parser.add_argument("--passthrough-confidence-floor", type=float, default=0.05)
+    parser.add_argument("--passthrough-logit-margin-floor", type=float, default=0.0)
     parser.add_argument("--hidden-sizes", nargs="+", type=int, default=[32, 64])
     parser.add_argument("--sequence-lengths", nargs="+", type=int, default=[4, 8, 16])
     parser.add_argument("--include-prev-force", action="store_true", default=True)

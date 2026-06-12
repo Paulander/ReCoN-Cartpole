@@ -966,3 +966,65 @@ def test_residual_policy_terminal_bin_delta_changes_policy_force():
     assert info["residual_policy_terminal"]["mode"] == "bin_delta"
     assert info["residual_policy_terminal"]["residual_delta"] == controller.config.force_mag
     assert residual.observation.shape == (7,)
+
+
+def test_residual_policy_terminal_bin_delta_can_hold_option_across_ticks():
+    class FakeBasePolicy:
+        def predict(self, observation, deterministic=True):
+            return 2, None
+
+    class FakeResidualPolicy:
+        def __init__(self):
+            self.actions = [4, 2, 2, 2]
+            self.calls = 0
+
+        def predict(self, observation, deterministic=True):
+            action = self.actions[min(self.calls, len(self.actions) - 1)]
+            self.calls += 1
+            return action, None
+
+    raw = np.asarray([0.0, 0.0, 0.18, 0.0], dtype=np.float32)
+    residual = FakeResidualPolicy()
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=1,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_observation_mode="normalized_raw",
+            residual_policy_terminal_mode="bin_delta",
+            residual_policy_terminal_action_bins=5,
+            residual_policy_terminal_gate_threshold=0.0,
+            residual_policy_terminal_hold_steps=3,
+        )
+    )
+    controller.policy_terminal_model = FakeBasePolicy()
+    controller.residual_policy_terminal_model = residual
+
+    first_force, first_info = controller._policy_terminal_force(raw, raw)
+    second_force, second_info = controller._policy_terminal_force(raw, raw)
+    third_force, third_info = controller._policy_terminal_force(raw, raw)
+    fourth_force, fourth_info = controller._policy_terminal_force(raw, raw)
+
+    assert first_force == controller.config.force_mag
+    assert first_info["residual_policy_terminal"]["requested_shift"] == 2
+    assert first_info["residual_policy_terminal"]["applied_shift"] == 2
+    assert first_info["residual_policy_terminal"]["option_remaining"] == 2
+    assert first_info["residual_policy_terminal"]["option_reused"] is False
+
+    assert second_force == controller.config.force_mag
+    assert second_info["residual_policy_terminal"]["requested_shift"] == 0
+    assert second_info["residual_policy_terminal"]["applied_shift"] == 2
+    assert second_info["residual_policy_terminal"]["option_remaining"] == 1
+    assert second_info["residual_policy_terminal"]["option_reused"] is True
+
+    assert third_force == controller.config.force_mag
+    assert third_info["residual_policy_terminal"]["applied_shift"] == 2
+    assert third_info["residual_policy_terminal"]["option_remaining"] == 0
+    assert third_info["residual_policy_terminal"]["option_reused"] is True
+
+    assert fourth_force == 0.0
+    assert fourth_info["residual_policy_terminal"]["requested_shift"] == 0
+    assert fourth_info["residual_policy_terminal"]["applied_shift"] == 0
+    assert fourth_info["residual_policy_terminal"]["option_reused"] is False

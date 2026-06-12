@@ -397,3 +397,24 @@ Hard-pool collection run: `reports/n4_counterfactual_residual_hardpool_20260612_
 
 Interpretation: the counterfactual residual infrastructure works, but one-step residual bin shifts almost never produce a clear short-horizon advantage under the current ReCoN+PPO base. This supports the earlier audit result: remaining N=4 failures are not usually clean one-tick action mistakes. A useful residual probably needs multi-step/options-style correction, a value/advantage target over trajectories, or a recurrent terminal trained with an objective that directly optimizes recovery instead of labeling isolated first actions.
 
+## Residual option-hold, self-imitation, and subchain representation probe
+
+Code changes:
+
+- Residual bin-delta terminals now support `residual_policy_terminal_hold_steps`, allowing a nonzero learned residual shift to persist as a short option across ticks. Traces record requested/applied shift, hold window, reuse, and remaining option ticks.
+- `train_counterfactual_residual_terminal.py` can probe and train these multi-tick residual options with `--option-hold-steps`.
+- `build_policy_dataset.py` now separates `--label-source teacher` from `--label-source rollout`, enabling explicit self-imitation datasets from the actual rollout policy rather than silently calling them teacher DAgger.
+- `train_recurrent_terminal_ladder.py` now exposes minGRU passthrough gates (`--passthrough-enabled`, `--passthrough-confidence-floor`, `--passthrough-logit-margin-floor`) so ladder evaluations can reproduce the current best integrated ReCoN path.
+- Added `normalized_raw4_subchains` and `normalized_raw4_subchains_prev_force` observation modes. These keep padded raw N=4 features and append adjacent-pair phase features for `(0,1)`, `(1,2)`, and `(2,3)`, which is the first concrete step toward letting ReCoN see N=4 as overlapping local subchains.
+- `train_mingru_supervised.py` supports `--resume-partial-input`, copying compatible old checkpoint columns into widened input layers so new feature columns can be added without training the whole recurrent policy from scratch.
+
+Experiments:
+
+| run | weak block | mean | p10 | success | note |
+|---|---:|---:|---:|---:|---|
+| incumbent h256/seq32 strict passthrough | 2100000 | 483.8 | 439.9 | 0.650 | current weak-block bar |
+| option-hold counterfactual residual, hold 4 | 2100000 | tied base | tied base | 0.633 | found 3 non-noop labels from 384 rows, no eval gain |
+| self-imitation h256/seq32 success500 warm | 2100000 | 482.6 | 441.2 | 0.633 | cloning only successful learned rollouts regressed success |
+| subchain-feature h256/seq32 partial-warm success500 | 2100000 | 482.1 | 435.8 | 0.617 | new local-chain features work technically but simple imitation regressed |
+
+Interpretation: the infrastructure now supports multi-tick residual options, rollout-label self-imitation, and explicit adjacent-subchain inputs. None of these variants cracked the N=4 weak block. This strengthens the diagnosis that the next useful ReCoN move is not more cloning, but an explicit subchain prototype/gating objective: learn reusable successful/failing local phase motifs and use them to gate or bias the global minGRU/ReCoN action only when the motif evidence is strong. No N=4 solve claim is justified; the best held-out broad result remains the incumbent h256/seq32 minGRU strict passthrough at about 0.721 over the 1900000/2000000/2100000/2200000 blocks.

@@ -76,6 +76,15 @@ def make_teacher(args: argparse.Namespace):
     raise ValueError(f"unsupported teacher: {args.teacher}")
 
 
+def label_action_and_force(args: argparse.Namespace, teacher_action: int, teacher_force: float, rollout_action: int, rollout_force: float) -> tuple[int, float, str]:
+    source = str(getattr(args, "label_source", "teacher") or "teacher")
+    if source == "teacher":
+        return int(teacher_action), float(teacher_force), "teacher"
+    if source == "rollout":
+        return int(rollout_action), float(rollout_force), "rollout"
+    raise ValueError(f"unsupported label_source: {source}")
+
+
 def make_behavior(args: argparse.Namespace):
     rollout_policy = getattr(args, "rollout_policy", "teacher")
     if rollout_policy == "teacher":
@@ -160,13 +169,19 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
                 rollout_force = 0.0 if prediction.force is None else float(prediction.force)
                 rollout_action = int(action_from_force(rollout_force, "discrete", args.force_mag, args.discrete_action_bins))
                 rollout_source = getattr(args, "rollout_policy", "teacher")
+            label_action, label_force, label_source = label_action_and_force(
+                args, int(action), float(force), int(rollout_action), float(rollout_force)
+            )
             next_obs, reward, terminated, truncated, info = env.step(rollout_action)
             episode_rows.append(
                 {
                     "observation": policy_obs.astype(np.float32),
                     "prev_force": float(prev_force),
-                    "force": float(force),
-                    "action": int(action),
+                    "force": float(label_force),
+                    "action": int(label_action),
+                    "teacher_force": float(force),
+                    "teacher_action": int(action),
+                    "label_source": label_source,
                     "rollout_force": float(rollout_force),
                     "rollout_action": int(rollout_action),
                     "rollout_source": rollout_source,
@@ -191,7 +206,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             returns_to_go.append(float(rtg[idx]))
             failure_within_k.append(float((last - idx) <= args.failure_window and last + 1 < args.horizon))
             seeds.append(row["seed"])
-            sources.append(args.teacher)
+            sources.append(row["label_source"])
             rollout_sources.append(row["rollout_source"])
             rollout_forces.append(row["rollout_force"])
             rollout_actions.append(row["rollout_action"])
@@ -230,16 +245,17 @@ def main() -> None:
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
-    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
-    parser.add_argument("--teacher-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force", "normalized_raw4_subchains", "normalized_raw4_subchains_prev_force"], default="normalized_raw")
+    parser.add_argument("--teacher-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force", "normalized_raw4_subchains", "normalized_raw4_subchains_prev_force"], default="normalized_raw")
     parser.add_argument("--policy-terminal-path", default="")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
     parser.add_argument("--rollout-policy", choices=["teacher", "mingru_terminal"], default="teacher")
+    parser.add_argument("--label-source", choices=["teacher", "rollout"], default="teacher")
     parser.add_argument("--behavior-checkpoint-path", default="")
     parser.add_argument("--behavior-hidden-size", type=int, default=64)
     parser.add_argument("--behavior-sequence-length", type=int, default=16)
-    parser.add_argument("--behavior-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw4_prev_force")
+    parser.add_argument("--behavior-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force", "normalized_raw4_subchains", "normalized_raw4_subchains_prev_force"], default="normalized_raw4_prev_force")
     parser.add_argument("--behavior-include-prev-force", action="store_true", default=True)
     parser.add_argument("--behavior-no-prev-force", dest="behavior_include_prev_force", action="store_false")
     parser.add_argument("--behavior-include-context", action="store_true", default=True)
@@ -270,6 +286,7 @@ def main() -> None:
             "observation_mode": args.observation_mode,
             "teacher_observation_mode": args.teacher_observation_mode,
             "rollout_policy": args.rollout_policy,
+            "label_source": args.label_source,
             "behavior_checkpoint_path": args.behavior_checkpoint_path,
             "behavior_observation_mode": args.behavior_observation_mode,
         },

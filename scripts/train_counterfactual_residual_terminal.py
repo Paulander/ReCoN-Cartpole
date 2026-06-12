@@ -54,6 +54,7 @@ def make_controller(args: argparse.Namespace, residual_model_path: str = "", gat
             residual_policy_terminal_action_bins=args.residual_action_bins,
             residual_policy_terminal_gate_threshold=args.residual_gate_threshold if gate_threshold is None else gate_threshold,
             residual_policy_terminal_feature_mode=args.residual_feature_mode,
+            residual_policy_terminal_hold_steps=getattr(args, "option_hold_steps", 1),
         )
     )
 
@@ -145,11 +146,20 @@ def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step:
     set_env_state(env, raw_state, step)
     obs = env._get_obs()
     controller.start_episode()
-    obs, _reward, terminated, truncated, info = env.step(first_action)
-    survived = 1
-    final_raw = np.asarray(info.get("raw_state", []), dtype=float)
+    survived = 0
+    final_raw = np.asarray(raw_state, dtype=float)
+    forced_steps = max(1, int(getattr(args, "option_hold_steps", 1))) if shift != 0 else 1
+    terminated = False
+    truncated = False
+    info: dict[str, Any] = {"raw_state": raw_state}
+    for forced_idx in range(forced_steps):
+        obs, _reward, terminated, truncated, info = env.step(first_action)
+        survived += 1
+        final_raw = np.asarray(info.get("raw_state", []), dtype=float)
+        if terminated or truncated:
+            break
     if not (terminated or truncated):
-        for _ in range(max(1, int(args.probe_horizon)) - 1):
+        for _ in range(max(1, int(args.probe_horizon)) - survived):
             raw = np.asarray(info["raw_state"], dtype=float).copy()
             action, _diagnostics = controller.act(obs, raw)
             obs, _reward, terminated, truncated, info = env.step(int(action))
@@ -159,7 +169,7 @@ def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step:
                 break
     margin = stability_margin(final_raw, args)
     score = float(survived) + float(args.margin_weight) * margin - float(args.shift_penalty) * abs(shift)
-    return {"class": int(residual_class), "shift": shift, "first_action": first_action, "survived": int(survived), "margin": float(margin), "score": score}
+    return {"class": int(residual_class), "shift": shift, "first_action": first_action, "forced_steps": int(forced_steps), "survived": int(survived), "margin": float(margin), "score": score}
 
 
 def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, Any]:
@@ -363,7 +373,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "base_eval": base_eval,
         "residual_eval": residual_eval,
         "eval_seeds": eval_seed_values(args),
-        "mechanisms": {"counterfactual_residual_terminal": True, "recon_integration_eval": True, "gain_mutation": False},
+        "option_hold_steps": int(getattr(args, "option_hold_steps", 1)),
+        "mechanisms": {"counterfactual_residual_terminal": True, "residual_option_hold": int(getattr(args, "option_hold_steps", 1)) > 1, "recon_integration_eval": True, "gain_mutation": False},
         "wall_clock_seconds": time.perf_counter() - started,
     }
     (out / "report.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -382,6 +393,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Residual model: `{result['residual_model_path']}`",
         f"Rows: `{ds['row_count']}`, non-noop labels: `{ds['non_noop_count']}`",
         f"Label counts: `{ds['label_counts']}`",
+        f"Option hold steps: `{result.get('option_hold_steps', 1)}`",
         "",
         "| evaluator | mean | p10 | cvar | success | mean abs delta | episodes |",
         "|---|---:|---:|---:|---:|---:|---:|",
@@ -406,6 +418,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics"], default="proposal_diagnostics")
     parser.add_argument("--residual-action-bins", type=int, default=5)
     parser.add_argument("--residual-gate-threshold", type=float, default=0.60)
+    parser.add_argument("--option-hold-steps", type=int, default=1)
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--dt", type=float, default=0.0005)
