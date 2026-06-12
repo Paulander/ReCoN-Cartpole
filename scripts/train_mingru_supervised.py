@@ -126,6 +126,12 @@ def adapt_state_dict_for_input_expansion(model_state: dict[str, Any], checkpoint
 def sample_weights(data: dict[str, np.ndarray], args: argparse.Namespace) -> np.ndarray:
     count = int(data["teacher_actions"].shape[0])
     weights = np.ones(count, dtype=np.float32)
+    dataset_weights: np.ndarray | None = None
+    if "sample_weights" in data:
+        dataset_weights = np.asarray(data["sample_weights"], dtype=np.float32).reshape(-1)
+        if dataset_weights.shape[0] != count:
+            raise ValueError("sample_weights length must match teacher_actions")
+        dataset_weights = np.clip(dataset_weights, 0.0, None)
     failure_weight = max(0.0, float(getattr(args, "failure_sample_weight", 0.0)))
     late_weight = max(0.0, float(getattr(args, "late_sample_weight", 0.0)))
     low_return_weight = max(0.0, float(getattr(args, "low_return_sample_weight", 0.0)))
@@ -139,6 +145,8 @@ def sample_weights(data: dict[str, np.ndarray], args: argparse.Namespace) -> np.
         horizon = max(1.0, float(getattr(args, "horizon", 500)))
         low_return = 1.0 - np.clip(data["returns_to_go"].astype(np.float32) / horizon, 0.0, 1.0)
         weights += low_return_weight * low_return
+    if dataset_weights is not None:
+        weights *= dataset_weights
     weights /= max(1e-6, float(np.mean(weights)))
     return weights.astype(np.float32)
 
@@ -264,6 +272,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "failure_sample_weight": max(0.0, float(getattr(args, "failure_sample_weight", 0.0))),
             "late_sample_weight": max(0.0, float(getattr(args, "late_sample_weight", 0.0))),
             "low_return_sample_weight": max(0.0, float(getattr(args, "low_return_sample_weight", 0.0))),
+            "dataset_sample_weights": "sample_weights" in data,
+            "dataset_sample_weight_mean": float(np.mean(data["sample_weights"])) if "sample_weights" in data else 1.0,
+            "dataset_sample_weight_max": float(np.max(data["sample_weights"])) if "sample_weights" in data else 1.0,
             "mean_weight": float(np.mean(weights)),
             "max_weight": float(np.max(weights)) if weights.size else 0.0,
         },

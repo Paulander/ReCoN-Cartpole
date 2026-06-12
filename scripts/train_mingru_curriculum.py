@@ -33,6 +33,7 @@ ARRAY_KEYS = [
     "rollout_actions",
     "episodes",
     "step_indices",
+    "sample_weights",
 ]
 
 
@@ -48,6 +49,7 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "force_noise": min(float(args.force_noise), 0.01),
             "rollout_policy": "teacher",
             "label_source": "teacher",
+            "sample_weight": args.n3_sample_weight,
         },
         {
             "name": "n4_low_angle_no_noise",
@@ -59,6 +61,7 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "force_noise": 0.0,
             "rollout_policy": "teacher",
             "label_source": "teacher",
+            "sample_weight": args.low_angle_sample_weight,
         },
         {
             "name": "n4_current",
@@ -70,6 +73,7 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "force_noise": args.force_noise,
             "rollout_policy": "teacher",
             "label_source": "teacher",
+            "sample_weight": args.current_sample_weight,
         },
         {
             "name": "n4_hard_tail",
@@ -82,6 +86,7 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "force_noise": args.force_noise,
             "rollout_policy": "mingru_terminal" if args.behavior_checkpoint_path else "teacher",
             "label_source": "teacher",
+            "sample_weight": args.tail_sample_weight,
         },
     ]
 
@@ -125,6 +130,8 @@ def collect_stage(args: argparse.Namespace, stage: dict[str, Any], out_dir: Path
     stage_dir = out_dir / f"{index:02d}_{stage['name']}"
     stage_dir.mkdir(parents=True, exist_ok=True)
     data = collect_policy_dataset(dataset_args(args, stage, stage_dir / "dataset.npz"))
+    sample_weight = max(0.0, float(stage.get("sample_weight", 1.0)))
+    data = {**data, "sample_weights": np.full(data["teacher_actions"].shape[0], sample_weight, dtype=np.float32)}
     np.savez_compressed(stage_dir / "dataset.npz", **data)
     report = {
         "name": stage["name"],
@@ -138,6 +145,7 @@ def collect_stage(args: argparse.Namespace, stage: dict[str, Any], out_dir: Path
         "initial_angle_range": float(stage["initial_angle_range"]),
         "force_noise": float(stage["force_noise"]),
         "samples": int(data["observations"].shape[0]),
+        "sample_weight": sample_weight,
         "dataset": str(stage_dir / "dataset.npz"),
     }
     (stage_dir / "metadata.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -201,19 +209,22 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Observation mode: `{result['observation_mode']}`",
         f"Sequence length: `{result['sequence_length']}`",
         "",
-        "| stage | n | teacher | rollout | angle | noise | samples |",
-        "|---|---:|---|---|---:|---:|---:|",
+        "| stage | n | teacher | rollout | angle | noise | weight | samples |",
+        "|---|---:|---|---|---:|---:|---:|---:|",
     ]
     for stage in result["stages"]:
         lines.append(
             f"| {stage['name']} | {stage['n_poles']} | {stage['teacher']} | {stage['rollout_policy']} | "
-            f"{stage['initial_angle_range']:.3f} | {stage['force_noise']:.3f} | {stage['samples']} |"
+            f"{stage['initial_angle_range']:.3f} | {stage['force_noise']:.3f} | {stage.get('sample_weight', 1.0):.3f} | {stage['samples']} |"
         )
     pure = result.get("pure_mingru_policy", {})
     recon = result.get("recon_mingru_terminal", {})
+    eval_status = result.get("eval_status", "completed")
     lines.extend([
         "",
         "## Held-Out N=4 Eval",
+        "",
+        f"Eval status: `{eval_status}`",
         "",
         "| evaluator | mean | p10 | success | episodes |",
         "|---|---:|---:|---:|---:|",
@@ -273,8 +284,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     seeds = eval_seeds(args)
     ladder_args = eval_args(args)
     checkpoint = str(train_report["checkpoint_path"])
-    pure = evaluate_pure_mingru(checkpoint, ladder_args, seeds, args.hidden_size, args.sequence_length)
-    recon = evaluate_recon_mingru(checkpoint, ladder_args, seeds, args.hidden_size, args.sequence_length)
+    if seeds:
+        pure = evaluate_pure_mingru(checkpoint, ladder_args, seeds, args.hidden_size, args.sequence_length)
+        recon = evaluate_recon_mingru(checkpoint, ladder_args, seeds, args.hidden_size, args.sequence_length)
+        eval_status = "completed"
+    else:
+        pure = {"episodes": 0, "mean_survival": 0.0, "p10_survival": 0.0, "success_rate": 0.0, "max_survival": 0.0}
+        recon = dict(pure)
+        eval_status = "skipped_no_eval_seeds"
     result = {
         "status": "completed",
         "out": str(out),
@@ -287,6 +304,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "stages": [item["metadata"] for item in stage_payloads],
         "train_report": train_report,
         "eval_seeds": seeds,
+        "eval_status": eval_status,
         "pure_mingru_policy": pure,
         "recon_mingru_terminal": recon,
         "mechanisms": {
@@ -326,6 +344,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--current-seed-start", type=int, default=3_010_000)
     parser.add_argument("--tail-seed-start", type=int, default=3_110_000)
     parser.add_argument("--tail-seed-list", default="")
+    parser.add_argument("--n3-sample-weight", type=float, default=1.0)
+    parser.add_argument("--low-angle-sample-weight", type=float, default=1.0)
+    parser.add_argument("--current-sample-weight", type=float, default=1.0)
+    parser.add_argument("--tail-sample-weight", type=float, default=1.0)
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force", "normalized_raw4_subchains", "normalized_raw4_subchains_prev_force"], default="normalized_raw4_prev_force")
     parser.add_argument("--teacher-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force", "normalized_raw4_subchains", "normalized_raw4_subchains_prev_force"], default="normalized_raw")

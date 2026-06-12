@@ -665,12 +665,17 @@ def test_mingru_curriculum_default_stages_progress_n3_to_n4():
         behavior_checkpoint_path="behavior.pt",
         initial_angle_range=0.05,
         force_noise=0.02,
+        n3_sample_weight=0.1,
+        low_angle_sample_weight=0.2,
+        current_sample_weight=0.5,
+        tail_sample_weight=2.0,
     )
 
     stages = curriculum.default_stages(args)
 
     assert [stage["name"] for stage in stages] == ["n3_stable", "n4_low_angle_no_noise", "n4_current", "n4_hard_tail"]
     assert [stage["n_poles"] for stage in stages] == [3, 4, 4, 4]
+    assert [stage["sample_weight"] for stage in stages] == [0.1, 0.2, 0.5, 2.0]
     assert stages[-1]["rollout_policy"] == "mingru_terminal"
 
 
@@ -695,6 +700,7 @@ def test_mingru_curriculum_aggregate_offsets_episode_ids():
             "rollout_actions": [2, 3],
             "episodes": [0, 0],
             "step_indices": [0, 1],
+            "sample_weights": [0.25, 0.25],
         })
     }
     second = {
@@ -712,6 +718,7 @@ def test_mingru_curriculum_aggregate_offsets_episode_ids():
             "rollout_actions": [2],
             "episodes": [0],
             "step_indices": [0],
+            "sample_weights": [2.0],
         })
     }
 
@@ -719,6 +726,7 @@ def test_mingru_curriculum_aggregate_offsets_episode_ids():
 
     assert merged["observations"].shape == (3, 1)
     assert merged["episodes"].tolist() == [0, 0, 1]
+    assert merged["sample_weights"].tolist() == [0.25, 0.25, 2.0]
 
 
 def test_subchain_observation_mode_adds_adjacent_pair_features():
@@ -808,6 +816,32 @@ def test_mingru_supervised_sample_weights_emphasize_tail_states():
 
     assert weights.shape == (3,)
     assert weights[1] > weights[0]
+    assert weights[2] > weights[0]
+    assert float(np.mean(weights)) == pytest.approx(1.0)
+
+
+def test_mingru_supervised_dataset_sample_weights_multiply_tail_weights():
+    import numpy as np
+
+    supervised = _load_script("train_mingru_supervised")
+    data = {
+        "teacher_actions": np.asarray([0, 1, 2], dtype=np.int64),
+        "failure_within_k": np.asarray([0.0, 1.0, 0.0], dtype=np.float32),
+        "step_indices": np.asarray([0, 250, 500], dtype=np.int64),
+        "returns_to_go": np.asarray([500.0, 100.0, 0.0], dtype=np.float32),
+        "sample_weights": np.asarray([1.0, 0.5, 4.0], dtype=np.float32),
+    }
+    args = SimpleNamespace(
+        horizon=500,
+        failure_sample_weight=2.0,
+        late_sample_weight=1.0,
+        low_return_sample_weight=1.0,
+    )
+
+    weights = supervised.sample_weights(data, args)
+
+    assert weights.shape == (3,)
+    assert weights[2] > weights[1]
     assert weights[2] > weights[0]
     assert float(np.mean(weights)) == pytest.approx(1.0)
 

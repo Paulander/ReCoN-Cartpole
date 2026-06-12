@@ -535,3 +535,38 @@ A full 4x60 eval was started but stopped after training because stepwise h256/se
 
 Interpretation: the explicit N3-to-N4 curriculum infrastructure now exists and works, but this first warm-started curriculum dataset regressed relative to the incumbent on the same tiny held-out seeds. The likely issue is destructive imitation mixing: N3/static-ReCoN and low-angle teacher data diluted the incumbent N4 behavior instead of improving the hard tail. The next recurrent attempt should keep the infrastructure but change weighting/sampling: much lower N3/low-angle weight after warm-start, or use curriculum pretraining only before incumbent DAgger, not as a late fine-tune mix. No N=4 solve claim is justified.
 
+
+## Weighted minGRU curriculum follow-up
+
+Code changes:
+
+- `scripts/train_mingru_curriculum.py` now supports per-stage `sample_weights` for `n3_stable`, `n4_low_angle_no_noise`, `n4_current`, and `n4_hard_tail` stages.
+- `scripts/train_mingru_supervised.py` now multiplies dataset-level sample weights with failure/late/low-return sample weighting and records dataset weight stats in `report.json`.
+- The curriculum runner can skip final eval with `--final-eval-episodes 0`, allowing faster training-only candidate generation followed by explicit held-out ladder checks.
+- Tests now cover stage weight propagation, aggregate sample-weight preservation, and dataset-weight multiplication.
+
+Run: `reports/n4_mingru_curriculum_weighted_20260612_seed2813k`
+
+- Warm-start: incumbent h256/seq32 no-context minGRU from DAgger iteration 2.
+- Same 107,631-sample N3-to-N4 curriculum as the previous attempt.
+- Stage weights: N3 `0.05`, N4 low-angle `0.10`, N4 current `0.50`, N4 hard-tail `2.00`.
+- Effective dataset weight mean before normalization: `0.878`; max raw dataset weight: `2.0`; max final combined sample weight: `3.68`.
+- Training: h256 seq32, `normalized_raw4_prev_force`, no context, 8 epochs, CUDA, resumed from incumbent.
+- Final validation action accuracy: `0.632`.
+
+Tiny held-out read on seed starts `1900000`, `2000000`, `2100000`, `2200000`, 2 episodes each:
+
+| checkpoint | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success |
+|---|---:|---:|---:|---:|---:|---:|
+| incumbent h256/seq32 | 500.0 | 500.0 | 1.000 | 500.0 | 500.0 | 1.000 |
+| unweighted curriculum | 480.0 | 439.1 | 0.500 | 484.4 | 439.1 | 0.625 |
+| weighted curriculum | 500.0 | 500.0 | 1.000 | 500.0 | 500.0 | 1.000 |
+
+Weak-block held-out read for weighted curriculum on seeds `2100000..2100019`:
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure minGRU | 488.1 | 463.7 | 0.600 | 20 |
+| ReCoN minGRU passthrough | 488.6 | 464.1 | 0.600 | 20 |
+
+Interpretation: stage weighting prevents the obvious destructive-regression seen in the unweighted curriculum, so the curriculum machinery is now safer for warm-start experiments. It still does not close the 2100000 weak-block tail; success remains around 0.60 on this 20-seed read. No N=4 solve claim is justified. The next performance move should shift from broad curriculum mixing toward targeted recovery-window learning or a stronger recurrent objective that directly optimizes weak-block trajectories rather than imitating the feedforward teacher on mixed stages.
