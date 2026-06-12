@@ -155,3 +155,56 @@ Further blind PPO micro-sweeps have diminishing expected value. The next high-si
 3. Train/evaluate the shared subchain terminal through curriculum: N=2/N=3 local stability, N=4 low-angle/no-noise, N=4 current, then hard-seed tail.
 4. Keep final N=4 claims tied to held-out mixed blocks only; the current best known N=4 state is still near-solved, not solved.
 
+## Subchain/Recurrent Probe Update - 2026-06-12
+
+After adding explicit adjacent subchain sensor nodes and exposing `normalized_raw4_subchains_prev_force`, two bounded probes were run. Neither solved N=4.
+
+### Flat PPO With Subchain Features
+
+Report: `reports/n4_ppo_subchain_prevforce_slice_20260612_seed2920k`
+
+Setup: feedforward PPO terminal, `normalized_raw4_subchains_prev_force`, one `5000`-step chunk per candidate, no VecNormalize, mixed validation, final held-out blocks `1500000`, `1600000`, and `2100000` with `20` episodes each.
+
+| Grid | clip | ent | late bonus | Mean | p10 | Success | Status |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 0 | 0.003 | 0.0 | 0.0 | 468.73 | 416.2 | 0.4833 | not solved |
+| 3 | 0.003 | 0.001 | 0.005 | 470.03 | 407.9 | 0.5000 | not solved |
+| 4 | 0.005 | 0.0 | 0.0 | 468.77 | 408.3 | 0.4667 | not solved |
+| 7 | 0.005 | 0.001 | 0.005 | 472.55 | 418.1 | 0.4833 | not solved |
+
+Interpretation: simply appending adjacent subchain features to the feedforward PPO terminal did not improve the success tail. This supports the view that the useful next step is not more flat features, but a more compositional/recurrent use of subchains.
+
+### Recurrent Subchain Curriculum Probe
+
+Report: `reports/n4_recurrent_subchain_curriculum_probe_20260612_seed2930k`
+
+Setup: RecurrentPPO terminal with `normalized_raw4_subchains_prev_force`, staged N=3 stable -> N=4 low-angle/no-noise -> N=4 current -> N=4 tail, one small `2048`-step chunk per stage.
+
+| Stage | Mean | p10 | Success | Notes |
+|---|---:|---:|---:|---|
+| N=3 stable | 500.0 | 500.0 | 1.0000 | warmup only |
+| N=4 low-angle/no-noise | 500.0 | 500.0 | 1.0000 | easy-stage transfer works |
+| N=4 current narrow validation | 484.06 | 431.0 | 0.7188 | small/narrow validation only |
+| Final held-out ReCoN eval | 456.88 | 389.7 | 0.3333 | not robust |
+
+Interpretation: the staged recurrent path can learn easy N=4 and looks promising on a narrow validation set, but that signal did not transfer to the separate final held-out blocks.
+
+### Widened-Validation Recurrent Tail Continuation
+
+Report: `reports/n4_recurrent_subchain_tail_wideval_20260612_seed2935k`
+
+Setup: resumed from the N=4-current recurrent checkpoint above, validated across `900000`, `930000`, `970000`, `1010000`, `1500000`, `1600000`, and `2100000`; two `5000`-step hard-tail chunks.
+
+| Row | Mean | p10 | Success | Promoted |
+|---|---:|---:|---:|---|
+| start | 472.41 | 412.5 | 0.5536 | yes |
+| chunk 1 | 472.10 | 412.0 | 0.5536 | no |
+| chunk 2 | 478.30 | 427.5 | 0.6071 | yes |
+| final ReCoN eval | 473.30 | 416.6 | 0.5167 | not solved |
+
+Interpretation: widening validation exposed the narrow-validation overestimate, but chunk 2 did improve the wide validation score. The final held-out result is still below the best feedforward PPO terminal results and far below solve threshold. This is a cautiously positive recurrent-tail signal, not a solution.
+
+### Updated Direction
+
+The next recurrent run should use the widened validation starts from the beginning and spend more budget only if intermediate promotions improve both success and p10. The flat subchain PPO path should not be prioritized unless paired with a true shared subchain module or stronger curriculum.
+
