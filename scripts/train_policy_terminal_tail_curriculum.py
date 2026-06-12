@@ -271,6 +271,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Selection mode: `{result.get('selection_mode', '')}`",
         f"Policy observation mode: `{result.get('policy_observation_mode', 'env')}`",
         f"Hard seed probability: `{result.get('hard_train_seed_probability', 0.0)}`",
+        f"Teacher action penalty: `{result.get('teacher_action_penalty', 0.0)}` until `{result.get('teacher_anchor_until_fraction', 1.0)}` horizon fraction below risk `{result.get('teacher_anchor_risk_threshold', 1.0)}`",
         f"Adaptive tail seed refresh: `{result.get('tail_seed_refresh_count', 0)}` seeds/chunk",
         f"Validation seed starts: `{', '.join(str(seed) for seed in result.get('validation_seed_starts', []))}`",
         f"Validation episodes per start: `{result.get('validation_episodes', '')}`",
@@ -404,6 +405,10 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         "hard_train_seed_probability": args.hard_train_seed_probability,
         "late_survival_bonus": args.late_survival_bonus,
         "late_survival_start_fraction": args.late_survival_start_fraction,
+        "teacher_anchor_model_path": args.teacher_anchor_model_path,
+        "teacher_action_penalty": args.teacher_action_penalty,
+        "teacher_anchor_until_fraction": args.teacher_anchor_until_fraction,
+        "teacher_anchor_risk_threshold": args.teacher_anchor_risk_threshold,
         "vec_normalize": bool(args.vec_normalize),
         "vec_normalize_reward": bool(args.vec_normalize_reward),
         "vec_normalize_clip_obs": float(args.vec_normalize_clip_obs),
@@ -440,8 +445,13 @@ def run_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
             "ent_coef": args.ent_coef,
             "vf_coef": args.vf_coef,
             "max_grad_norm": args.max_grad_norm,
+            "target_kl": args.target_kl,
             "late_survival_bonus": args.late_survival_bonus,
             "late_survival_start_fraction": args.late_survival_start_fraction,
+            "teacher_anchor_model_path": args.teacher_anchor_model_path,
+            "teacher_action_penalty": args.teacher_action_penalty,
+            "teacher_anchor_until_fraction": args.teacher_anchor_until_fraction,
+            "teacher_anchor_risk_threshold": args.teacher_anchor_risk_threshold,
             "vec_normalize": bool(args.vec_normalize),
             "vec_normalize_reward": bool(args.vec_normalize_reward),
             "vec_normalize_clip_obs": float(args.vec_normalize_clip_obs),
@@ -581,10 +591,15 @@ def main() -> None:
     parser.add_argument("--ent-coef", type=float, default=0.0)
     parser.add_argument("--vf-coef", type=float, default=0.5)
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
+    parser.add_argument("--target-kl", type=float, default=0.0)
     parser.add_argument("--success-bonus", type=float, default=25.0)
     parser.add_argument("--failure-penalty", type=float, default=2.0)
     parser.add_argument("--late-survival-bonus", type=float, default=0.0)
     parser.add_argument("--late-survival-start-fraction", type=float, default=0.80)
+    parser.add_argument("--teacher-anchor-model-path", default="")
+    parser.add_argument("--teacher-action-penalty", type=float, default=0.0)
+    parser.add_argument("--teacher-anchor-until-fraction", type=float, default=1.0)
+    parser.add_argument("--teacher-anchor-risk-threshold", type=float, default=1.0)
     parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping")
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)

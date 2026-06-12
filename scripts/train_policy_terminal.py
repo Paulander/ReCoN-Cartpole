@@ -78,6 +78,100 @@ class FailurePenaltyWrapper(gym.Wrapper):
         return obs, float(reward), terminated, truncated, info
 
 
+class TeacherActionAnchorWrapper(gym.Wrapper):
+    def __init__(
+        self,
+        env: gym.Env,
+        model_path: str,
+        penalty: float,
+        observation_mode: str,
+        until_fraction: float = 1.0,
+        risk_threshold: float = 1.0,
+        teacher_model: Any | None = None,
+    ):
+        super().__init__(env)
+        self.config = _env_config(env)
+        if self.config is None:
+            raise ValueError("TeacherActionAnchorWrapper requires env.config")
+        self.model_path = str(model_path)
+        self.penalty = max(0.0, float(penalty))
+        self.observation_mode = str(observation_mode)
+        self.until_fraction = max(0.0, min(1.0, float(until_fraction)))
+        self.risk_threshold = max(0.0, float(risk_threshold))
+        self.previous_force = 0.0
+        self.elapsed_steps = 0
+        self.current_observation: Any | None = None
+        self.current_info: dict[str, Any] = {}
+        self.teacher_model = teacher_model if teacher_model is not None else self._load_teacher()
+
+    def _load_teacher(self) -> Any:
+        try:
+            from stable_baselines3 import PPO
+        except Exception as exc:  # pragma: no cover - optional dependency path
+            raise RuntimeError("teacher action anchoring requires stable-baselines3") from exc
+        return PPO.load(self.model_path, device="cpu")
+
+    def _policy_observation(self) -> np.ndarray:
+        return policy_observation_from_state(
+            self.current_observation,
+            self.current_info.get("raw_state"),
+            self.config.n_poles,
+            self.observation_mode,
+            x_threshold=self.config.x_threshold,
+            theta_threshold=self.config.theta_threshold_radians,
+            previous_force=self.previous_force,
+            force_mag=self.config.force_mag,
+        )
+
+    def _risk_pressure(self) -> float:
+        raw = np.asarray(self.current_info.get("raw_state", []), dtype=float).reshape(-1)
+        n = int(self.config.n_poles)
+        if raw.size < 2 + 2 * n:
+            return 0.0
+        x = abs(float(raw[0])) / max(float(self.config.x_threshold), 1e-9)
+        theta = np.max(np.abs(raw[2 : 2 + n])) / max(float(self.config.theta_threshold_radians), 1e-9)
+        theta_dot = np.max(np.abs(raw[2 + n : 2 + 2 * n])) / 5.0
+        return float(max(x, theta, 0.5 * theta_dot))
+
+    def _anchor_active(self) -> bool:
+        horizon = max(1, int(getattr(self.config, "horizon", 500)))
+        if self.elapsed_steps >= int(round(horizon * self.until_fraction)):
+            return False
+        return self._risk_pressure() < self.risk_threshold
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+        self.previous_force = 0.0
+        self.elapsed_steps = 0
+        observation, info = self.env.reset(seed=seed, options=options)
+        self.current_observation = observation
+        self.current_info = dict(info)
+        return observation, info
+
+    def step(self, action: Any):
+        active = self.penalty > 0.0 and self._anchor_active()
+        teacher_action = None
+        mismatch = False
+        if active:
+            teacher_obs = self._policy_observation()
+            teacher_action, _state = self.teacher_model.predict(teacher_obs, deterministic=True)
+            teacher_idx = int(np.asarray(teacher_action).reshape(-1)[0])
+            action_idx = int(np.asarray(action).reshape(-1)[0])
+            mismatch = teacher_idx != action_idx
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        self.elapsed_steps += 1
+        if active and mismatch:
+            reward = float(reward) - self.penalty
+            info = {
+                **info,
+                "teacher_action_penalty": self.penalty,
+                "teacher_action": int(np.asarray(teacher_action).reshape(-1)[0]),
+            }
+        self.previous_force = _force_from_env_action(action, self.config)
+        self.current_observation = observation
+        self.current_info = dict(info)
+        return observation, float(reward), terminated, truncated, info
+
+
 
 class LateSurvivalBonusWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env, bonus: float, start_fraction: float):
@@ -336,6 +430,17 @@ def make_env(
     if use_failure_penalty and failure_penalty > 0.0:
         env = FailurePenaltyWrapper(env, failure_penalty)
     obs_mode = str(_arg(args, "policy_observation_mode", "env"))
+    teacher_anchor_path = str(_arg(args, "teacher_anchor_model_path", ""))
+    teacher_action_penalty = float(_arg(args, "teacher_action_penalty", 0.0))
+    if use_success_bonus and teacher_anchor_path and teacher_action_penalty > 0.0:
+        env = TeacherActionAnchorWrapper(
+            env,
+            teacher_anchor_path,
+            teacher_action_penalty,
+            obs_mode,
+            until_fraction=float(_arg(args, "teacher_anchor_until_fraction", 1.0)),
+            risk_threshold=float(_arg(args, "teacher_anchor_risk_threshold", 1.0)),
+        )
     if obs_mode != "env":
         env = PolicyObservationWrapper(env, obs_mode)
     if use_frame_stack and int(_arg(args, "frame_stack", 1)) > 1:
@@ -371,7 +476,7 @@ def policy_kwargs(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def ppo_kwargs(args: argparse.Namespace) -> dict[str, Any]:
-    return {
+    kwargs = {
         "learning_rate": float(_arg(args, "learning_rate", 3e-4)),
         "n_steps": int(_arg(args, "n_steps", 2048)),
         "batch_size": int(_arg(args, "batch_size", 64)),
@@ -384,6 +489,10 @@ def ppo_kwargs(args: argparse.Namespace) -> dict[str, Any]:
         "max_grad_norm": float(_arg(args, "max_grad_norm", 0.5)),
         "policy_kwargs": policy_kwargs(args),
     }
+    target_kl = float(_arg(args, "target_kl", 0.0))
+    if target_kl > 0.0:
+        kwargs["target_kl"] = target_kl
+    return kwargs
 
 
 def evaluate_model(model: Any, args: argparse.Namespace, seeds: list[int]) -> dict[str, Any]:
@@ -697,6 +806,10 @@ def main() -> None:
         default=0.80,
         help="Fraction of the horizon after which late-survival-bonus is applied.",
     )
+    parser.add_argument("--teacher-anchor-model-path", default="")
+    parser.add_argument("--teacher-action-penalty", type=float, default=0.0)
+    parser.add_argument("--teacher-anchor-until-fraction", type=float, default=1.0)
+    parser.add_argument("--teacher-anchor-risk-threshold", type=float, default=1.0)
     parser.add_argument("--n-envs", type=int, default=16)
     parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="dummy")
     parser.add_argument("--device", default="cpu")
@@ -713,6 +826,7 @@ def main() -> None:
     parser.add_argument("--ent-coef", type=float, default=0.0)
     parser.add_argument("--vf-coef", type=float, default=0.5)
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
+    parser.add_argument("--target-kl", type=float, default=0.0)
     parser.add_argument(
         "--reward-mode", choices=["survival", "upright_shaping"], default="survival"
     )

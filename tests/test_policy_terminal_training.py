@@ -68,6 +68,56 @@ def test_success_bonus_is_training_only():
     assert "success_bonus" not in info
 
 
+def test_teacher_action_anchor_penalizes_early_mismatch():
+    import gymnasium as gym
+    import numpy as np
+
+    class TinyEnv(gym.Env):
+        observation_space = gym.spaces.Box(-10.0, 10.0, shape=(4,), dtype=np.float32)
+        action_space = gym.spaces.Discrete(5)
+
+        def __init__(self):
+            self.config = SimpleNamespace(
+                n_poles=1,
+                horizon=10,
+                x_threshold=2.4,
+                theta_threshold_radians=0.2,
+                action_mode="discrete",
+                discrete_action_bins=5,
+                force_mag=10.0,
+            )
+            self.steps = 0
+
+        def reset(self, *, seed=None, options=None):
+            self.steps = 0
+            return np.zeros(4, dtype=np.float32), {"raw_state": [0.0, 0.0, 0.0, 0.0]}
+
+        def step(self, action):
+            self.steps += 1
+            return np.zeros(4, dtype=np.float32), 1.0, False, self.steps >= 10, {"raw_state": [0.0, 0.0, 0.0, 0.0]}
+
+    class Teacher:
+        def predict(self, obs, deterministic=True):
+            return 2, None
+
+    env = trainer.TeacherActionAnchorWrapper(
+        TinyEnv(),
+        model_path="unused.zip",
+        penalty=0.25,
+        observation_mode="env",
+        until_fraction=0.5,
+        risk_threshold=1.0,
+        teacher_model=Teacher(),
+    )
+    env.reset(seed=1)
+    _obs, reward, _terminated, _truncated, info = env.step(4)
+    assert reward == 0.75
+    assert info["teacher_action_penalty"] == 0.25
+    _obs, reward, _terminated, _truncated, info = env.step(2)
+    assert reward == 1.0
+    assert "teacher_action_penalty" not in info
+
+
 def test_hard_seed_wrapper_offsets_sampling_by_worker_seed():
     import gymnasium as gym
     import numpy as np
@@ -232,6 +282,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     ppo_sweep = _load_script("run_ppo_sweep")
     residual = _load_script("train_residual_policy_terminal")
     recurrent_curriculum = _load_script("train_recurrent_policy_terminal_curriculum")
+    action_compare = _load_script("compare_policy_actions")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -246,6 +297,46 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(ppo_sweep.run_sweep)
     assert callable(residual.train_residual)
     assert callable(recurrent_curriculum.run_curriculum)
+    assert callable(action_compare.run_comparison)
+
+
+def test_action_comparison_summarizes_seed_deltas():
+    action_compare = _load_script("compare_policy_actions")
+    rows = [
+        {
+            "seed": 1,
+            "a_steps": 499,
+            "b_steps": 500,
+            "delta_steps": 1,
+            "a_success": False,
+            "b_success": True,
+            "a_failure": "pole_1_angle",
+            "b_failure": "success",
+            "same_outcome": False,
+            "action_diff_count": 1,
+            "first_action_diff": {"step": 498},
+        },
+        {
+            "seed": 2,
+            "a_steps": 500,
+            "b_steps": 498,
+            "delta_steps": -2,
+            "a_success": True,
+            "b_success": False,
+            "a_failure": "success",
+            "b_failure": "rail_right",
+            "same_outcome": False,
+            "action_diff_count": 2,
+            "first_action_diff": {"step": 100},
+        },
+    ]
+
+    summary = action_compare.summarize_comparison(rows, horizon=500)
+
+    assert summary["success_gain_count"] == 1
+    assert summary["success_loss_count"] == 1
+    assert summary["changed_seed_count"] == 2
+    assert summary["first_diff_step_median"] == 299.0
 
 
 def test_late_survival_bonus_starts_at_threshold():
