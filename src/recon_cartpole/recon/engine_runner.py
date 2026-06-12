@@ -34,6 +34,7 @@ from recon_cartpole.control.arbitration import arbitrate_force
 from recon_cartpole.control.controllers import ControllerMode, heuristic_force, random_action
 from recon_cartpole.control.goal_vector import compute_cartpole_goal_vector
 from recon_cartpole.control.policy_observation import policy_observation_from_state
+from recon_cartpole.control.residual_features import residual_aux_features
 from recon_cartpole.control.scripts import (
     REGIMES,
     ForceProposal,
@@ -122,6 +123,7 @@ class RunnerConfig:
     residual_policy_terminal_action_bins: int = 5
     residual_policy_terminal_max_force: float = 4.0
     residual_policy_terminal_gate_threshold: float = 0.30
+    residual_policy_terminal_feature_mode: str = "basic"
     mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
     pole1_fix: Pole1FixConfig = field(default_factory=Pole1FixConfig)
     rescue: RescueConfig = field(default_factory=RescueConfig)
@@ -522,6 +524,7 @@ class ReConCartPoleController:
                 "policy_terminal_normalizer_path": self.config.policy_terminal_normalizer_path,
                 "residual_policy_terminal_path": self.config.residual_policy_terminal_path,
                 "residual_policy_terminal_mode": self.config.residual_policy_terminal_mode,
+                "residual_policy_terminal_feature_mode": self.config.residual_policy_terminal_feature_mode,
                 "mingru_terminal_config": self.config.mingru_terminal.__dict__,
                 "pole1_fix_config": self.config.pole1_fix.__dict__,
                 "rescue_config": self.config.rescue.__dict__,
@@ -654,17 +657,21 @@ class ReConCartPoleController:
         if self.residual_policy_terminal_model is None:
             return base_force, {"available": False, "reason": "no_model"}
         gate = self._residual_risk_gate(raw_state)
+        aux_features = residual_aux_features(
+            raw_state,
+            n_poles=self.config.n_poles,
+            force_mag=self.config.force_mag,
+            base_force=base_force,
+            previous_force=self.recent_forces[-1] if self.recent_forces else 0.0,
+            horizon=500,
+            episode_step=self.episode_step,
+            mode=self.config.residual_policy_terminal_feature_mode,
+            proposal_gains=self.config.proposal_gains,
+        )
         residual_obs = np.concatenate(
             [
                 np.asarray(policy_observation, dtype=np.float32).reshape(-1),
-                np.asarray(
-                    [
-                        float(base_force) / max(float(self.config.force_mag), 1e-9),
-                        gate,
-                        (self.recent_forces[-1] if self.recent_forces else 0.0) / max(float(self.config.force_mag), 1e-9),
-                    ],
-                    dtype=np.float32,
-                ),
+                aux_features,
             ]
         ).astype(np.float32, copy=False)
         action, _state = self.residual_policy_terminal_model.predict(residual_obs, deterministic=True)
@@ -711,6 +718,8 @@ class ReConCartPoleController:
             "available": True,
             "model_path": self.config.residual_policy_terminal_path,
             "mode": mode,
+            "feature_mode": self.config.residual_policy_terminal_feature_mode,
+            "aux_feature_size": int(aux_features.size),
             "observation_size": int(residual_obs.size),
             "action": [action_idx],
             "risk_gate": gate,

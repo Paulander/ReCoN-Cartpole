@@ -68,6 +68,20 @@ def test_success_bonus_is_training_only():
     assert "success_bonus" not in info
 
 
+def test_residual_proposal_diagnostic_features_are_stable_size():
+    from recon_cartpole.control.residual_features import residual_aux_feature_size, residual_aux_features
+    import numpy as np
+
+    raw = np.asarray([0.0, 0.0, 0.05, -0.04, 0.1, -0.1], dtype=np.float32)
+    basic = residual_aux_features(raw, n_poles=2, force_mag=10.0, base_force=5.0, mode="basic")
+    diag = residual_aux_features(raw, n_poles=2, force_mag=10.0, base_force=5.0, mode="proposal_diagnostics")
+
+    assert basic.shape == (residual_aux_feature_size("basic"),)
+    assert diag.shape == (residual_aux_feature_size("proposal_diagnostics"),)
+    assert diag.shape[0] > basic.shape[0]
+    assert np.isfinite(diag).all()
+
+
 def test_teacher_action_anchor_penalizes_early_mismatch():
     import gymnasium as gym
     import numpy as np
@@ -283,6 +297,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     residual = _load_script("train_residual_policy_terminal")
     recurrent_curriculum = _load_script("train_recurrent_policy_terminal_curriculum")
     action_compare = _load_script("compare_policy_actions")
+    residual_grid = _load_script("evaluate_recon_residual_grid")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -298,6 +313,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(residual.train_residual)
     assert callable(recurrent_curriculum.run_curriculum)
     assert callable(action_compare.run_comparison)
+    assert callable(residual_grid.run_sweep)
 
 
 def test_action_comparison_summarizes_seed_deltas():

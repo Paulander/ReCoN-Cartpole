@@ -11,7 +11,10 @@ import numpy as np
 
 from recon_cartpole.control.actuators import action_from_force
 from recon_cartpole.control.policy_observation import policy_observation_from_state, policy_observation_size
+from recon_cartpole.control.residual_features import residual_aux_feature_size, residual_aux_features
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
+from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
+from recon_cartpole.training.evaluate import rollout
 from recon_cartpole.training.ablations import summarize_steps
 from train_policy_terminal import load_observation_normalizer, parse_seed_list
 
@@ -55,7 +58,10 @@ class ResidualCorrectionEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(max(2, int(args.residual_action_bins)))
         base_size = policy_observation_size(args.n_poles, args.base_observation_mode)
         self.observation_space = gym.spaces.Box(
-            -np.inf, np.inf, shape=(base_size + 3,), dtype=np.float32
+            -np.inf,
+            np.inf,
+            shape=(base_size + residual_aux_feature_size(args.residual_feature_mode),),
+            dtype=np.float32,
         )
 
     def _base_policy_obs(self, env_obs: Any, raw: Any) -> np.ndarray:
@@ -91,23 +97,33 @@ class ResidualCorrectionEnv(gym.Env):
         return self._base_action_and_force(env_obs, raw)[1]
 
     def _risk_gate(self, raw: Any) -> float:
-        raw_arr = np.asarray(raw, dtype=np.float32).reshape(-1)
-        n = int(self.args.n_poles)
-        if raw_arr.size < 2 + 2 * n:
-            return 0.0
-        x = abs(float(raw_arr[0])) / 2.4
-        theta = np.max(np.abs(raw_arr[2 : 2 + n])) / 0.20943951023931953
-        theta_dot = np.max(np.abs(raw_arr[2 + n : 2 + 2 * n])) / 5.0
-        late = self.step_count / max(1, int(self.args.horizon))
-        return float(np.clip(max(x, theta, 0.5 * theta_dot, late if late > 0.75 else 0.0), 0.0, 1.0))
+        return float(
+            residual_aux_features(
+                raw,
+                n_poles=self.args.n_poles,
+                force_mag=self.args.force_mag,
+                base_force=self._base_force(self.last_env_obs if self.last_env_obs is not None else raw, raw),
+                previous_force=self.previous_force,
+                horizon=self.args.horizon,
+                episode_step=self.step_count,
+                mode="basic",
+            )[1]
+        )
 
     def _residual_obs(self, env_obs: Any, raw: Any) -> np.ndarray:
         base_obs = self._base_policy_obs(env_obs, raw)
         base_force = self._base_force(env_obs, raw)
-        gate = self._risk_gate(raw)
-        return np.concatenate(
-            [base_obs, np.asarray([base_force / self.args.force_mag, gate, self.previous_force / self.args.force_mag], dtype=np.float32)]
-        ).astype(np.float32, copy=False)
+        aux = residual_aux_features(
+            raw,
+            n_poles=self.args.n_poles,
+            force_mag=self.args.force_mag,
+            base_force=base_force,
+            previous_force=self.previous_force,
+            horizon=self.args.horizon,
+            episode_step=self.step_count,
+            mode=self.args.residual_feature_mode,
+        )
+        return np.concatenate([base_obs, aux]).astype(np.float32, copy=False)
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         self.previous_force = 0.0
@@ -180,7 +196,7 @@ def evaluate_base(args: argparse.Namespace, seeds: list[int]) -> dict[str, Any]:
             if terminated or truncated:
                 break
         steps.append(float(total_steps))
-    summary = summarize_steps(steps, args.horizon)
+    summary = _tail_metrics(steps, args.horizon)
     summary["episodes"] = len(seeds)
     return summary
 
@@ -200,29 +216,146 @@ def evaluate_residual(model: Any, args: argparse.Namespace, seeds: list[int]) ->
             if terminated or truncated:
                 break
         steps.append(float(total_steps))
-    summary = summarize_steps(steps, args.horizon)
+    summary = _tail_metrics(steps, args.horizon)
     summary.update({"episodes": len(seeds), "mean_abs_residual_delta": float(np.mean(deltas)) if deltas else 0.0})
+    return summary
+
+
+def _tail_metrics(steps: list[float], horizon: int, cvar_fraction: float = 0.10) -> dict[str, Any]:
+    summary = summarize_steps(steps, horizon)
+    values = np.asarray(steps, dtype=float)
+    if values.size:
+        count = max(1, int(np.ceil(values.size * cvar_fraction)))
+        summary["cvar_survival"] = float(np.mean(np.sort(values)[:count]))
+    else:
+        summary["cvar_survival"] = 0.0
+    return summary
+
+
+def _cartpole_eval_env(args: argparse.Namespace) -> CartPoleNEnv:
+    return CartPoleNEnv(
+        CartPoleNConfig(
+            n_poles=args.n_poles,
+            horizon=args.horizon,
+            dt=args.dt,
+            dynamics_mode=args.dynamics_mode,
+            action_mode=args.env_action_mode,
+            discrete_action_bins=args.discrete_action_bins,
+            force_mag=args.force_mag,
+            initial_angle_range=args.initial_angle_range,
+            force_noise=args.force_noise,
+            link_coupling=args.link_coupling,
+        )
+    )
+
+
+def evaluate_recon_residual(residual_model_path: str, args: argparse.Namespace, seeds: list[int]) -> dict[str, Any]:
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=args.n_poles,
+            mode="recon_policy_terminal",
+            action_mode=args.env_action_mode,
+            discrete_action_bins=args.discrete_action_bins,
+            force_mag=args.force_mag,
+            selection_mode=args.selection_mode,
+            learn=False,
+            reset_bandit_each_episode=False,
+            policy_terminal_path=str(args.base_model_path),
+            policy_terminal_blend=args.policy_terminal_blend,
+            policy_terminal_scope=args.policy_terminal_scope,
+            policy_terminal_observation_mode=args.base_observation_mode,
+            policy_terminal_normalizer_path=args.base_normalizer_path,
+            residual_policy_terminal_path=residual_model_path,
+            residual_policy_terminal_mode=args.residual_mode,
+            residual_policy_terminal_action_bins=args.residual_action_bins,
+            residual_policy_terminal_max_force=args.max_residual_force,
+            residual_policy_terminal_gate_threshold=args.residual_gate_threshold,
+            residual_policy_terminal_feature_mode=args.residual_feature_mode,
+        )
+    )
+    steps: list[float] = []
+    returns: list[float] = []
+    residual_deltas: list[float] = []
+    per_seed: list[dict[str, Any]] = []
+    for seed in seeds:
+        result = rollout(_cartpole_eval_env(args), controller, seed=seed, horizon=args.horizon, trace=True)
+        trace = result.get("trace", [])
+        for item in trace:
+            residual = ((item.get("policy_terminal") or {}).get("residual_policy_terminal") or {})
+            residual_deltas.append(abs(float(residual.get("residual_delta", 0.0) or 0.0)))
+        step_count = float(result["steps"])
+        steps.append(step_count)
+        returns.append(float(result["return"]))
+        per_seed.append({"seed": int(seed), "steps": int(step_count), "success": step_count >= args.horizon})
+    summary = _tail_metrics(steps, args.horizon)
+    summary.update({
+        "episodes": len(seeds),
+        "returns_mean": float(np.mean(returns)) if returns else 0.0,
+        "mean_abs_residual_delta": float(np.mean(residual_deltas)) if residual_deltas else 0.0,
+        "per_seed": per_seed,
+    })
+    return summary
+
+
+def evaluate_recon_base(args: argparse.Namespace, seeds: list[int]) -> dict[str, Any]:
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=args.n_poles,
+            mode="recon_policy_terminal",
+            action_mode=args.env_action_mode,
+            discrete_action_bins=args.discrete_action_bins,
+            force_mag=args.force_mag,
+            selection_mode=args.selection_mode,
+            learn=False,
+            reset_bandit_each_episode=False,
+            policy_terminal_path=str(args.base_model_path),
+            policy_terminal_blend=args.policy_terminal_blend,
+            policy_terminal_scope=args.policy_terminal_scope,
+            policy_terminal_observation_mode=args.base_observation_mode,
+            policy_terminal_normalizer_path=args.base_normalizer_path,
+        )
+    )
+    steps: list[float] = []
+    returns: list[float] = []
+    per_seed: list[dict[str, Any]] = []
+    for seed in seeds:
+        result = rollout(_cartpole_eval_env(args), controller, seed=seed, horizon=args.horizon, trace=False)
+        step_count = float(result["steps"])
+        steps.append(step_count)
+        returns.append(float(result["return"]))
+        per_seed.append({"seed": int(seed), "steps": int(step_count), "success": step_count >= args.horizon})
+    summary = _tail_metrics(steps, args.horizon)
+    summary.update({
+        "episodes": len(seeds),
+        "returns_mean": float(np.mean(returns)) if returns else 0.0,
+        "per_seed": per_seed,
+    })
     return summary
 
 
 def write_markdown(report: dict[str, Any], path: Path) -> None:
     base = report["base_eval"]
     residual = report["residual_eval"]
+    recon_base = report.get("recon_base_eval", {})
+    recon_residual = report.get("recon_residual_eval", {})
     lines = [
         "# Residual Policy Terminal Training",
         "",
         f"Status: `{report['status']}`",
         f"Base model: `{report['base_model_path']}`",
         f"Residual model: `{report['residual_model_path']}`",
+        f"Residual feature mode: `{report.get('residual_feature_mode', 'basic')}`",
         "",
-        "| evaluator | mean | p10 | success | max | episodes |",
-        "|---|---:|---:|---:|---:|---:|",
-        f"| frozen_base | {base['mean_survival']:.1f} | {base['p10_survival']:.1f} | {base['success_rate']:.3f} | {base['max_survival']:.1f} | {base['episodes']} |",
-        f"| residual_specialist | {residual['mean_survival']:.1f} | {residual['p10_survival']:.1f} | {residual['success_rate']:.3f} | {residual['max_survival']:.1f} | {residual['episodes']} |",
+        "| evaluator | mean | p10 | cvar | success | max | episodes |",
+        "|---|---:|---:|---:|---:|---:|---:|",
+        f"| residual_env_frozen_base | {base['mean_survival']:.1f} | {base['p10_survival']:.1f} | {base.get('cvar_survival', 0.0):.1f} | {base['success_rate']:.3f} | {base['max_survival']:.1f} | {base['episodes']} |",
+        f"| residual_env_specialist | {residual['mean_survival']:.1f} | {residual['p10_survival']:.1f} | {residual.get('cvar_survival', 0.0):.1f} | {residual['success_rate']:.3f} | {residual['max_survival']:.1f} | {residual['episodes']} |",
+        f"| recon_frozen_base | {recon_base.get('mean_survival', 0.0):.1f} | {recon_base.get('p10_survival', 0.0):.1f} | {recon_base.get('cvar_survival', 0.0):.1f} | {recon_base.get('success_rate', 0.0):.3f} | {recon_base.get('max_survival', 0.0):.1f} | {recon_base.get('episodes', 0)} |",
+        f"| recon_residual_specialist | {recon_residual.get('mean_survival', 0.0):.1f} | {recon_residual.get('p10_survival', 0.0):.1f} | {recon_residual.get('cvar_survival', 0.0):.1f} | {recon_residual.get('success_rate', 0.0):.3f} | {recon_residual.get('max_survival', 0.0):.1f} | {recon_residual.get('episodes', 0)} |",
         "",
         "## Mechanisms",
         "",
-        "The base PPO terminal is frozen. The residual learner sees base force, previous force, and a risk gate; low-risk changes are penalized so the specialist focuses on late/tail failures rather than rewriting successful behavior.",
+        "The base PPO terminal is frozen. The residual learner sees base force, previous force, risk gate, and optionally proposal-diagnostic features; low-risk changes are penalized so the specialist focuses on late/tail failures rather than rewriting successful behavior.",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -281,14 +414,19 @@ def train_residual(args: argparse.Namespace) -> dict[str, Any]:
         "base_model_path": args.base_model_path,
         "base_normalizer_path": args.base_normalizer_path,
         "residual_model_path": str(model_path),
+        "residual_feature_mode": args.residual_feature_mode,
         "timesteps": train_timesteps,
         "eval_seeds": seeds,
         "base_eval": evaluate_base(args, seeds),
         "residual_eval": evaluate_residual(model, args, seeds),
+        "recon_base_eval": evaluate_recon_base(args, seeds),
+        "recon_residual_eval": evaluate_recon_residual(str(model_path), args, seeds),
         "mechanisms": {
             "frozen_base_policy_terminal": True,
             "learned_residual_policy": True,
             "risk_gate": True,
+            "proposal_diagnostics": args.residual_feature_mode == "proposal_diagnostics",
+            "recon_integration_eval": True,
             "gain_mutation": False,
         },
         "wall_clock_seconds": time.perf_counter() - started,
@@ -306,6 +444,9 @@ def main() -> None:
     parser.add_argument("--residual-model-path", default="")
     parser.add_argument("--base-normalizer-path", default="")
     parser.add_argument("--base-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
+    parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
+    parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--dt", type=float, default=0.0005)
@@ -317,6 +458,7 @@ def main() -> None:
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--residual-mode", choices=["force", "bin_delta"], default="force")
+    parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics"], default="proposal_diagnostics")
     parser.add_argument("--residual-action-bins", type=int, default=5)
     parser.add_argument("--residual-gate-threshold", type=float, default=0.30)
     parser.add_argument("--max-residual-force", type=float, default=4.0)

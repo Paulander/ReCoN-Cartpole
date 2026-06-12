@@ -102,7 +102,10 @@ def curriculum_args(args: argparse.Namespace, candidate: dict[str, Any], index: 
         score_success_weight=args.score_success_weight,
         max_success_regression=args.max_success_regression,
         max_p10_regression=args.max_p10_regression,
+        max_cvar_regression=args.max_cvar_regression,
+        promotion_mode=args.promotion_mode,
         final_seed_start=args.final_seed_start,
+        final_seed_starts=args.final_seed_starts,
         final_eval_episodes=args.final_eval_episodes,
         n_envs=args.n_envs,
         vec_env=args.vec_env,
@@ -123,10 +126,15 @@ def curriculum_args(args: argparse.Namespace, candidate: dict[str, Any], index: 
         ent_coef=float(candidate["ent_coef"]),
         vf_coef=args.vf_coef,
         max_grad_norm=args.max_grad_norm,
+        target_kl=args.target_kl,
         success_bonus=args.success_bonus,
         failure_penalty=args.failure_penalty,
         late_survival_bonus=float(candidate["late_survival_bonus"]),
         late_survival_start_fraction=args.late_survival_start_fraction,
+        teacher_anchor_model_path=args.teacher_anchor_model_path,
+        teacher_action_penalty=args.teacher_action_penalty,
+        teacher_anchor_until_fraction=args.teacher_anchor_until_fraction,
+        teacher_anchor_risk_threshold=args.teacher_anchor_risk_threshold,
         reward_mode=args.reward_mode,
         selection_mode=args.selection_mode,
         policy_terminal_blend=args.policy_terminal_blend,
@@ -225,6 +233,8 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
             "n_poles": args.n_poles,
             "validation_seed_starts": args.validation_seed_starts or [args.validation_seed_start],
             "final_seed_start": args.final_seed_start,
+        "final_seed_starts": args.final_seed_starts or [args.final_seed_start],
+            "final_seed_starts": args.final_seed_starts or [args.final_seed_start],
             "candidates": rows,
             "best": best,
             "mechanisms": {
@@ -246,6 +256,7 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
         "n_poles": args.n_poles,
         "validation_seed_starts": args.validation_seed_starts or [args.validation_seed_start],
         "final_seed_start": args.final_seed_start,
+        "final_seed_starts": args.final_seed_starts or [args.final_seed_start],
         "candidates": rows,
         "best": best,
         "wall_clock_seconds": time.perf_counter() - started,
@@ -295,7 +306,10 @@ def main() -> None:
     parser.add_argument("--score-success-weight", type=float, default=130.0)
     parser.add_argument("--max-success-regression", type=float, default=0.01)
     parser.add_argument("--max-p10-regression", type=float, default=6.0)
+    parser.add_argument("--max-cvar-regression", type=float, default=8.0)
+    parser.add_argument("--promotion-mode", choices=["score", "lexicographic_success"], default="lexicographic_success")
     parser.add_argument("--final-seed-start", type=int, default=1_040_000)
+    parser.add_argument("--final-seed-starts", type=int, nargs="+", default=None)
     parser.add_argument("--final-eval-episodes", type=int, default=300)
     parser.add_argument("--n-envs", type=int, default=12)
     parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="subproc")
@@ -306,9 +320,14 @@ def main() -> None:
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--vf-coef", type=float, default=0.5)
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
+    parser.add_argument("--target-kl", type=float, default=0.0)
     parser.add_argument("--success-bonus", type=float, default=25.0)
     parser.add_argument("--failure-penalty", type=float, default=2.0)
     parser.add_argument("--late-survival-start-fraction", type=float, default=0.80)
+    parser.add_argument("--teacher-anchor-model-path", default="")
+    parser.add_argument("--teacher-action-penalty", type=float, default=0.0)
+    parser.add_argument("--teacher-anchor-until-fraction", type=float, default=1.0)
+    parser.add_argument("--teacher-anchor-risk-threshold", type=float, default=1.0)
     parser.add_argument("--reward-mode", choices=["survival", "upright_shaping"], default="upright_shaping")
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
