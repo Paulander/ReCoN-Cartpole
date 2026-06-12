@@ -633,3 +633,26 @@ Bounded weak-block run: `reports/n4_residual_preserve_success_20260612_seed2841k
 | recon_residual_specialist | 489.4 | 467.9 | 429.5 | 0.650 | 0.937 | 20 |
 
 Interpretation: this is a more faithful learned residual setup than earlier permissive counterfactual labels: the base is frozen, residuals see risk/proposal/subchain diagnostics, and successful base behavior is explicitly protected. It still does not improve the held-out weak block after a 5k PPO slice. The residual path is not dead, but this result argues that simple residual PPO over whole episodes is too diffuse; a future residual attempt should train from selected recovery windows or optimize a trajectory-level recovery objective rather than hoping sparse late failures dominate normal rollout training. No N=4 solve claim is justified.
+
+## Counterfactual recovery-window residual slice
+
+Code change: extended `scripts/train_counterfactual_residual_terminal.py` with recovery-window failure-state selection. Failed episodes can now contribute a denser pre-failure window ranked by `recovery_pressure`, rather than only a few fixed offsets. Reports record the failure-window parameters so residual training cannot be mistaken for a broad solve claim. The supervised residual trainer also supports `--non-noop-oversample-factor`, with metadata for original/expanded row counts, to make rare recovery labels learnable without changing evaluation logic.
+
+Test coverage: `uv run pytest tests/test_policy_terminal_training.py -k counterfactual -s` passed `7 passed`; full suite `uv run pytest -s` passed `103 passed`.
+
+Bounded hard-pool run: `reports/n4_counterfactual_recovery_window_hardpool_20260612_seed2860k`, collecting from non-held-out hard seeds in `reports/hard_seeds_n4_combined_nearmiss_600/hard_seeds.json`, using recovery window `0..120` ticks before failure, stride `5`, option hold `6`, probe horizon `80`, and held-out weak-block eval seeds `2100000..2100019`.
+
+| variant | rows | non-noop labels | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| frozen PPO/ReCoN base | - | - | 489.5 | 468.8 | 429.5 | 0.650 | 0.000 |
+| recovery-window residual | 279 | 8 | 489.5 | 468.8 | 429.5 | 0.650 | 0.000 |
+
+Oversampled calibration run: `reports/n4_counterfactual_recovery_window_oversample_20260612_seed2861k` used the same collection/eval setup with `--non-noop-oversample-factor 25`, `--max-class-weight 20`, and `--noop-class-weight 0.5`.
+
+| variant | rows | expanded rows | non-noop recall | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| oversampled recovery residual | 279 | 471 | 1.000 | 489.5 | 468.8 | 429.5 | 0.650 | 0.128 |
+
+Gate sweep: `reports/n4_counterfactual_recovery_window_oversample_grid_20260612_seed2861k` evaluated thresholds `0.0,0.15,0.30,0.50,0.75` on the same 20 held-out weak-block seeds. Every threshold tied at mean `489.5`, p10 `468.8`, cvar `429.5`, success `0.650`.
+
+Interpretation: recovery-window selection improved the residual label density compared with earlier sparse counterfactual runs, and oversampling made the residual causally active in held-out traces. However, the learned interventions are not outcome-improving on the weak block. The next useful move is not another gate threshold tweak; it is to change the residual target from one-step/short-probe bin labels to trajectory-level recovery advantages, likely using motif-risk to pick windows and optimizing multi-step option behavior directly. No N=4 solve claim is justified.

@@ -156,6 +156,63 @@ def test_counterfactual_residual_label_summary_counts_non_noop():
     assert summary["max_score_gap"] == 0.5
 
 
+def test_counterfactual_residual_failure_window_keeps_high_pressure_states():
+    residual = _load_script("train_counterfactual_residual_terminal")
+
+    states = []
+    for step in range(30):
+        raw = [0.0, 0.0, 0.01, 0.01, 0.01, 0.01, 0.0, 0.0, 0.0, 0.0]
+        if step == 14:
+            raw[3] = 0.20
+        states.append({"step": step, "raw_before": raw, "force": 0.0})
+    args = SimpleNamespace(
+        use_failure_window=True,
+        failure_window_start=0,
+        failure_window_end=20,
+        failure_window_stride=5,
+        failure_window_target_offset=15,
+        max_window_states=5,
+        failure_offsets=[1],
+        max_failure_states=3,
+        n_poles=4,
+    )
+
+    selected = residual.select_failure_states(args, {"seed": 123, "states": states})
+
+    assert len(selected) == 3
+    assert any(item["step"] == 14 for item in selected)
+    assert all(item["seed"] == 123 for item in selected)
+    assert all("failure_offset" in item for item in selected)
+    assert all("recovery_pressure" in item for item in selected)
+
+
+def test_counterfactual_residual_train_model_oversamples_non_noop_labels():
+    residual = _load_script("train_counterfactual_residual_terminal")
+    rows = [
+        {"feature": [0.0, 0.0], "label": 2},
+        {"feature": [1.0, 0.0], "label": 2},
+        {"feature": [0.0, 1.0], "label": 1},
+    ]
+    args = SimpleNamespace(
+        residual_action_bins=5,
+        hidden_size=4,
+        max_class_weight=8.0,
+        noop_class_weight=1.0,
+        learning_rate=1e-3,
+        train_seed=7,
+        epochs=1,
+        batch_size=2,
+        non_noop_oversample_factor=4,
+    )
+
+    _model, meta = residual.train_model(rows, args)
+
+    assert meta["original_row_count"] == 3
+    assert meta["expanded_row_count"] == 6
+    assert meta["non_noop_oversample_factor"] == 4
+    assert meta["label_counts"]["1"] == 4
+
+
 def test_counterfactual_residual_label_state_respects_advantage_gates(monkeypatch):
     residual = _load_script("train_counterfactual_residual_terminal")
 

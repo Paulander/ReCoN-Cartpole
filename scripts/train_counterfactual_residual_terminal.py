@@ -87,6 +87,17 @@ def stability_margin(raw_state: Any, args: argparse.Namespace) -> float:
     return float(1.0 - angle_pressure - 0.10 * x - 0.03 * velocity_pressure)
 
 
+def recovery_pressure(raw_state: Any, n_poles: int) -> float:
+    raw = np.asarray(raw_state, dtype=np.float32).reshape(-1)
+    n = int(n_poles)
+    if raw.size < 2 + 2 * n:
+        return 0.0
+    cart = abs(float(raw[0])) / 2.4
+    angle = float(np.max(np.abs(raw[2 : 2 + n]))) / 0.20943951023931953
+    velocity = float(np.max(np.abs(raw[2 + n : 2 + 2 * n]))) / 5.0
+    return float(np.clip(0.35 * cart + 0.45 * angle + 0.20 * velocity, 0.0, 2.0))
+
+
 def residual_observation(args: argparse.Namespace, raw_state: Any, base_force: float, step: int) -> np.ndarray:
     raw = np.asarray(raw_state, dtype=np.float32).reshape(-1)
     policy_obs = policy_observation_from_state(
@@ -222,6 +233,64 @@ def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, An
     }
 
 
+def select_failure_states(args: argparse.Namespace, episode: dict[str, Any]) -> list[dict[str, Any]]:
+    """Pick candidate states from failed episodes for residual counterfactual probing."""
+    states = episode["states"]
+    if not states:
+        return []
+    selected: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    if bool(getattr(args, "use_failure_window", False)):
+        start = max(0, int(getattr(args, "failure_window_start", 0)))
+        end = max(start, int(getattr(args, "failure_window_end", 120)))
+        stride = max(1, int(getattr(args, "failure_window_stride", 5)))
+        candidates: list[dict[str, Any]] = []
+        for offset in range(start, end + 1, stride):
+            pos = len(states) - 1 - int(offset)
+            if 0 <= pos < len(states):
+                state = states[pos]
+                step = int(state["step"])
+                if step in seen:
+                    continue
+                seen.add(step)
+                candidate = dict(state)
+                candidate["seed"] = episode["seed"]
+                candidate["failure_offset"] = int(offset)
+                candidate["recovery_pressure"] = recovery_pressure(candidate["raw_before"], int(args.n_poles))
+                candidates.append(candidate)
+        target = int(getattr(args, "failure_window_target_offset", 40))
+        candidates.sort(
+            key=lambda item: (
+                float(item.get("recovery_pressure", 0.0)),
+                -abs(int(item.get("failure_offset", 0)) - target),
+            ),
+            reverse=True,
+        )
+        selected.extend(candidates[: int(getattr(args, "max_window_states", args.max_failure_states))])
+    for offset in args.failure_offsets:
+        pos = len(states) - 1 - int(offset)
+        if 0 <= pos < len(states) and int(states[pos]["step"]) not in seen:
+            seen.add(int(states[pos]["step"]))
+            state = dict(states[pos])
+            state["seed"] = episode["seed"]
+            state["failure_offset"] = int(offset)
+            state["recovery_pressure"] = recovery_pressure(state["raw_before"], int(args.n_poles))
+            selected.append(state)
+    cap = max(1, int(args.max_failure_states))
+    if len(selected) > cap:
+        target = int(getattr(args, "failure_window_target_offset", 40))
+        selected.sort(
+            key=lambda item: (
+                float(item.get("recovery_pressure", 0.0)),
+                -abs(int(item.get("failure_offset", 0)) - target),
+                int(item.get("step", 0)),
+            ),
+            reverse=True,
+        )
+        selected = selected[:cap]
+    selected.sort(key=lambda item: int(item["step"]))
+    return selected
+
 
 def collect_seed_values(args: argparse.Namespace) -> list[int]:
     seed_list = str(getattr(args, "collect_seed_list", "") or "").strip()
@@ -265,15 +334,8 @@ def collect_dataset(args: argparse.Namespace) -> dict[str, Any]:
                     feature = residual_observation(args, state["raw_before"], float(state["force"]), int(state["step"]))
                     rows.append({"feature": feature.tolist(), "label": int(args.residual_action_bins) // 2, "seed": episode["seed"], "step": int(state["step"]), "success_negative": True})
         else:
-            seen: set[int] = set()
-            for offset in args.failure_offsets:
-                pos = len(states) - 1 - int(offset)
-                if 0 <= pos < len(states) and int(states[pos]["step"]) not in seen:
-                    seen.add(int(states[pos]["step"]))
-                    state = dict(states[pos])
-                    state["seed"] = episode["seed"]
-                    selected.append(state)
-            for state in selected[-int(args.max_failure_states) :]:
+            selected = select_failure_states(args, episode)
+            for state in selected:
                 rows.append(label_state(args, state))
         partial = {"episodes": episodes, "rows": len(rows), "positive_rows": sum(1 for row in rows if int(row["label"]) != int(args.residual_action_bins) // 2)}
         (out / "partial_dataset.json").write_text(json.dumps(partial, indent=2), encoding="utf-8")
@@ -286,13 +348,19 @@ def train_model(rows: list[dict[str, Any]], args: argparse.Namespace) -> tuple[A
 
     if not rows:
         raise ValueError("no counterfactual residual rows collected")
-    x = torch.tensor([row["feature"] for row in rows], dtype=torch.float32)
-    y = torch.tensor([int(row["label"]) for row in rows], dtype=torch.long)
     classes = int(args.residual_action_bins)
+    center = classes // 2
+    factor = max(1, int(round(float(getattr(args, "non_noop_oversample_factor", 1.0)))))
+    train_rows = list(rows)
+    if factor > 1:
+        non_noop_rows = [row for row in rows if int(row["label"]) != center]
+        for _ in range(factor - 1):
+            train_rows.extend(non_noop_rows)
+    x = torch.tensor([row["feature"] for row in train_rows], dtype=torch.float32)
+    y = torch.tensor([int(row["label"]) for row in train_rows], dtype=torch.long)
     model = nn.Sequential(nn.Linear(x.shape[1], int(args.hidden_size)), nn.ReLU(), nn.Linear(int(args.hidden_size), classes))
     counts = torch.bincount(y, minlength=classes).float()
     weights = torch.clamp(counts.sum() / torch.clamp(counts, min=1.0), max=float(args.max_class_weight))
-    center = classes // 2
     weights[center] = min(float(weights[center]), float(args.noop_class_weight))
     opt = torch.optim.Adam(model.parameters(), lr=float(args.learning_rate))
     loss_fn = nn.CrossEntropyLoss(weight=weights)
@@ -315,6 +383,9 @@ def train_model(rows: list[dict[str, Any]], args: argparse.Namespace) -> tuple[A
         "hidden_size": int(args.hidden_size),
         "classes": classes,
         "label_counts": {str(i): int(counts[i].item()) for i in range(classes)},
+        "original_row_count": int(len(rows)),
+        "expanded_row_count": int(len(train_rows)),
+        "non_noop_oversample_factor": int(factor),
         "train_accuracy": acc,
         "non_noop_recall": non_noop_recall,
         "format": "counterfactual_residual_terminal_v1",
@@ -418,6 +489,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "residual_eval": residual_eval,
         "eval_seeds": eval_seed_values(args),
         "option_hold_steps": int(getattr(args, "option_hold_steps", 1)),
+        "failure_state_selection": {
+            "use_failure_window": bool(getattr(args, "use_failure_window", False)),
+            "failure_window_start": int(getattr(args, "failure_window_start", 0)),
+            "failure_window_end": int(getattr(args, "failure_window_end", 0)),
+            "failure_window_stride": int(getattr(args, "failure_window_stride", 0)),
+            "failure_window_target_offset": int(getattr(args, "failure_window_target_offset", 0)),
+            "max_window_states": int(getattr(args, "max_window_states", 0)),
+            "failure_offsets": [int(item) for item in args.failure_offsets],
+        },
         "label_gates": {
             "min_score_gap": float(args.min_score_gap),
             "min_survival_gain": int(getattr(args, "min_survival_gain", 0)),
@@ -444,6 +524,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Rows: `{ds['row_count']}`, non-noop labels: `{ds['non_noop_count']}`",
         f"Label counts: `{ds['label_counts']}`",
         f"Option hold steps: `{result.get('option_hold_steps', 1)}`",
+        f"Failure state selection: `{result.get('failure_state_selection', {})}`",
         f"Label gates: `{result.get('label_gates', {})}`",
         f"Mean chosen survival gain: `{ds.get('mean_chosen_survival_gain', 0.0):.3f}`; max best survival gain: `{ds.get('max_best_survival_gain', 0.0):.3f}`",
         "",
@@ -485,6 +566,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--collect-episodes", type=int, default=80)
     parser.add_argument("--failure-offsets", type=int, nargs="*", default=[0, 2, 5, 10, 20, 40])
     parser.add_argument("--max-failure-states", type=int, default=6)
+    parser.add_argument("--use-failure-window", action="store_true")
+    parser.add_argument("--failure-window-start", type=int, default=0)
+    parser.add_argument("--failure-window-end", type=int, default=120)
+    parser.add_argument("--failure-window-stride", type=int, default=5)
+    parser.add_argument("--failure-window-target-offset", type=int, default=40)
+    parser.add_argument("--max-window-states", type=int, default=18)
     parser.add_argument("--success-negative-stride", type=int, default=80)
     parser.add_argument("--max-success-states", type=int, default=3)
     parser.add_argument("--probe-horizon", type=int, default=100)
@@ -501,6 +588,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--max-class-weight", type=float, default=8.0)
     parser.add_argument("--noop-class-weight", type=float, default=1.0)
+    parser.add_argument("--non-noop-oversample-factor", type=float, default=1.0)
     parser.add_argument("--train-seed", type=int, default=2380)
     parser.add_argument("--eval-seed-start", type=int, default=2100000)
     parser.add_argument("--eval-seed-starts", type=int, nargs="*", default=[])
