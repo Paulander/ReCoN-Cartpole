@@ -281,3 +281,24 @@ Verification:
 - `uv run ruff check src/recon_cartpole/recon/engine_runner.py src/recon_cartpole/control/controllers.py tests/test_controller.py` -> passed.
 - `uv run pytest -s -q` -> 110 passed.
 
+## Subchain Bias Grid Result - 2026-06-12
+
+The new shared subchain control hook was evaluated on top of the frozen PPO incumbent.
+
+Report: `reports/n4_subchain_bias_grid_20260612_40eps_actiondelta`
+
+Setup: `reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip`, N=4, 5-bin discrete force, `serial_lagrange`, seed starts `980000`, `1300000`, `1500000`, and `1600000`, 10 episodes per start.
+
+| Candidate | Mean | p10 | Success | Action changes/tick mean | Notes |
+|---|---:|---:|---:|---:|---|
+| baseline_no_subchain_bias | 481.48 | 444.0 | 0.6250 | 0.0 | best in this probe |
+| conservative_default | 475.57 | 421.0 | 0.6250 | 269.2 | changed actions often and degraded p10 |
+| low_blend_default | 481.48 | 444.0 | 0.6250 | 0.0 | continuous-force changes did not cross 5-bin boundaries |
+| delta_angle_focus | 481.48 | 444.0 | 0.6250 | 0.2 | effectively action-identical |
+| mean_pair_focus | 481.48 | 444.0 | 0.6250 | 4.0 | nearly action-identical |
+| outer_pair_weighted | 481.48 | 444.0 | 0.6250 | 0.0 | action-identical |
+
+Interpretation: the hook works and is visible in diagnostics, but hand-tuned continuous subchain bias is not enough in the current 5-bin setup. Weak settings rarely change discrete actions; stronger settings damage the tail. This reinforces that the next useful subchain path should be learned/recurrent or action-logit-aware, not static continuous-force nudging.
+
+Implementation note: `StepTrace` and `training.evaluate.rollout(..., trace=True)` now carry `subchain_bias` so future replays can show the pair votes.
+

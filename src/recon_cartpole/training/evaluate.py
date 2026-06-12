@@ -75,6 +75,7 @@ def rollout(
                     mlp_terminal=diagnostics.get("mlp_terminal", {}),
                     policy_terminal=diagnostics.get("policy_terminal", {}),
                     mingru_terminal=diagnostics.get("mingru_terminal", {}),
+                    subchain_bias=diagnostics.get("subchain_bias", {}),
                     bandit=diagnostics.get("bandit", {}),
                     consolidation=diagnostics.get("consolidation", {}),
                     graph_nodes=diagnostics.get("graph_nodes", {}),
