@@ -527,6 +527,69 @@ def test_mingru_build_inputs_avoids_duplicate_prev_force_column():
     assert inputs.shape == (2, 11)
 
 
+def test_mingru_supervised_resume_checkpoint_records_source(tmp_path):
+    import numpy as np
+    from recon_cartpole.recon.mingru_terminal import MinGRUTerminal, MinGRUTerminalConfig
+
+    supervised = _load_script("train_mingru_supervised")
+    dataset = tmp_path / "dataset.npz"
+    np.savez_compressed(
+        dataset,
+        observations=np.zeros((4, 5), dtype=np.float32),
+        prev_forces=np.zeros(4, dtype=np.float32),
+        teacher_actions=np.asarray([0, 1, 0, 1], dtype=np.int64),
+        returns_to_go=np.ones(4, dtype=np.float32),
+        failure_within_k=np.zeros(4, dtype=np.float32),
+        episodes=np.asarray([0, 0, 1, 1], dtype=np.int64),
+    )
+    resume = tmp_path / "resume.pt"
+    MinGRUTerminal(
+        1,
+        10.0,
+        2,
+        MinGRUTerminalConfig(
+            enabled=True,
+            hidden_size=4,
+            sequence_length=2,
+            observation_mode="env",
+            include_prev_force=False,
+            include_context=False,
+        ),
+    ).save_checkpoint(str(resume))
+
+    report = supervised.train(
+        SimpleNamespace(
+            dataset=str(dataset),
+            resume_checkpoint=str(resume),
+            out=str(tmp_path / "out"),
+            n_poles=1,
+            horizon=2,
+            force_mag=10.0,
+            discrete_action_bins=2,
+            observation_mode="env",
+            hidden_size=4,
+            sequence_length=2,
+            include_prev_force=False,
+            include_context=False,
+            scope="stabilize_chain",
+            blend=1.0,
+            confidence_floor=0.05,
+            epochs=1,
+            batch_size=2,
+            learning_rate=1e-4,
+            validation_fraction=0.25,
+            value_weight=0.05,
+            failure_weight=0.10,
+            confidence_weight=0.05,
+            max_grad_norm=1.0,
+            seed=123,
+        )
+    )
+
+    assert report["resume_checkpoint"] == str(resume)
+    assert Path(report["checkpoint_path"]).exists()
+
+
 def test_mingru_terminal_padded_prev_force_observation_uses_state_force():
     import numpy as np
     from recon_cartpole.recon.mingru_terminal import MinGRUTerminal, MinGRUTerminalConfig

@@ -87,6 +87,11 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     terminal = MinGRUTerminal(args.n_poles, args.force_mag, args.discrete_action_bins, config)
     model = terminal.model
     assert model is not None
+    resume_checkpoint = str(getattr(args, "resume_checkpoint", "") or "")
+    if resume_checkpoint:
+        checkpoint = torch.load(resume_checkpoint, map_location="cpu")
+        state_dict = checkpoint.get("model_state_dict", checkpoint) if isinstance(checkpoint, dict) else checkpoint
+        model.load_state_dict(state_dict)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     def batch_loss(batch_idx: np.ndarray, train_mode: bool) -> tuple[torch.Tensor, dict[str, float]]:
@@ -142,6 +147,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     report = {
         "checkpoint_path": str(checkpoint_path),
         "dataset": args.dataset,
+        "resume_checkpoint": resume_checkpoint,
         "samples": int(x.shape[0]),
         "train_samples": int(len(train_idx)),
         "validation_samples": int(len(val_idx)),
@@ -164,6 +170,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True)
+    parser.add_argument("--resume-checkpoint", default="")
     parser.add_argument("--out", default="reports/mingru_supervised")
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)

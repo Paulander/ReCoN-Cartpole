@@ -252,3 +252,42 @@ Block detail for targeted hard-tail h256:
 | 2200000 | 489.4 | 449.9 | 0.800 | 60 |
 
 Interpretation: naive hard-tail oversampling from a separate training pool did not improve the held-out weak block and regressed overall success. Keep iter2 h256 as the current best learned N=4 checkpoint. The next hard-tail attempt should probably avoid pure oversampling and instead use either weighted sampling/mixing, a residual correction head, or collect hard seeds that specifically match the 2100000 failure signature without training on the held-out block itself.
+
+## Warm-start hard-tail fine-tune and passthrough confidence sweep
+
+Code change: `train_mingru_supervised.py` now accepts `--resume-checkpoint`, loading compatible minGRU weights before supervised training while preserving the requested training config. This enables conservative fine-tuning from the current best learned policy instead of retraining from scratch.
+
+Warm-start hard-tail run: `reports/n4_mingru_warm_hardtail_20260612_seed2310k`
+
+- Resume checkpoint: best iter2 h256 minGRU, `reports/n4_mingru_dagger_iter2_20260612_seed2760k/supervised_h256_seq32_noctx/mingru_terminal.pt`.
+- Training data: iter2 aggregate + targeted hard-tail dataset, 105,703 samples.
+- Fine-tune: h256 seq32 no-context, 8 epochs, LR 5e-5, max grad norm 0.75.
+- Validation action accuracy: 0.861.
+- Held-out ReCoN passthrough eval on seed starts 1900000, 2000000, 2100000, 2200000: mean 484.8, p10 437.8, success 0.692 over 240 episodes.
+
+Interpretation: warm-start hard-tail fine-tuning still regressed versus the best iter2 h256 checkpoint. This supports the hypothesis that feedforward-teacher labels on the selected hard-tail states are not a good correction target for the stronger minGRU policy.
+
+Passthrough confidence-floor sweep on best iter2 h256:
+
+| passthrough floor | eval blocks | mean | p10 | success | episodes |
+|---:|---|---:|---:|---:|---:|
+| 0.05 | 2100000 | 483.8 | 439.9 | 0.633 | 60 |
+| 0.30 | 2100000 | 483.8 | 439.9 | 0.633 | 60 |
+| 0.50 | 2100000 | 483.8 | 439.9 | 0.633 | 60 |
+| 0.70 | 2100000 | 483.8 | 439.9 | 0.633 | 60 |
+| 0.90 | 2100000 | 483.8 | 439.9 | 0.650 | 60 |
+| 0.93 | 2100000 | 483.8 | 439.9 | 0.650 | 60 |
+| 0.95 | 2100000 | 483.8 | 439.8 | 0.650 | 60 |
+| 0.97 | 2100000 | 483.7 | 439.8 | 0.650 | 60 |
+
+Broad held-out eval with best iter2 h256 and `passthrough_confidence_floor=0.90`:
+
+| seed start | mean | p10 | success | episodes |
+|---:|---:|---:|---:|---:|
+| 1900000 | 486.9 | 446.0 | 0.700 | 60 |
+| 2000000 | 485.9 | 444.9 | 0.733 | 60 |
+| 2100000 | 483.8 | 439.9 | 0.650 | 60 |
+| 2200000 | 490.9 | 461.8 | 0.800 | 60 |
+| total | 486.9 | 444.9 | 0.721 | 240 |
+
+Interpretation: the learned confidence head is useful only at a high threshold, but a strict passthrough floor improves the integrated ReCoN+minGRU result from 0.713 to 0.721 success over the broad held-out comparison. This is the current best N=4 result, still not a solve. The next productive path is likely learning a better gate/residual around the minGRU policy, not more feedforward-teacher hard-tail cloning.
