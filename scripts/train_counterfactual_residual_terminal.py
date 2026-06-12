@@ -159,6 +159,8 @@ def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step:
     controller.start_episode()
     survived = 0
     final_raw = np.asarray(raw_state, dtype=float)
+    initial_pressure = recovery_pressure(final_raw, int(args.n_poles))
+    pressures: list[float] = [float(initial_pressure)]
     forced_steps = max(1, int(getattr(args, "option_hold_steps", 1))) if shift != 0 else 1
     terminated = False
     truncated = False
@@ -167,6 +169,7 @@ def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step:
         obs, _reward, terminated, truncated, info = env.step(first_action)
         survived += 1
         final_raw = np.asarray(info.get("raw_state", []), dtype=float)
+        pressures.append(recovery_pressure(final_raw, int(args.n_poles)))
         if terminated or truncated:
             break
     if not (terminated or truncated):
@@ -176,11 +179,37 @@ def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step:
             obs, _reward, terminated, truncated, info = env.step(int(action))
             survived += 1
             final_raw = np.asarray(info.get("raw_state", []), dtype=float)
+            pressures.append(recovery_pressure(final_raw, int(args.n_poles)))
             if terminated or truncated:
                 break
     margin = stability_margin(final_raw, args)
-    score = float(survived) + float(args.margin_weight) * margin - float(args.shift_penalty) * abs(shift)
-    return {"class": int(residual_class), "shift": shift, "first_action": first_action, "forced_steps": int(forced_steps), "survived": int(survived), "margin": float(margin), "score": score}
+    pressure_mean = float(np.mean(pressures)) if pressures else 0.0
+    pressure_max = float(np.max(pressures)) if pressures else 0.0
+    pressure_final = float(pressures[-1]) if pressures else 0.0
+    pressure_drop = float(initial_pressure - pressure_final)
+    score = (
+        float(survived)
+        + float(args.margin_weight) * margin
+        + float(getattr(args, "pressure_drop_weight", 0.0)) * pressure_drop
+        - float(getattr(args, "pressure_mean_weight", 0.0)) * pressure_mean
+        - float(getattr(args, "pressure_max_weight", 0.0)) * pressure_max
+        - float(getattr(args, "pressure_final_weight", 0.0)) * pressure_final
+        - float(args.shift_penalty) * abs(shift)
+    )
+    return {
+        "class": int(residual_class),
+        "shift": shift,
+        "first_action": first_action,
+        "forced_steps": int(forced_steps),
+        "survived": int(survived),
+        "margin": float(margin),
+        "pressure_initial": float(initial_pressure),
+        "pressure_mean": pressure_mean,
+        "pressure_max": pressure_max,
+        "pressure_final": pressure_final,
+        "pressure_drop": pressure_drop,
+        "score": score,
+    }
 
 
 def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, Any]:
@@ -190,6 +219,7 @@ def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, An
     center_score = float(center_option["score"])
     center_survived = int(center_option["survived"])
     center_margin = float(center_option["margin"])
+    center_pressure_final = float(center_option.get("pressure_final", 0.0))
     best_option = max(options, key=lambda item: float(item["score"]))
     best_score = float(best_option["score"])
     best_classes = [
@@ -201,6 +231,7 @@ def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, An
     for idx, item in enumerate(options):
         survival_gain = int(item["survived"]) - center_survived
         margin_gain = float(item["margin"]) - center_margin
+        pressure_gain = center_pressure_final - float(item.get("pressure_final", center_pressure_final))
         score_gap = float(item["score"]) - center_score
         if idx == center:
             continue
@@ -209,6 +240,8 @@ def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, An
         if survival_gain < int(getattr(args, "min_survival_gain", 0)):
             continue
         if margin_gain < float(getattr(args, "min_margin_gain", 0.0)):
+            continue
+        if pressure_gain < float(getattr(args, "min_pressure_gain", -999.0)):
             continue
         eligible.append(item)
     if eligible and center not in best_classes:
@@ -228,8 +261,10 @@ def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, An
         "chosen_score": float(chosen["score"]),
         "chosen_survival_gain": int(chosen["survived"]) - center_survived,
         "chosen_margin_gain": float(chosen["margin"]) - center_margin,
+        "chosen_pressure_gain": center_pressure_final - float(chosen.get("pressure_final", center_pressure_final)),
         "best_survival_gain": int(best_option["survived"]) - center_survived,
         "best_margin_gain": float(best_option["margin"]) - center_margin,
+        "best_pressure_gain": center_pressure_final - float(best_option.get("pressure_final", center_pressure_final)),
     }
 
 
@@ -447,6 +482,8 @@ def label_summary(rows: list[dict[str, Any]], classes: int) -> dict[str, Any]:
     chosen_margin_gains: list[float] = []
     best_survival_gains: list[float] = []
     best_margin_gains: list[float] = []
+    chosen_pressure_gains: list[float] = []
+    best_pressure_gains: list[float] = []
     for row in rows:
         label = int(row.get("label", 0))
         counts[str(label)] = counts.get(str(label), 0) + 1
@@ -455,6 +492,8 @@ def label_summary(rows: list[dict[str, Any]], classes: int) -> dict[str, Any]:
         chosen_margin_gains.append(float(row.get("chosen_margin_gain", 0.0)))
         best_survival_gains.append(float(row.get("best_survival_gain", 0.0)))
         best_margin_gains.append(float(row.get("best_margin_gain", 0.0)))
+        chosen_pressure_gains.append(float(row.get("chosen_pressure_gain", 0.0)))
+        best_pressure_gains.append(float(row.get("best_pressure_gain", 0.0)))
     center = classes // 2
     return {
         "row_count": len(rows),
@@ -466,6 +505,8 @@ def label_summary(rows: list[dict[str, Any]], classes: int) -> dict[str, Any]:
         "mean_chosen_margin_gain": float(np.mean(chosen_margin_gains)) if chosen_margin_gains else 0.0,
         "max_best_survival_gain": max(best_survival_gains) if best_survival_gains else 0.0,
         "max_best_margin_gain": max(best_margin_gains) if best_margin_gains else 0.0,
+        "mean_chosen_pressure_gain": float(np.mean(chosen_pressure_gains)) if chosen_pressure_gains else 0.0,
+        "max_best_pressure_gain": max(best_pressure_gains) if best_pressure_gains else 0.0,
     }
 
 
@@ -502,7 +543,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "min_score_gap": float(args.min_score_gap),
             "min_survival_gain": int(getattr(args, "min_survival_gain", 0)),
             "min_margin_gain": float(getattr(args, "min_margin_gain", 0.0)),
+            "min_pressure_gain": float(getattr(args, "min_pressure_gain", -999.0)),
             "score_tolerance": float(args.score_tolerance),
+            "pressure_drop_weight": float(getattr(args, "pressure_drop_weight", 0.0)),
+            "pressure_mean_weight": float(getattr(args, "pressure_mean_weight", 0.0)),
+            "pressure_max_weight": float(getattr(args, "pressure_max_weight", 0.0)),
+            "pressure_final_weight": float(getattr(args, "pressure_final_weight", 0.0)),
         },
         "mechanisms": {"counterfactual_residual_terminal": True, "residual_option_hold": int(getattr(args, "option_hold_steps", 1)) > 1, "recon_integration_eval": True, "gain_mutation": False},
         "wall_clock_seconds": time.perf_counter() - started,
@@ -527,6 +573,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Failure state selection: `{result.get('failure_state_selection', {})}`",
         f"Label gates: `{result.get('label_gates', {})}`",
         f"Mean chosen survival gain: `{ds.get('mean_chosen_survival_gain', 0.0):.3f}`; max best survival gain: `{ds.get('max_best_survival_gain', 0.0):.3f}`",
+        f"Mean chosen pressure gain: `{ds.get('mean_chosen_pressure_gain', 0.0):.3f}`; max best pressure gain: `{ds.get('max_best_pressure_gain', 0.0):.3f}`",
         "",
         "| evaluator | mean | p10 | cvar | success | mean abs delta | episodes |",
         "|---|---:|---:|---:|---:|---:|---:|",
@@ -580,6 +627,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-score-gap", type=float, default=0.03)
     parser.add_argument("--min-survival-gain", type=int, default=0)
     parser.add_argument("--min-margin-gain", type=float, default=0.0)
+    parser.add_argument("--min-pressure-gain", type=float, default=-999.0)
+    parser.add_argument("--pressure-drop-weight", type=float, default=0.0)
+    parser.add_argument("--pressure-mean-weight", type=float, default=0.0)
+    parser.add_argument("--pressure-max-weight", type=float, default=0.0)
+    parser.add_argument("--pressure-final-weight", type=float, default=0.0)
     parser.add_argument("--score-tolerance", type=float, default=1e-6)
     parser.add_argument("--counterfactual-no-noise", action="store_true")
     parser.add_argument("--hidden-size", type=int, default=64)

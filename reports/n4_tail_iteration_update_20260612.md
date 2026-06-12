@@ -656,3 +656,25 @@ Oversampled calibration run: `reports/n4_counterfactual_recovery_window_oversamp
 Gate sweep: `reports/n4_counterfactual_recovery_window_oversample_grid_20260612_seed2861k` evaluated thresholds `0.0,0.15,0.30,0.50,0.75` on the same 20 held-out weak-block seeds. Every threshold tied at mean `489.5`, p10 `468.8`, cvar `429.5`, success `0.650`.
 
 Interpretation: recovery-window selection improved the residual label density compared with earlier sparse counterfactual runs, and oversampling made the residual causally active in held-out traces. However, the learned interventions are not outcome-improving on the weak block. The next useful move is not another gate threshold tweak; it is to change the residual target from one-step/short-probe bin labels to trajectory-level recovery advantages, likely using motif-risk to pick windows and optimizing multi-step option behavior directly. No N=4 solve claim is justified.
+
+## Trajectory-pressure residual label probe
+
+Code change: extended `scripts/train_counterfactual_residual_terminal.py` so counterfactual residual labels can score the whole probe trajectory, not only survival count plus final margin. Each residual option now records `pressure_initial`, `pressure_mean`, `pressure_max`, `pressure_final`, and `pressure_drop`; label gates can require `min_pressure_gain`; reports include pressure weights and pressure-gain summaries. This is intended to make learned residual labels prefer options that lower the local recovery-risk trajectory even when all candidates survive the short probe.
+
+Test coverage: `uv run pytest tests/test_policy_terminal_training.py -k counterfactual -s` passed `8 passed`; full suite `uv run pytest -s` passed `104 passed`.
+
+Strict pressure-gain run: `reports/n4_counterfactual_trajectory_pressure_20260612_seed2870k`, same non-held-out hard-pool collection and held-out weak-block eval as the recovery-window residual slice, with probe horizon `100`, option hold `6`, pressure weights `{drop: 2.0, mean: 0.5, max: 0.5, final: 1.0}`, and `min_pressure_gain=0.02`.
+
+| variant | rows | non-noop labels | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| strict pressure-gain residual | 279 | 0 | 489.5 | 468.8 | 429.5 | 0.650 | 0.000 |
+
+Loose pressure-scored run: `reports/n4_counterfactual_trajectory_pressure_loose_20260612_seed2871k` removed the hard pressure-gain requirement (`min_pressure_gain=-999`) and lowered `min_score_gap` to `0.005` while keeping the pressure-weighted score.
+
+| variant | rows | non-noop labels | mean chosen pressure gain | max best pressure gain | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| loose pressure-scored residual | 279 | 8 | -0.000 | 0.002 | 489.5 | 468.8 | 429.5 | 0.650 | 0.111 |
+
+Gate sweep: `reports/n4_counterfactual_trajectory_pressure_loose_grid_20260612_seed2871k` evaluated thresholds `0.0,0.10,0.20,0.35,0.50,0.75`; every threshold tied at mean `489.5`, p10 `468.8`, cvar `429.5`, success `0.650`.
+
+Interpretation: pressure-aware scoring confirms that the current local residual action labels are not finding meaningful risk-reducing options. The active residual changes actions but not outcomes, and the best pressure gains are tiny. The next residual attempt should stop treating single residual-bin choices as labels and instead train a genuine multi-step option/policy from recovery-window resets, or shift back to recurrent curriculum/PPO sweep rather than spending more time on threshold calibration. No N=4 solve claim is justified.

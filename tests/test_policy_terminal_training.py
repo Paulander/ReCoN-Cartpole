@@ -218,11 +218,11 @@ def test_counterfactual_residual_label_state_respects_advantage_gates(monkeypatc
 
     def fake_score(_args, _raw_state, _step, _base_force, residual_class):
         options = {
-            0: {"survived": 8, "margin": -0.2, "score": 7.8},
-            1: {"survived": 10, "margin": 0.1, "score": 10.1},
-            2: {"survived": 10, "margin": 0.0, "score": 10.0},
-            3: {"survived": 11, "margin": 0.0, "score": 11.0},
-            4: {"survived": 9, "margin": 0.0, "score": 9.0},
+            0: {"survived": 8, "margin": -0.2, "pressure_final": 0.9, "score": 7.8},
+            1: {"survived": 10, "margin": 0.1, "pressure_final": 0.4, "score": 10.1},
+            2: {"survived": 10, "margin": 0.0, "pressure_final": 0.5, "score": 10.0},
+            3: {"survived": 11, "margin": 0.0, "pressure_final": 0.6, "score": 11.0},
+            4: {"survived": 9, "margin": 0.0, "pressure_final": 0.8, "score": 9.0},
         }
         item = dict(options[int(residual_class)])
         item.update({"class": int(residual_class), "shift": int(residual_class) - 2, "first_action": 2, "forced_steps": 1})
@@ -237,6 +237,7 @@ def test_counterfactual_residual_label_state_respects_advantage_gates(monkeypatc
         min_score_gap=0.1,
         min_survival_gain=2,
         min_margin_gain=0.0,
+        min_pressure_gain=-999.0,
     )
 
     gated = residual.label_state(args, state)
@@ -247,6 +248,40 @@ def test_counterfactual_residual_label_state_respects_advantage_gates(monkeypatc
     assert gated["best_survival_gain"] == 1
     assert allowed["label"] == 3
     assert allowed["chosen_survival_gain"] == 1
+
+
+def test_counterfactual_residual_label_state_can_use_pressure_advantage(monkeypatch):
+    residual = _load_script("train_counterfactual_residual_terminal")
+
+    def fake_score(_args, _raw_state, _step, _base_force, residual_class):
+        options = {
+            0: {"survived": 10, "margin": 0.0, "pressure_final": 0.8, "score": 9.8},
+            1: {"survived": 10, "margin": 0.0, "pressure_final": 0.4, "score": 10.2},
+            2: {"survived": 10, "margin": 0.0, "pressure_final": 0.6, "score": 10.0},
+            3: {"survived": 10, "margin": 0.0, "pressure_final": 0.55, "score": 10.05},
+            4: {"survived": 10, "margin": 0.0, "pressure_final": 0.7, "score": 9.9},
+        }
+        item = dict(options[int(residual_class)])
+        item.update({"class": int(residual_class), "shift": int(residual_class) - 2, "first_action": 2, "forced_steps": 1})
+        return item
+
+    monkeypatch.setattr(residual, "counterfactual_score", fake_score)
+    monkeypatch.setattr(residual, "residual_observation", lambda *_args, **_kwargs: residual.np.zeros(3, dtype=residual.np.float32))
+    args = SimpleNamespace(
+        residual_action_bins=5,
+        score_tolerance=1e-6,
+        min_score_gap=0.1,
+        min_survival_gain=0,
+        min_margin_gain=0.0,
+        min_pressure_gain=0.1,
+    )
+
+    row = residual.label_state(args, {"raw_before": [0.0] * 10, "step": 100, "force": 0.0, "seed": 1})
+
+    assert row["label"] == 1
+    assert row["chosen_survival_gain"] == 0
+    assert row["chosen_pressure_gain"] == pytest.approx(0.2)
+    assert row["best_pressure_gain"] == pytest.approx(0.2)
 
 
 def test_residual_env_penalizes_changes_on_base_solved_episode(monkeypatch):
