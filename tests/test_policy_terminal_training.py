@@ -491,3 +491,17 @@ def test_counterfactual_gate_noop_eval_resets_override_counts():
     assert gate["checked_steps"] == 0
     assert gate["override_rate"] == 0.0
     assert base["override_count"] == 9
+
+
+def test_recurrent_tail_final_seed_starts_expand_blocks():
+    recurrent_tail = _load_script("train_recurrent_policy_terminal_tail_curriculum")
+    args = SimpleNamespace(final_seed_start=10, final_seed_starts=[100, 200], final_eval_episodes=2)
+
+    assert recurrent_tail.recurrent_final_seeds(args) == [100, 101, 200, 201]
+
+
+def test_recurrent_tail_final_seed_start_fallback():
+    recurrent_tail = _load_script("train_recurrent_policy_terminal_tail_curriculum")
+    args = SimpleNamespace(final_seed_start=10, final_seed_starts=None, final_eval_episodes=2)
+
+    assert recurrent_tail.recurrent_final_seeds(args) == [10, 11]

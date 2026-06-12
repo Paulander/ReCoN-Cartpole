@@ -45,6 +45,7 @@ def stage_args(args: argparse.Namespace, stage: dict[str, Any], start_model: str
         max_p10_regression=args.max_p10_regression,
         max_cvar_regression=args.max_cvar_regression,
         final_seed_start=int(stage.get("final_seed_start", args.final_seed_start)),
+        final_seed_starts=stage.get("final_seed_starts", getattr(args, "final_seed_starts", None)),
         final_eval_episodes=int(stage.get("final_eval_episodes", 0 if not stage.get("final", False) else args.final_eval_episodes)),
         n_envs=args.n_envs,
         vec_env=args.vec_env,
@@ -125,6 +126,7 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "validation_seed_starts": args.validation_seed_starts,
             "validation_episodes": args.validation_episodes,
             "final_eval_episodes": args.final_eval_episodes,
+            "final_seed_starts": getattr(args, "final_seed_starts", None),
             "final": True,
         },
     ]
@@ -273,6 +275,7 @@ def main() -> None:
     parser.add_argument("--max-p10-regression", type=float, default=6.0)
     parser.add_argument("--max-cvar-regression", type=float, default=8.0)
     parser.add_argument("--final-seed-start", type=int, default=1_040_000)
+    parser.add_argument("--final-seed-starts", type=int, nargs="+", default=None)
     parser.add_argument("--final-eval-episodes", type=int, default=300)
     parser.add_argument("--n-envs", type=int, default=12)
     parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="subproc")

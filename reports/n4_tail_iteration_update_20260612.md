@@ -98,3 +98,18 @@ Compared recent candidate checkpoints on held-out seed blocks 1900000 and 200000
 | sweep2700_candidate03_010k | 484.4 | 438.0 | 412.6 | 0.683 |
 
 Interpretation: recent promoted checkpoints are mostly action-equivalent to the base under the ReCoN wrapper on these held-out seeds; upright shaping is worse. Model selection does not reveal a hidden better checkpoint.
+
+
+## Recurrent multi-block evaluation patch and bounded run
+
+Code change: recurrent tail/curriculum scripts now support `--final-seed-starts`, matching the multi-block held-out discipline used by feedforward tail runs. Smoke run `reports/smoke_recurrent_multiblock_final_20260612` verified two final starts produced four final eval episodes.
+
+Run: `reports/n4_recurrent_multiblock_tail_20260612_seed2720k`
+
+- RecurrentPPO, `normalized_raw4_prev_force`, 2 x 10k chunks, validation blocks 1500000/1600000/1700000/1800000.
+- Best validation checkpoint: chunk 1, success 0.483.
+- Final held-out blocks: 1900000 and 2000000, 60 episodes each.
+- Pure recurrent PPO final: mean 461.6, p10 383.9, CVaR 362.9, success 0.442.
+- ReCoN recurrent terminal final: mean 465.0, p10 389.5, CVaR 365.7, success 0.492.
+
+Interpretation: direct recurrent PPO from scratch is currently much weaker than the best feedforward ReCoN terminal on the same held-out block. The recurrent path likely needs distillation/warm-start from the feedforward policy or a different recurrent terminal training objective before it is competitive.

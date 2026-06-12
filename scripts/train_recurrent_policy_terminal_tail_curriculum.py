@@ -16,7 +16,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from train_policy_terminal import hard_train_seeds, make_env, ppo_kwargs  # noqa: E402
-from train_policy_terminal_iterative import final_seeds, passes, solve_threshold  # noqa: E402
+from train_policy_terminal_iterative import passes, solve_threshold  # noqa: E402
 from train_policy_terminal_tail_curriculum import (  # noqa: E402
     evaluate_recon_terminal_tail,
     merge_seed_pool,
@@ -27,6 +27,14 @@ from train_policy_terminal_tail_curriculum import (  # noqa: E402
     write_seed_file,
     save_summary,
 )
+
+
+def recurrent_final_seeds(args: argparse.Namespace) -> list[int]:
+    starts = getattr(args, "final_seed_starts", None) or [args.final_seed_start]
+    seeds: list[int] = []
+    for start in starts:
+        seeds.extend(int(start) + idx for idx in range(int(args.final_eval_episodes)))
+    return seeds
 
 
 def recurrent_eval_args(args: argparse.Namespace, seed_start: int, episodes: int) -> Namespace:
@@ -237,6 +245,7 @@ def run_recurrent_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         "validation_seed_starts": args.validation_seed_starts or [args.validation_seed_start],
         "validation_episodes": args.validation_episodes,
         "final_eval_episodes": args.final_eval_episodes,
+        "final_seed_starts": getattr(args, "final_seed_starts", None) or [args.final_seed_start],
         "score_weights": {
             "mean_survival": args.score_mean_weight,
             "p10_survival": args.score_p10_weight,
@@ -311,7 +320,7 @@ def run_recurrent_tail_curriculum(args: argparse.Namespace) -> dict[str, Any]:
         final_args = recurrent_eval_args(args, args.final_seed_start, args.final_eval_episodes)
         final_args.cvar_fraction = args.cvar_fraction
         eval_model = RecurrentPPO.load(str(best_path), device=args.device)
-        seeds = final_seeds(args)
+        seeds = recurrent_final_seeds(args)
         final_eval = {
             "checkpoint": str(best_path),
             "pure_recurrent_ppo_eval": evaluate_recurrent_model(eval_model, final_args, seeds),
@@ -373,6 +382,7 @@ def main() -> None:
     parser.add_argument("--max-p10-regression", type=float, default=6.0)
     parser.add_argument("--max-cvar-regression", type=float, default=8.0)
     parser.add_argument("--final-seed-start", type=int, default=1_140_000)
+    parser.add_argument("--final-seed-starts", type=int, nargs="+", default=None)
     parser.add_argument("--final-eval-episodes", type=int, default=300)
     parser.add_argument("--n-envs", type=int, default=12)
     parser.add_argument("--vec-env", choices=["dummy", "subproc"], default="subproc")
