@@ -927,6 +927,48 @@ def test_torch_residual_policy_terminal_can_be_loaded(tmp_path):
     assert int(action) == 4
 
 
+def test_residual_policy_terminal_subchain_feature_mode_expands_observation():
+    from recon_cartpole.control.residual_features import residual_aux_feature_size
+
+    class FakeBasePolicy:
+        def predict(self, observation, deterministic=True):
+            return 2, None
+
+    class FakeResidualPolicy:
+        def __init__(self):
+            self.observation = None
+
+        def predict(self, observation, deterministic=True):
+            self.observation = np.asarray(observation, dtype=np.float32).copy()
+            return 2, None
+
+    raw = np.asarray([0.1, -0.2, 0.05, -0.08, 0.02, 0.1], dtype=np.float32)
+    residual = FakeResidualPolicy()
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=2,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_observation_mode="normalized_raw",
+            residual_policy_terminal_mode="bin_delta",
+            residual_policy_terminal_action_bins=5,
+            residual_policy_terminal_gate_threshold=0.0,
+            residual_policy_terminal_feature_mode="subchain_diagnostics",
+        )
+    )
+    controller.policy_terminal_model = FakeBasePolicy()
+    controller.residual_policy_terminal_model = residual
+
+    _force, info = controller._policy_terminal_force(raw, raw)
+
+    residual_info = info["residual_policy_terminal"]
+    assert residual_info["feature_mode"] == "subchain_diagnostics"
+    assert residual_info["aux_feature_size"] == residual_aux_feature_size("subchain_diagnostics")
+    assert residual.observation.shape == (6 + residual_aux_feature_size("subchain_diagnostics"),)
+
+
 def test_residual_policy_terminal_bin_delta_changes_policy_force():
     class FakeBasePolicy:
         def predict(self, observation, deterministic=True):

@@ -446,3 +446,33 @@ Compact held-out weak-block run: `reports/n4_motif_gated_passthrough_20260612_we
 | force passthrough | 0.454-4.544 | 489.4 | 474.8 | 0.600 | 86-89 |
 
 Interpretation: motif-risk is a strong near-failure detector, but a naive online action gate does not improve control. Forcing passthrough under motif-risk can hurt. Suppressing passthrough is mostly neutral because strict passthrough already changes few high-risk decisions. The next useful route is to use motif-risk for targeted residual-data collection or advantage labeling, not as a direct hand-authored action switch. No N=4 solve claim is justified.
+
+## Subchain-diagnostic residual terminal probe
+
+Code changes:
+
+- Added `subchain_diagnostics` as a residual terminal feature mode. It extends proposal diagnostics with adjacent-pair phase features for `(0,1)`, `(1,2)`, and `(2,3)`, matching the newer subchain observation path.
+- `evaluate_recon_residual_grid.py` now forwards and records `residual_hold_steps`, so option-hold residual checkpoints can be evaluated without silently reverting to one-tick residual changes.
+- Residual training/evaluation CLIs now accept the same `subchain_diagnostics` feature mode, with tests covering feature size, controller wiring, and hold-step forwarding.
+
+Run: `reports/n4_counterfactual_residual_subchain_20260612_seed2390k`
+
+- Base: frozen feedforward PPO terminal `reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip`, evaluated through ReCoN.
+- Collection seeds: targeted hard-tail pool from `reports/n4_targetkl_survival_tail_20260612_seed2650k/tail_seed_pool.json`.
+- Residual labels: short-horizon counterfactual bin shifts with `--option-hold-steps 4`, `--probe-horizon 120`, no counterfactual force noise.
+- Dataset: 250 rows, 170 non-noop labels.
+- Label counts: `0:72`, `1:2`, `2:80`, `3:51`, `4:45`.
+- Training accuracy: 0.608; non-noop recall: 0.706.
+- Weak held-out block `2100000`, 60 episodes: base success `0.633`, residual success `0.633`.
+
+Gate sweep: `reports/n4_counterfactual_residual_subchain_gate_sweep_20260612`
+
+| threshold | max force | mean | p10 | cvar | success | episodes |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.450 | 4.00 | 482.8 | 441.2 | 413.7 | 0.633 | 60 |
+| 0.600 | 4.00 | 482.8 | 441.2 | 414.0 | 0.633 | 60 |
+| 0.750 | 4.00 | 482.8 | 441.2 | 414.0 | 0.633 | 60 |
+| 0.900 | 4.00 | 482.9 | 441.2 | 414.2 | 0.633 | 60 |
+
+Interpretation: subchain diagnostics make the residual label problem much less sparse than the earlier one-tick residual probes, so the representation is moving in the right direction. The learned residual still does not improve held-out control once integrated into ReCoN; it mostly learns interventions that are not useful enough under the weak-block dynamics. The next residual attempt should optimize an explicit trajectory advantage/recovery target, or use motif-risk to select multi-step recovery windows, rather than trusting permissive short-horizon bin labels. No N=4 solve claim is justified.
+

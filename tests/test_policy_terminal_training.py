@@ -164,11 +164,15 @@ def test_residual_proposal_diagnostic_features_are_stable_size():
     raw = np.asarray([0.0, 0.0, 0.05, -0.04, 0.1, -0.1], dtype=np.float32)
     basic = residual_aux_features(raw, n_poles=2, force_mag=10.0, base_force=5.0, mode="basic")
     diag = residual_aux_features(raw, n_poles=2, force_mag=10.0, base_force=5.0, mode="proposal_diagnostics")
+    subchain = residual_aux_features(raw, n_poles=2, force_mag=10.0, base_force=5.0, mode="subchain_diagnostics")
 
     assert basic.shape == (residual_aux_feature_size("basic"),)
     assert diag.shape == (residual_aux_feature_size("proposal_diagnostics"),)
+    assert subchain.shape == (residual_aux_feature_size("subchain_diagnostics"),)
     assert diag.shape[0] > basic.shape[0]
+    assert subchain.shape[0] == diag.shape[0] + 12
     assert np.isfinite(diag).all()
+    assert np.isfinite(subchain).all()
 
 
 def test_teacher_action_anchor_penalizes_early_mismatch():
@@ -993,4 +997,37 @@ def test_motif_gated_passthrough_can_force_terminal_force():
     assert action == 4
     assert info["changed"] is True
     assert info["reason"] == "forced_passthrough"
+
+def test_residual_grid_controller_forwards_hold_steps(monkeypatch):
+    grid = _load_script("evaluate_recon_residual_grid")
+    captured = {}
+
+    class FakeController:
+        def __init__(self, config):
+            captured["hold_steps"] = config.residual_policy_terminal_hold_steps
+            captured["feature_mode"] = config.residual_policy_terminal_feature_mode
+
+    monkeypatch.setattr(grid, "ReConCartPoleController", FakeController)
+    args = SimpleNamespace(
+        n_poles=4,
+        discrete_action_bins=5,
+        force_mag=10.0,
+        selection_mode="hard_select",
+        base_model_path="base.zip",
+        policy_terminal_blend=1.0,
+        policy_terminal_scope="stabilize_chain",
+        base_observation_mode="normalized_raw",
+        base_normalizer_path="",
+        residual_model_path="residual.pt",
+        residual_mode="bin_delta",
+        residual_action_bins=5,
+        residual_feature_mode="subchain_diagnostics",
+        residual_hold_steps=4,
+    )
+
+    controller = grid.controller_for(args, threshold=0.7, max_force=4.0)
+
+    assert isinstance(controller, FakeController)
+    assert captured["hold_steps"] == 4
+    assert captured["feature_mode"] == "subchain_diagnostics"
 

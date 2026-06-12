@@ -464,7 +464,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
     parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
-    parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics"], default="proposal_diagnostics")
+    parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics", "subchain_diagnostics"], default="proposal_diagnostics")
     parser.add_argument("--collect-seed-start", type=int, default=980000)
     parser.add_argument("--collect-episodes", type=int, default=80)
     parser.add_argument("--failure-offsets", type=int, nargs="*", default=[0, 2, 5, 10, 20, 40])

@@ -5,6 +5,7 @@ from typing import Any
 import numpy as np
 
 from recon_cartpole.control.goal_vector import compute_cartpole_goal_vector
+from recon_cartpole.control.policy_observation import adjacent_subchain_features
 from recon_cartpole.control.scripts import ProposalGains, REGIMES, propose_force_for_regime
 from recon_cartpole.control.sensors import features_from_state
 
@@ -32,9 +33,27 @@ PROPOSAL_DIAGNOSTIC_FEATURE_NAMES = BASIC_RESIDUAL_FEATURE_NAMES + [
 ]
 
 
+SUBCHAIN_DIAGNOSTIC_FEATURE_NAMES = PROPOSAL_DIAGNOSTIC_FEATURE_NAMES + [
+    "pair01_delta_angle",
+    "pair01_delta_velocity",
+    "pair01_mean_angle",
+    "pair01_mean_velocity",
+    "pair12_delta_angle",
+    "pair12_delta_velocity",
+    "pair12_mean_angle",
+    "pair12_mean_velocity",
+    "pair23_delta_angle",
+    "pair23_delta_velocity",
+    "pair23_mean_angle",
+    "pair23_mean_velocity",
+]
+
+
 def residual_aux_feature_names(mode: str = "basic") -> list[str]:
     if str(mode) == "proposal_diagnostics":
         return list(PROPOSAL_DIAGNOSTIC_FEATURE_NAMES)
+    if str(mode) == "subchain_diagnostics":
+        return list(SUBCHAIN_DIAGNOSTIC_FEATURE_NAMES)
     return list(BASIC_RESIDUAL_FEATURE_NAMES)
 
 
@@ -69,12 +88,14 @@ def residual_aux_features(
     force_scale = max(float(force_mag), 1e-9)
     gate = residual_risk_gate(raw_state, n_poles, horizon, episode_step)
     values = [float(base_force) / force_scale, gate, float(previous_force) / force_scale]
-    if str(mode) != "proposal_diagnostics":
+    feature_mode = str(mode)
+    if feature_mode not in ("proposal_diagnostics", "subchain_diagnostics"):
         return np.asarray(values, dtype=np.float32)
 
     raw = np.asarray(raw_state, dtype=np.float32).reshape(-1)
     if raw.size < 2 + 2 * int(n_poles):
-        values.extend([0.0] * (len(PROPOSAL_DIAGNOSTIC_FEATURE_NAMES) - len(values)))
+        target = SUBCHAIN_DIAGNOSTIC_FEATURE_NAMES if feature_mode == "subchain_diagnostics" else PROPOSAL_DIAGNOSTIC_FEATURE_NAMES
+        values.extend([0.0] * (len(target) - len(values)))
         return np.asarray(values, dtype=np.float32)
 
     features = features_from_state(raw, raw, int(n_poles))
@@ -107,4 +128,9 @@ def residual_aux_features(
             float(episode_step) / max(1.0, float(horizon)),
         ]
     )
+    if feature_mode == "subchain_diagnostics":
+        n = int(n_poles)
+        theta = raw[2 : 2 + n] / 0.20943951023931953
+        theta_dot = raw[2 + n : 2 + 2 * n] / 5.0
+        values.extend(adjacent_subchain_features(theta, theta_dot, 4))
     return np.asarray(values, dtype=np.float32)

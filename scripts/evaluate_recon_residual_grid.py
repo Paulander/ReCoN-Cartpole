@@ -76,6 +76,7 @@ def controller_for(args: argparse.Namespace, threshold: float, max_force: float)
             residual_policy_terminal_max_force=max_force,
             residual_policy_terminal_gate_threshold=threshold,
             residual_policy_terminal_feature_mode=args.residual_feature_mode,
+            residual_policy_terminal_hold_steps=int(getattr(args, "residual_hold_steps", 1)),
         )
     )
 
@@ -112,6 +113,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Base model: `{result.get('base_model_path')}`",
         f"Residual model: `{result.get('residual_model_path')}`",
         f"Residual feature mode: `{result.get('residual_feature_mode')}`",
+        f"Residual hold steps: `{result.get('residual_hold_steps', 1)}`",
         "",
         "| threshold | max force | mean | p10 | cvar | success | episodes |",
         "|---:|---:|---:|---:|---:|---:|---:|",
@@ -148,6 +150,7 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
                 "base_model_path": args.base_model_path,
                 "residual_model_path": args.residual_model_path,
                 "residual_feature_mode": args.residual_feature_mode,
+                "residual_hold_steps": int(getattr(args, "residual_hold_steps", 1)),
                 "seed_starts": args.seed_starts or [args.seed_start],
                 "episodes_per_start": args.episodes_per_start,
                 "candidates": rows,
@@ -162,6 +165,7 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
         "base_model_path": args.base_model_path,
         "residual_model_path": args.residual_model_path,
         "residual_feature_mode": args.residual_feature_mode,
+        "residual_hold_steps": int(getattr(args, "residual_hold_steps", 1)),
         "seed_starts": args.seed_starts or [args.seed_start],
         "episodes_per_start": args.episodes_per_start,
         "candidates": rows,
@@ -180,8 +184,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-normalizer-path", default="")
     parser.add_argument("--base-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
     parser.add_argument("--residual-mode", choices=["force", "bin_delta"], default="bin_delta")
-    parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics"], default="proposal_diagnostics")
+    parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics", "subchain_diagnostics"], default="proposal_diagnostics")
     parser.add_argument("--residual-action-bins", type=int, default=5)
+    parser.add_argument("--residual-hold-steps", type=int, default=1)
     parser.add_argument("--thresholds", default="0.30,0.50,0.62,0.75,0.90")
     parser.add_argument("--max-residual-forces", default="4.0")
     parser.add_argument("--n-poles", type=int, default=4)

@@ -415,7 +415,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
-    parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics"], default="proposal_diagnostics")
+    parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics", "subchain_diagnostics"], default="proposal_diagnostics")
     parser.add_argument("--residual-action-bins", type=int, default=5)
     parser.add_argument("--residual-gate-threshold", type=float, default=0.60)
     parser.add_argument("--option-hold-steps", type=int, default=1)
