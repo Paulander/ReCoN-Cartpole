@@ -133,9 +133,21 @@ class MinGRUTerminal:
         checkpoint = torch.load(path, map_location="cpu")
         checkpoint_config = checkpoint.get("config") if isinstance(checkpoint, dict) else None
         if isinstance(checkpoint_config, dict):
+            runtime_control = {
+                "enabled": self.config.enabled,
+                "blend": self.config.blend,
+                "scope": self.config.scope,
+                "confidence_floor": self.config.confidence_floor,
+                "passthrough_enabled": self.config.passthrough_enabled,
+                "passthrough_confidence_floor": self.config.passthrough_confidence_floor,
+                "passthrough_logit_margin_floor": self.config.passthrough_logit_margin_floor,
+                "checkpoint_path": self.config.checkpoint_path,
+            }
             for key, value in checkpoint_config.items():
                 if hasattr(self.config, key):
                     setattr(self.config, key, value)
+            for key, value in runtime_control.items():
+                setattr(self.config, key, value)
             self.motif_model = load_motif_model(self.config.motif_model_path)
             self._build_model()
         state_dict = checkpoint.get("model_state_dict", checkpoint)

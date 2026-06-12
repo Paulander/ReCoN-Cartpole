@@ -434,3 +434,28 @@ Verification:
 - Integration smoke: `reports/smoke_mingru_motif_curriculum_20260612`, horizon 120, 4 eval seeds, motif score enabled, success 1.0. This is only a wiring smoke, not a robust N=4 result.
 
 No N=4 solve claim is justified from this change. The immediate next experiment is a real motif-enabled recurrent curriculum on the normal horizon/held-out blocks, compared against the same config without motif score.
+
+
+## Motif Recurrent DAgger Batch - 2026-06-12
+
+A full-horizon paired recurrent curriculum batch tested whether the new learned motif-score observable helps the primary minGRU terminal on held-out N=4 mixed blocks. All rows below use the same 80 held-out eval seeds from starts `1900000`, `2000000`, `2100000`, and `2200000` with 20 episodes per block. These are not train seeds and are not solve claims.
+
+| run | key change | samples | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `reports/n4_mingru_curriculum_subchain_nomotif_20260612_seed3210k` | subchain curriculum, no motif scalar | 39648 | 462.9 | 389.4 | 0.400 | 464.7 | 389.6 | 0.425 |
+| `reports/n4_mingru_curriculum_subchain_motif_20260612_seed3210k` | same curriculum plus motif scalar | 39648 | 462.6 | 389.4 | 0.400 | 464.5 | 389.4 | 0.425 |
+| `reports/n4_mingru_curriculum_subchain_motif_dagger2_20260612_seed3610k` | student hard-tail rollouts, teacher labels, resume from motif | 38668 | 456.1 | 354.0 | 0.4875 | 483.0 | 443.8 | 0.5875 |
+| `reports/n4_mingru_curriculum_subchain_motif_dagger3_20260612_seed4010k` | larger student-tail set, stronger tail weight | 42343 | 484.2 | 423.7 | 0.675 | 486.5 | 442.8 | 0.6625 |
+| `reports/n4_mingru_curriculum_subchain_motif_dagger4_20260612_seed4410k` | larger tail set, lower LR, stronger low-return weighting | 53447 | 487.0 | 449.9 | 0.675 | 487.0 | 449.9 | 0.675 |
+| `reports/n4_mingru_curriculum_subchain_motif_dagger5_20260612_seed4810k` | conservative follow-up from DAgger4 | 53507 | 487.4 | 443.8 | 0.675 | 487.4 | 443.8 | 0.675 |
+
+Interpretation: the motif scalar alone did not move the recurrent policy. The large improvement came from DAgger-style hard-tail collection where the student recurrent policy generated drift states and the frozen teacher supplied labels. This directly supports the compounding-error diagnosis: plain supervised imitation can show high validation action accuracy while failing in rollout. DAgger3/4/5 pushed held-out success from 0.425 to 0.675 and p10 from about 389 to about 450, but the batch plateaued below 0.70 on this 80-seed block. No N=4 solve claim is justified.
+
+Engineering fix found during this batch: `MinGRUTerminal.load_checkpoint` was overwriting runtime arbitration knobs from saved checkpoint config, which made passthrough/arbitration sweeps unreliable. Runtime fields such as `blend`, `scope`, `confidence_floor`, and passthrough thresholds are now preserved from the caller while architecture/input fields still load from the checkpoint.
+
+Verification for the code fix:
+
+- `uv run pytest tests/test_policy_terminal_training.py -q -s` -> 65 passed.
+- `uv run ruff check src/recon_cartpole/recon/mingru_terminal.py tests/test_policy_terminal_training.py` -> passed.
+
+Next best move: stop adding motif scalars and continue with distribution-aware learning. The strongest path is either another DAgger/on-policy loop that explicitly mines the remaining held-out failures, or a true recurrent PPO/fine-tuning step initialized from DAgger4/5. The current supervised DAgger loop appears useful but is flattening just under the target band.

@@ -1291,6 +1291,60 @@ def test_mingru_supervised_resume_checkpoint_records_source(tmp_path):
     assert Path(report["checkpoint_path"]).exists()
 
 
+def test_mingru_checkpoint_load_preserves_runtime_arbitration_overrides(tmp_path):
+    from recon_cartpole.recon.mingru_terminal import MinGRUTerminal, MinGRUTerminalConfig
+
+    checkpoint = tmp_path / "mingru.pt"
+    MinGRUTerminal(
+        1,
+        10.0,
+        2,
+        MinGRUTerminalConfig(
+            enabled=True,
+            hidden_size=4,
+            sequence_length=2,
+            observation_mode="env",
+            include_prev_force=False,
+            include_context=False,
+            blend=0.25,
+            scope="all",
+            confidence_floor=0.8,
+            passthrough_enabled=True,
+            passthrough_confidence_floor=0.9,
+            passthrough_logit_margin_floor=0.4,
+        ),
+    ).save_checkpoint(str(checkpoint))
+
+    loaded = MinGRUTerminal(
+        1,
+        10.0,
+        2,
+        MinGRUTerminalConfig(
+            enabled=True,
+            hidden_size=4,
+            sequence_length=2,
+            observation_mode="env",
+            include_prev_force=False,
+            include_context=False,
+            blend=1.0,
+            scope="stabilize_chain",
+            confidence_floor=0.05,
+            passthrough_enabled=False,
+            passthrough_confidence_floor=0.1,
+            passthrough_logit_margin_floor=0.0,
+            checkpoint_path=str(checkpoint),
+        ),
+    )
+
+    assert loaded.config.blend == 1.0
+    assert loaded.config.scope == "stabilize_chain"
+    assert loaded.config.confidence_floor == 0.05
+    assert loaded.config.passthrough_enabled is False
+    assert loaded.config.passthrough_confidence_floor == 0.1
+    assert loaded.config.passthrough_logit_margin_floor == 0.0
+    assert loaded.config.hidden_size == 4
+
+
 def test_mingru_terminal_padded_prev_force_observation_uses_state_force():
     import numpy as np
     from recon_cartpole.recon.mingru_terminal import MinGRUTerminal, MinGRUTerminalConfig
