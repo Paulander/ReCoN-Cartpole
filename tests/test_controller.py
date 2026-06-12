@@ -594,6 +594,21 @@ def test_recurrent_policy_terminal_tracks_state_and_episode_start():
     assert third["policy_terminal"]["episode_start"] is True
 
 
+def test_recon_controller_reports_adjacent_subchain_sensor_values():
+    raw = np.asarray([0.0, 0.0, 0.01, -0.02, 0.03, -0.04, 0.5, -0.6, 0.7, -0.8], dtype=np.float32)
+    controller = ReConCartPoleController(
+        RunnerConfig(n_poles=4, mode="static_recon", discrete_action_bins=5, learn=False)
+    )
+
+    _action, diagnostics = controller.act(raw, raw)
+
+    subchains = diagnostics["subchain_sensors"]
+    assert set(subchains) == {"0_1", "1_2", "2_3"}
+    assert subchains["0_1"]["delta_angle"] == pytest.approx(-0.03)
+    assert subchains["1_2"]["delta_velocity"] == pytest.approx(1.3)
+    assert subchains["2_3"]["mean_angle"] == pytest.approx(-0.005)
+
+
 def test_policy_terminal_normalized_raw_prev_force_observation_mode():
     class FakePolicy:
         def __init__(self):

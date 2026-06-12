@@ -63,6 +63,20 @@ def build_cartpole_graph(n_poles: int, config: GraphConfig | None = None) -> Gra
         graph.add_hierarchy_pair("observe_state", f"pole_{idx}_monitor")
         graph.add_hierarchy_pair(f"pole_{idx}_monitor", f"pole_{idx}_sensor")
 
+    for idx in range(max(0, n_poles - 1)):
+        script(f"subchain_{idx}_{idx + 1}_monitor", subchain=True)
+        term(
+            f"subchain_{idx}_{idx + 1}_sensor",
+            "subchain_sensor",
+            start_pole=idx,
+            end_pole=idx + 1,
+        )
+        graph.add_hierarchy_pair("observe_state", f"subchain_{idx}_{idx + 1}_monitor")
+        graph.add_hierarchy_pair(
+            f"subchain_{idx}_{idx + 1}_monitor",
+            f"subchain_{idx}_{idx + 1}_sensor",
+        )
+
     graph.nodes["root_balance"].meta["confirm_policy"] = "and"
     graph.nodes["select_control_regime"].meta["confirm_policy"] = "and"
 

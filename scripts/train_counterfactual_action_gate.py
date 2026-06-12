@@ -8,8 +8,10 @@ from typing import Any
 
 import numpy as np
 
-from recon_cartpole.control.actuators import action_from_force
-from recon_cartpole.control.policy_observation import policy_observation_from_state, policy_observation_size
+from recon_cartpole.control.policy_observation import (
+    POLICY_OBSERVATION_MODES,
+    policy_observation_from_state,
+)
 from recon_cartpole.control.residual_features import residual_aux_features
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
@@ -463,7 +465,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
-    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--policy-observation-mode", choices=POLICY_OBSERVATION_MODES, default="normalized_raw")
     parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics", "subchain_diagnostics"], default="proposal_diagnostics")
     parser.add_argument("--collect-seed-start", type=int, default=980000)
     parser.add_argument("--collect-episodes", type=int, default=80)

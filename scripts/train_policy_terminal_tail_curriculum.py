@@ -14,6 +14,7 @@ import numpy as np
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
 from recon_cartpole.training.ablations import summarize_steps
 from recon_cartpole.training.evaluate import rollout
+from recon_cartpole.control.policy_observation import POLICY_OBSERVATION_MODES
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -27,7 +28,7 @@ from train_policy_terminal import (  # noqa: E402
     make_env,
     ppo_kwargs,
 )
-from train_policy_terminal_iterative import eval_args, final_seeds, passes, solve_threshold  # noqa: E402
+from train_policy_terminal_iterative import eval_args, passes, solve_threshold  # noqa: E402
 
 
 def tail_metrics(steps: list[float], horizon: int, cvar_fraction: float = 0.10) -> dict[str, float]:
@@ -608,7 +609,7 @@ def main() -> None:
         choices=["stabilize_chain", "selected", "all"],
         default="stabilize_chain",
     )
-    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--policy-observation-mode", choices=POLICY_OBSERVATION_MODES, default="normalized_raw")
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/policy_terminal_tail_curriculum")

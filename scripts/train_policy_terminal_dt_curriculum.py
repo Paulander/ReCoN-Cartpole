@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from train_policy_terminal import train_policy_terminal
+from recon_cartpole.control.policy_observation import POLICY_OBSERVATION_MODES
 
 
 def solve_threshold(n_poles: int) -> dict[str, float]:
@@ -285,7 +286,7 @@ def main() -> None:
         help="Which ReCoN proposals can be force-blended with the PPO terminal.",
     )
     parser.add_argument(
-        "--policy-observation-mode", choices=["env", "normalized_raw"], default="env"
+        "--policy-observation-mode", choices=POLICY_OBSERVATION_MODES, default="env"
     )
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)

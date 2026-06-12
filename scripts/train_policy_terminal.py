@@ -17,6 +17,7 @@ from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
 from recon_cartpole.training.ablations import summarize_steps
 from recon_cartpole.training.evaluate import rollout
+from recon_cartpole.control.policy_observation import POLICY_OBSERVATION_MODES
 
 
 def _env_config(env: gym.Env):
@@ -842,7 +843,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--policy-observation-mode",
-        choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"],
+        choices=POLICY_OBSERVATION_MODES,
         default="env",
         help="Observation representation used by the learned PPO terminal.",
     )

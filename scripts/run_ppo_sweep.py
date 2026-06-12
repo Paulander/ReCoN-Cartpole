@@ -10,6 +10,7 @@ from typing import Any
 
 from train_policy_terminal_iterative import passes, solve_threshold
 from train_policy_terminal_tail_curriculum import run_tail_curriculum, tail_score
+from recon_cartpole.control.policy_observation import POLICY_OBSERVATION_MODES
 
 
 def _floats(text: str) -> list[float]:
@@ -341,7 +342,7 @@ def main() -> None:
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
-    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--policy-observation-mode", choices=POLICY_OBSERVATION_MODES, default="normalized_raw")
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--learning-rates", default="2.5e-6,5e-6,1e-5")
     parser.add_argument("--clip-ranges", default="0.015,0.025,0.05")

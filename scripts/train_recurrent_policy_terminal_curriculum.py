@@ -9,6 +9,7 @@ from typing import Any
 
 from train_policy_terminal_iterative import passes, solve_threshold
 from train_recurrent_policy_terminal_tail_curriculum import run_recurrent_tail_curriculum
+from recon_cartpole.control.policy_observation import POLICY_OBSERVATION_MODES
 
 
 def stage_args(args: argparse.Namespace, stage: dict[str, Any], start_model: str, index: int, out: Path) -> Namespace:
@@ -303,7 +304,7 @@ def main() -> None:
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
-    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw4_prev_force")
+    parser.add_argument("--policy-observation-mode", choices=POLICY_OBSERVATION_MODES, default="normalized_raw4_prev_force")
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--verbose", type=int, default=0)
     parser.add_argument("--out", default="reports/recurrent_policy_terminal_curriculum")

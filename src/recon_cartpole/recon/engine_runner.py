@@ -463,6 +463,7 @@ class ReConCartPoleController:
             "bandit": snapshot_bandit(self.bandit_state),
             "graph_nodes": {nid: node.state.name for nid, node in self.graph.nodes.items()},
             "graph_ticks": graph_ticks,
+            "subchain_sensors": dict(context.get("subchain_sensor_values", {})),
             "rescue": dict(context.get("rescue", {})),
         }
         self.last_rescue = dict(context.get("rescue", {}))
@@ -955,6 +956,7 @@ class ReConCartPoleController:
             "arbitrate_force": self._arbitrate_force,
             "apply_force": self._apply_force,
             "pole_sensor": self._pole_sensor,
+            "subchain_sensor": self._subchain_sensor,
         }
 
     def _observe_state(self, _node, env):
@@ -1345,6 +1347,24 @@ class ReConCartPoleController:
     def _pole_sensor(self, node, env):
         idx = int(node.meta["pole_index"])
         env.setdefault("pole_sensor_values", {})[idx] = env["features"].poles[idx]
+        return True, True
+
+    def _subchain_sensor(self, node, env):
+        start = int(node.meta["start_pole"])
+        end = int(node.meta["end_pole"])
+        poles = env["features"].poles
+        if start < 0 or end >= len(poles):
+            return False, False
+        left = poles[start]
+        right = poles[end]
+        env.setdefault("subchain_sensor_values", {})[f"{start}_{end}"] = {
+            "delta_angle": right.theta - left.theta,
+            "delta_velocity": right.theta_dot - left.theta_dot,
+            "mean_angle": 0.5 * (left.theta + right.theta),
+            "mean_velocity": 0.5 * (left.theta_dot + right.theta_dot),
+            "max_angle_abs": max(left.angle_abs, right.angle_abs),
+            "max_velocity_abs": max(abs(left.theta_dot), abs(right.theta_dot)),
+        }
         return True, True
 
     def _select_regime(

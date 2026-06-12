@@ -6,6 +6,17 @@ from typing import Any
 import numpy as np
 
 
+POLICY_OBSERVATION_MODES = (
+    "env",
+    "normalized_raw",
+    "normalized_raw_prev_force",
+    "normalized_raw4",
+    "normalized_raw4_prev_force",
+    "normalized_raw4_subchains",
+    "normalized_raw4_subchains_prev_force",
+)
+
+
 def _padded_pole_count(mode: str, n_poles: int) -> int:
     if mode in (
         "normalized_raw4",
@@ -72,15 +83,9 @@ def policy_observation_from_state(
     previous_force: float = 0.0,
     force_mag: float = 10.0,
 ) -> np.ndarray:
-    normalized_modes = (
-        "normalized_raw",
-        "normalized_raw_prev_force",
-        "normalized_raw4",
-        "normalized_raw4_prev_force",
-        "normalized_raw4_subchains",
-        "normalized_raw4_subchains_prev_force",
-    )
-    if mode not in normalized_modes:
+    if mode == "env":
+        return np.asarray(observation, dtype=np.float32).reshape(-1)
+    if mode not in POLICY_OBSERVATION_MODES:
         return np.asarray(observation, dtype=np.float32).reshape(-1)
     raw = (
         np.asarray(raw_state, dtype=np.float32).reshape(-1)

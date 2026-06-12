@@ -12,6 +12,7 @@ from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
 from recon_cartpole.training.ablations import summarize_steps
 from recon_cartpole.training.evaluate import rollout
+from recon_cartpole.control.policy_observation import POLICY_OBSERVATION_MODES
 
 
 def _floats(text: str) -> list[float]:
@@ -182,7 +183,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-model-path", required=True)
     parser.add_argument("--residual-model-path", required=True)
     parser.add_argument("--base-normalizer-path", default="")
-    parser.add_argument("--base-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--base-observation-mode", choices=POLICY_OBSERVATION_MODES, default="normalized_raw")
     parser.add_argument("--residual-mode", choices=["force", "bin_delta"], default="bin_delta")
     parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics", "subchain_diagnostics"], default="proposal_diagnostics")
     parser.add_argument("--residual-action-bins", type=int, default=5)

@@ -13,6 +13,7 @@ from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
 from recon_cartpole.training.ablations import summarize_steps
 from recon_cartpole.training.evaluate import rollout
+from recon_cartpole.control.policy_observation import POLICY_OBSERVATION_MODES
 
 
 def make_env(args: argparse.Namespace) -> CartPoleNEnv:
@@ -152,7 +153,7 @@ def main() -> None:
         default="stabilize_chain",
     )
     parser.add_argument(
-        "--policy-observation-mode", choices=["env", "normalized_raw"], default="env"
+        "--policy-observation-mode", choices=POLICY_OBSERVATION_MODES, default="env"
     )
     parser.add_argument("--frame-stack", type=int, default=1)
     parser.add_argument("--episodes", type=int, default=200)

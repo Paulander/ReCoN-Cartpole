@@ -12,6 +12,7 @@ import numpy as np
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
 from recon_cartpole.training.ablations import summarize_steps
+from recon_cartpole.control.policy_observation import POLICY_OBSERVATION_MODES
 
 
 def make_env(args: argparse.Namespace, force_noise: float | None = None) -> CartPoleNEnv:
@@ -295,7 +296,7 @@ def main() -> None:
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
-    parser.add_argument("--policy-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--policy-observation-mode", choices=POLICY_OBSERVATION_MODES, default="normalized_raw")
     parser.add_argument("--episodes", type=int, default=80)
     parser.add_argument("--seed-start", type=int, default=980_000)
     parser.add_argument("--failure-window", type=int, default=20)
