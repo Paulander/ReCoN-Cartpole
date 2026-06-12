@@ -208,3 +208,60 @@ Interpretation: widening validation exposed the narrow-validation overestimate, 
 
 The next recurrent run should use the widened validation starts from the beginning and spend more budget only if intermediate promotions improve both success and p10. The flat subchain PPO path should not be prioritized unless paired with a true shared subchain module or stronger curriculum.
 
+## Tail Continuation And Failure Audit Update - 2026-06-12
+
+Two additional feedforward tail attempts were run against the broad mixed-grid validation set. Neither solved N=4.
+
+### Feedforward Tail Continuation From Sweep Candidate
+
+Report: `reports/n4_feedforward_tail_wideval_20260612_seed2940k`
+
+Setup: resumed from `reports/n4_survival_ppo_sweep_20260612_seed2700k/candidate_01/checkpoint_010000.zip`, validated on 12 seed starts with 10 episodes each, then final-evaluated on `980000`, `1500000`, `1600000`, and `2100000` with 75 episodes each.
+
+| Row | Mean | p10 | CVaR | Success | Promoted |
+|---|---:|---:|---:|---:|---|
+| start | 484.98 | 437.7 | 420.75 | 0.6500 | yes |
+| chunk 1 | 483.71 | 435.0 | 411.83 | 0.6500 | no |
+| chunk 2 | 483.73 | 433.9 | 414.58 | 0.6500 | no |
+| chunk 3 | 482.13 | 430.9 | 407.50 | 0.6333 | no |
+| chunk 4 | 481.25 | 429.8 | 403.83 | 0.6333 | no |
+
+Final held-out ReCoN eval of the preserved best/start checkpoint: mean `482.07`, p10 `428.0`, CVaR `408.9`, success `0.6533` over 300 episodes. This is near-solved but below the configured success threshold.
+
+### Local Failure Action Audits
+
+Reports:
+
+- `reports/n4_failure_action_audit_tailbest_980k_20260612`
+- `reports/n4_failure_action_audit_tailbest_1500k_20260612`
+- `reports/n4_failure_action_audit_tailbest_1600k_20260612`
+- `reports/n4_failure_action_audit_tailbest_980k_early_20260612`
+- `reports/n4_failure_action_audit_tailbest_1500k_early_20260612`
+
+The audits found frequent exact-action alternatives near failures, but almost no survival gain from changing one action:
+
+| Seed block | Offset window | Episodes | Success | Main failures | Mistake rate | Mean survival gap |
+|---|---|---:|---:|---|---:|---:|
+| 980k | 0/2/5/10/20 | 30 | 0.6333 | pole_1, pole_2 | 0.6909 | 0.000 |
+| 1500k | 0/2/5/10/20 | 30 | 0.6667 | pole_2, pole_1 | 0.6400 | 0.040 |
+| 1600k | 0/2/5/10/20 | 30 | 0.7667 | pole_1, pole_2 | 0.7714 | 0.000 |
+| 980k | 40/80/120 | 30 | 0.6333 | pole_1, pole_2 | 0.7576 | 0.000 |
+| 1500k | 40/80/120 | 30 | 0.6667 | pole_2, pole_1 | 0.9000 | 0.033 |
+
+Interpretation: the tail failures do not look like simple late one-action mistakes. A residual or action-gate trained only on near-failure windows is unlikely to close the gap by itself.
+
+### Preservation-First Teacher-Anchored Tail Probe
+
+Report directory: `reports/n4_incumbent_teacher_anchor_tail_20260612_seed2950k`
+
+Setup: resumed from `reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip`, used tiny PPO updates plus teacher-action penalty in low-risk states. The run was interrupted after the first chunk because the teacher-in-env path was too slow for an autonomous iteration loop.
+
+Saved validation evidence:
+
+| Row | Mean | p10 | CVaR | Success | Notes |
+|---|---:|---:|---:|---:|---|
+| start | 484.98 | 437.7 | 420.75 | 0.6500 | broad mixed-grid start |
+| chunk 1 | 483.44 | 434.9 | 417.50 | 0.6333 | latest validation only; regressed |
+
+Interpretation: preservation-first feedforward continuation did not show an early positive signal and was too slow with the current teacher wrapper. The next high-signal path is structural: shared/recurrent subchain composition rather than more flat feedforward tail microfits.
+
