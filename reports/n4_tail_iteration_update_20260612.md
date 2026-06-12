@@ -337,3 +337,41 @@ Run: `reports/n4_mingru_success_filter_20260612_seed2350k/supervised_h256_seq32_
 
 Interpretation: success-filtered cloning is also dominated by the incumbent weak-block result of `0.650`. The failure mode is not solved by cloning only trajectories that already survived; the next data objective probably needs counterfactual/rewarded recovery training rather than more teacher-action filtering.
 
+## Residual recovery shaping and ReCoN-aligned residual training
+
+Code changes:
+
+- `train_residual_policy_terminal.py` now supports optional potential-based recovery shaping. The residual reward can include pressure reduction from the previous tick to the next tick via `--recovery-progress-weight`, plus explicit `--failure-penalty` and `--success-bonus` terms. Defaults are zero, so prior residual runs are reproducible.
+- Residual training now supports `--residual-base-controller recon_policy_terminal`, which freezes and uses the same ReCoN+PPO controller during residual training that is used during ReCoN-integrated evaluation. This avoids training a residual on pure PPO and then deploying it on a different base policy.
+
+Pure-PPO-base residual run: `reports/n4_residual_recovery_shaping_20260612_seed2360k`
+
+- Base: frozen feedforward PPO terminal `reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip`.
+- Residual: bin-delta PPO, proposal diagnostics, 50k timesteps, recovery shaping enabled.
+- Weak held-out block `2100000`, 60 episodes:
+
+| evaluator | mean | p10 | cvar | success |
+|---|---:|---:|---:|---:|
+| residual_env_frozen_ppo | 436.7 | 321.7 | 298.0 | 0.483 |
+| residual_env_specialist | 447.8 | 342.8 | 313.7 | 0.500 |
+| recon_frozen_base | 482.9 | 441.2 | 414.3 | 0.633 |
+| recon_residual_specialist | 482.3 | 436.7 | 413.7 | 0.633 |
+
+Gate sweep on the learned residual (`0.30` through `0.90`) did not beat frozen ReCoN. The best rows tied success at `0.633` and approached the frozen-base p10 only when the gate suppressed most residual changes.
+
+ReCoN-base residual run: `reports/n4_residual_reconbase_recovery_20260612_seed2370k`
+
+- Residual trained directly on top of frozen ReCoN+PPO using `--residual-base-controller recon_policy_terminal`.
+- 30k timesteps, gate threshold `0.60`, stronger low-risk change penalty.
+- Weak held-out block `2100000`, 60 episodes:
+
+| evaluator | mean | p10 | cvar | success |
+|---|---:|---:|---:|---:|
+| recon_frozen_base | 482.9 | 441.2 | 414.3 | 0.633 |
+| reconbase_residual_env | 482.9 | 441.2 | 414.3 | 0.633 |
+| recon_residual_integrated | 482.9 | 441.2 | 414.3 | 0.633 |
+
+Gate sweep over thresholds `0.30`, `0.45`, `0.60`, `0.75` found no improvement. Threshold `0.30` regressed p10 to `439.4`; `0.45+` effectively tied the frozen base.
+
+Interpretation: recovery-shaped residual learning is now better aligned and no longer obviously harmful, but it has not cracked the N=4 weak block. The pure-PPO-base residual learned real corrections for pure PPO, yet those corrections were redundant or harmful once ReCoN arbitration was present. The ReCoN-base residual learned to be conservative. The next residual attempt should likely use an explicit advantage-style objective over paired base-vs-residual rollouts or train on saved near-failure states with short-horizon counterfactual rollouts, rather than ordinary PPO survival reward.
+

@@ -43,7 +43,28 @@ class ResidualCorrectionEnv(gym.Env):
                 link_coupling=args.link_coupling,
             )
         )
-        self.base_model = PPO.load(str(args.base_model_path), device=args.device)
+        self.base_model = None
+        self.base_controller: ReConCartPoleController | None = None
+        if args.residual_base_controller == "recon_policy_terminal":
+            self.base_controller = ReConCartPoleController(
+                RunnerConfig(
+                    n_poles=args.n_poles,
+                    mode="recon_policy_terminal",
+                    action_mode=args.env_action_mode,
+                    discrete_action_bins=args.discrete_action_bins,
+                    force_mag=args.force_mag,
+                    selection_mode=args.selection_mode,
+                    learn=False,
+                    reset_bandit_each_episode=False,
+                    policy_terminal_path=str(args.base_model_path),
+                    policy_terminal_blend=args.policy_terminal_blend,
+                    policy_terminal_scope=args.policy_terminal_scope,
+                    policy_terminal_observation_mode=args.base_observation_mode,
+                    policy_terminal_normalizer_path=args.base_normalizer_path,
+                )
+            )
+        else:
+            self.base_model = PPO.load(str(args.base_model_path), device=args.device)
         self.base_normalizer = (
             load_observation_normalizer(args.base_normalizer_path)
             if args.base_normalizer_path
@@ -84,6 +105,13 @@ class ResidualCorrectionEnv(gym.Env):
         return obs
 
     def _base_action_and_force(self, env_obs: Any, raw: Any) -> tuple[int | None, float]:
+        if self.base_controller is not None:
+            idx, diagnostics = self.base_controller.act(env_obs, raw)
+            force = float(diagnostics.get("force", 0.0))
+            if self.args.env_action_mode == "continuous":
+                return None, force
+            return int(idx), force
+        assert self.base_model is not None
         action, _state = self.base_model.predict(self._base_policy_obs(env_obs, raw), deterministic=True)
         if self.args.env_action_mode == "continuous":
             return None, float(np.clip(np.asarray(action, dtype=float).reshape(-1)[0], -self.args.force_mag, self.args.force_mag))
@@ -132,6 +160,8 @@ class ResidualCorrectionEnv(gym.Env):
             seed = self.hard_seeds[self.seed_index % len(self.hard_seeds)]
             self.seed_index += 1
         env_obs, info = self.env.reset(seed=seed, options=options)
+        if self.base_controller is not None:
+            self.base_controller.start_episode()
         self.last_raw = np.asarray(info.get("raw_state"), dtype=np.float32)
         self.last_env_obs = env_obs
         return self._residual_obs(env_obs, self.last_raw), info
@@ -157,21 +187,54 @@ class ResidualCorrectionEnv(gym.Env):
             delta = float(bins[action_idx])
             force = float(np.clip(base_force + gate * delta, -self.args.force_mag, self.args.force_mag))
             env_action = action_from_force(force, self.args.env_action_mode, self.args.force_mag, self.args.discrete_action_bins)
+        pressure_before = recovery_pressure(raw, self.args.n_poles)
         env_obs, reward, terminated, truncated, info = self.env.step(env_action)
         self.step_count += 1
         self.previous_force = force
         self.last_raw = np.asarray(info.get("raw_state"), dtype=np.float32)
         self.last_env_obs = env_obs
+        pressure_after = recovery_pressure(self.last_raw, self.args.n_poles)
+        recovery_progress = float(pressure_before - pressure_after)
         delta_scale = self.args.force_mag if self.args.residual_mode == "bin_delta" else self.args.max_residual_force
         change_penalty = float(self.args.low_risk_change_penalty) * abs(delta / max(delta_scale, 1e-9)) * (1.0 - gate)
         late_bonus = float(self.args.late_survival_bonus) if self.step_count >= int(self.args.horizon * self.args.late_survival_start_fraction) else 0.0
-        shaped_reward = float(reward) + late_bonus - change_penalty
-        info = {**info, "base_force": base_force, "residual_delta": delta, "risk_gate": gate, "final_force": force, "residual_mode": self.args.residual_mode}
+        recovery_bonus = float(self.args.recovery_progress_weight) * recovery_progress
+        failure_penalty = float(self.args.failure_penalty) if terminated else 0.0
+        success_bonus = float(self.args.success_bonus) if truncated and not terminated else 0.0
+        shaped_reward = float(reward) + late_bonus + recovery_bonus + success_bonus - change_penalty - failure_penalty
+        info = {
+            **info,
+            "base_force": base_force,
+            "residual_delta": delta,
+            "risk_gate": gate,
+            "final_force": force,
+            "residual_mode": self.args.residual_mode,
+            "recovery_pressure_before": pressure_before,
+            "recovery_pressure_after": pressure_after,
+            "recovery_progress": recovery_progress,
+        }
+        if abs(recovery_bonus) > 1e-12:
+            info["recovery_progress_bonus"] = recovery_bonus
+        if failure_penalty:
+            info["failure_penalty"] = failure_penalty
+        if success_bonus:
+            info["success_bonus"] = success_bonus
         return self._residual_obs(env_obs, self.last_raw), shaped_reward, terminated, truncated, info
 
 
 def make_env(args: argparse.Namespace, hard_seeds: list[int] | None = None):
     return ResidualCorrectionEnv(args, hard_seeds=hard_seeds)
+
+
+def recovery_pressure(raw_state: Any, n_poles: int) -> float:
+    raw = np.asarray(raw_state, dtype=np.float32).reshape(-1)
+    n = int(n_poles)
+    if raw.size < 2 + 2 * n:
+        return 0.0
+    cart = abs(float(raw[0])) / 2.4
+    angle = float(np.max(np.abs(raw[2 : 2 + n]))) / 0.20943951023931953
+    velocity = float(np.max(np.abs(raw[2 + n : 2 + 2 * n]))) / 5.0
+    return float(np.clip(0.35 * cart + 0.45 * angle + 0.20 * velocity, 0.0, 2.0))
 
 
 def eval_seeds(args: argparse.Namespace) -> list[int]:
@@ -415,6 +478,7 @@ def train_residual(args: argparse.Namespace) -> dict[str, Any]:
         "base_normalizer_path": args.base_normalizer_path,
         "residual_model_path": str(model_path),
         "residual_feature_mode": args.residual_feature_mode,
+        "residual_base_controller": args.residual_base_controller,
         "timesteps": train_timesteps,
         "eval_seeds": seeds,
         "base_eval": evaluate_base(args, seeds),
@@ -423,6 +487,7 @@ def train_residual(args: argparse.Namespace) -> dict[str, Any]:
         "recon_residual_eval": evaluate_recon_residual(str(model_path), args, seeds),
         "mechanisms": {
             "frozen_base_policy_terminal": True,
+            "residual_base_controller": args.residual_base_controller,
             "learned_residual_policy": True,
             "risk_gate": True,
             "proposal_diagnostics": args.residual_feature_mode == "proposal_diagnostics",
@@ -444,6 +509,7 @@ def main() -> None:
     parser.add_argument("--residual-model-path", default="")
     parser.add_argument("--base-normalizer-path", default="")
     parser.add_argument("--base-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--residual-base-controller", choices=["ppo", "recon_policy_terminal"], default="ppo")
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
@@ -465,6 +531,9 @@ def main() -> None:
     parser.add_argument("--low-risk-change-penalty", type=float, default=0.05)
     parser.add_argument("--late-survival-bonus", type=float, default=0.02)
     parser.add_argument("--late-survival-start-fraction", type=float, default=0.80)
+    parser.add_argument("--recovery-progress-weight", type=float, default=0.0)
+    parser.add_argument("--failure-penalty", type=float, default=0.0)
+    parser.add_argument("--success-bonus", type=float, default=0.0)
     parser.add_argument("--hard-train-seeds", default="")
     parser.add_argument("--hard-seed-probability", type=float, default=0.55)
     parser.add_argument("--timesteps", type=int, default=50_000)

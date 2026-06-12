@@ -70,6 +70,68 @@ def test_success_bonus_is_training_only():
     assert "success_bonus" not in info
 
 
+def test_residual_env_can_use_recon_base_controller(monkeypatch):
+    residual = _load_script("train_residual_policy_terminal")
+    captured = {"started": 0}
+
+    class FakeController:
+        def __init__(self, config):
+            captured["mode"] = config.mode
+            captured["policy_terminal_path"] = config.policy_terminal_path
+
+        def start_episode(self):
+            captured["started"] += 1
+
+        def act(self, env_obs, raw):
+            return 4, {"force": 10.0}
+
+    monkeypatch.setattr(residual, "ReConCartPoleController", FakeController)
+    args = SimpleNamespace(
+        n_poles=1,
+        horizon=4,
+        dt=0.02,
+        dynamics_mode="parallel",
+        env_action_mode="discrete",
+        discrete_action_bins=5,
+        force_mag=10.0,
+        initial_angle_range=0.0,
+        force_noise=0.0,
+        link_coupling=0.35,
+        base_model_path="base.zip",
+        device="cpu",
+        residual_base_controller="recon_policy_terminal",
+        selection_mode="hard_select",
+        policy_terminal_blend=1.0,
+        policy_terminal_scope="stabilize_chain",
+        base_observation_mode="normalized_raw",
+        base_normalizer_path="",
+        residual_feature_mode="basic",
+        residual_action_bins=5,
+        hard_seed_probability=0.0,
+    )
+
+    env = residual.ResidualCorrectionEnv(args)
+    obs, info = env.reset(seed=3)
+    action, force = env._base_action_and_force(obs, info["raw_state"])
+
+    assert captured["mode"] == "recon_policy_terminal"
+    assert captured["policy_terminal_path"] == "base.zip"
+    assert captured["started"] == 1
+    assert action == 4
+    assert force == 10.0
+
+
+def test_residual_recovery_pressure_increases_with_state_risk():
+    import numpy as np
+
+    residual = _load_script("train_residual_policy_terminal")
+    calm = np.asarray([0.0, 0.0, 0.01, -0.01, 0.1, -0.1], dtype=np.float32)
+    risky = np.asarray([1.8, 0.0, 0.16, -0.12, 3.0, -2.5], dtype=np.float32)
+
+    assert residual.recovery_pressure(risky, 2) > residual.recovery_pressure(calm, 2)
+    assert residual.recovery_pressure(calm, 2) >= 0.0
+
+
 def test_residual_proposal_diagnostic_features_are_stable_size():
     from recon_cartpole.control.residual_features import residual_aux_feature_size, residual_aux_features
     import numpy as np
