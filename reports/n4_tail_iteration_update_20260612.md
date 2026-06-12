@@ -476,3 +476,26 @@ Gate sweep: `reports/n4_counterfactual_residual_subchain_gate_sweep_20260612`
 
 Interpretation: subchain diagnostics make the residual label problem much less sparse than the earlier one-tick residual probes, so the representation is moving in the right direction. The learned residual still does not improve held-out control once integrated into ReCoN; it mostly learns interventions that are not useful enough under the weak-block dynamics. The next residual attempt should optimize an explicit trajectory advantage/recovery target, or use motif-risk to select multi-step recovery windows, rather than trusting permissive short-horizon bin labels. No N=4 solve claim is justified.
 
+## Advantage-gated residual label calibration
+
+Code changes:
+
+- `train_counterfactual_residual_terminal.py` now supports stricter counterfactual label gates: `--min-survival-gain` and `--min-margin-gain` in addition to `--min-score-gap`.
+- Residual reports now record the active label gates plus chosen/best survival and margin gain statistics, so a residual run can distinguish high-volume score labels from actual recovery-advantage labels.
+- Added a unit test proving that `label_state` suppresses a high-scoring residual class unless it clears the configured survival-gain gate.
+
+Calibration run: `reports/n4_counterfactual_residual_advantage_subchain_20260612_seed2392k_calib`
+
+- Feature mode: `subchain_diagnostics`.
+- Option hold: 6 ticks.
+- Probe horizon: 180 ticks, no counterfactual force noise.
+- Label gates: `min_score_gap=0.10`, `min_survival_gain=1`, `min_margin_gain=-0.02`.
+- Dataset: 212 rows, 7 non-noop labels.
+- Label counts: `0:0`, `1:3`, `2:205`, `3:3`, `4:1`.
+- Mean chosen survival gain: 0.033; max best survival gain: 1.000.
+- Weak-block calibration eval over seeds `2100000..2100039`: frozen base success `0.600`, residual success `0.600`, mean abs residual delta `0.045`.
+
+A stricter attempt with `min_survival_gain=2` produced 194 rows and 0 non-noop labels before being terminated. This is useful negative evidence: residual actions that produce multi-tick survival advantage are extremely sparse under the current short-horizon counterfactual probe.
+
+Interpretation: advantage-gated labels are much more causally honest than the permissive subchain labels, but they are too sparse to move held-out control in this form. The next residual path should probably optimize trajectory-level advantage/recovery directly, or train a recurrent recovery option on selected windows, rather than fitting a point classifier to isolated rare labels. No N=4 solve claim is justified.
+

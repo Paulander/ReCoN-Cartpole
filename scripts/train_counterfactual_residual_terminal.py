@@ -175,14 +175,35 @@ def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step:
 def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, Any]:
     options = [counterfactual_score(args, state["raw_before"], int(state["step"]), float(state["force"]), cls) for cls in range(int(args.residual_action_bins))]
     center = int(args.residual_action_bins) // 2
-    scores = [float(item["score"]) for item in options]
-    best_score = max(scores)
-    center_score = scores[center]
-    best_classes = [idx for idx, value in enumerate(scores) if abs(value - best_score) <= float(args.score_tolerance)]
+    center_option = options[center]
+    center_score = float(center_option["score"])
+    center_survived = int(center_option["survived"])
+    center_margin = float(center_option["margin"])
+    best_option = max(options, key=lambda item: float(item["score"]))
+    best_score = float(best_option["score"])
+    best_classes = [
+        idx for idx, item in enumerate(options)
+        if abs(float(item["score"]) - best_score) <= float(args.score_tolerance)
+    ]
     label = center
-    if (best_score - center_score) >= float(args.min_score_gap) and center not in best_classes:
-        label = int(best_classes[0])
+    eligible: list[dict[str, Any]] = []
+    for idx, item in enumerate(options):
+        survival_gain = int(item["survived"]) - center_survived
+        margin_gain = float(item["margin"]) - center_margin
+        score_gap = float(item["score"]) - center_score
+        if idx == center:
+            continue
+        if score_gap < float(args.min_score_gap):
+            continue
+        if survival_gain < int(getattr(args, "min_survival_gain", 0)):
+            continue
+        if margin_gain < float(getattr(args, "min_margin_gain", 0.0)):
+            continue
+        eligible.append(item)
+    if eligible and center not in best_classes:
+        label = int(max(eligible, key=lambda item: float(item["score"]))["class"])
     feature = residual_observation(args, state["raw_before"], float(state["force"]), int(state["step"]))
+    chosen = options[int(label)]
     return {
         "feature": feature.tolist(),
         "label": int(label),
@@ -193,6 +214,11 @@ def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, An
         "center_score": float(center_score),
         "best_score": float(best_score),
         "score_gap": float(best_score - center_score),
+        "chosen_score": float(chosen["score"]),
+        "chosen_survival_gain": int(chosen["survived"]) - center_survived,
+        "chosen_margin_gain": float(chosen["margin"]) - center_margin,
+        "best_survival_gain": int(best_option["survived"]) - center_survived,
+        "best_margin_gain": float(best_option["margin"]) - center_margin,
     }
 
 
@@ -346,12 +372,30 @@ def evaluate_controller(args: argparse.Namespace, residual_path: str = "", gate_
 def label_summary(rows: list[dict[str, Any]], classes: int) -> dict[str, Any]:
     counts = {str(idx): 0 for idx in range(classes)}
     gaps: list[float] = []
+    chosen_survival_gains: list[float] = []
+    chosen_margin_gains: list[float] = []
+    best_survival_gains: list[float] = []
+    best_margin_gains: list[float] = []
     for row in rows:
         label = int(row.get("label", 0))
         counts[str(label)] = counts.get(str(label), 0) + 1
         gaps.append(float(row.get("score_gap", 0.0)))
+        chosen_survival_gains.append(float(row.get("chosen_survival_gain", 0.0)))
+        chosen_margin_gains.append(float(row.get("chosen_margin_gain", 0.0)))
+        best_survival_gains.append(float(row.get("best_survival_gain", 0.0)))
+        best_margin_gains.append(float(row.get("best_margin_gain", 0.0)))
     center = classes // 2
-    return {"row_count": len(rows), "label_counts": counts, "non_noop_count": sum(v for k, v in counts.items() if int(k) != center), "max_score_gap": max(gaps) if gaps else 0.0, "mean_score_gap": float(np.mean(gaps)) if gaps else 0.0}
+    return {
+        "row_count": len(rows),
+        "label_counts": counts,
+        "non_noop_count": sum(v for k, v in counts.items() if int(k) != center),
+        "max_score_gap": max(gaps) if gaps else 0.0,
+        "mean_score_gap": float(np.mean(gaps)) if gaps else 0.0,
+        "mean_chosen_survival_gain": float(np.mean(chosen_survival_gains)) if chosen_survival_gains else 0.0,
+        "mean_chosen_margin_gain": float(np.mean(chosen_margin_gains)) if chosen_margin_gains else 0.0,
+        "max_best_survival_gain": max(best_survival_gains) if best_survival_gains else 0.0,
+        "max_best_margin_gain": max(best_margin_gains) if best_margin_gains else 0.0,
+    }
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
@@ -374,6 +418,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "residual_eval": residual_eval,
         "eval_seeds": eval_seed_values(args),
         "option_hold_steps": int(getattr(args, "option_hold_steps", 1)),
+        "label_gates": {
+            "min_score_gap": float(args.min_score_gap),
+            "min_survival_gain": int(getattr(args, "min_survival_gain", 0)),
+            "min_margin_gain": float(getattr(args, "min_margin_gain", 0.0)),
+            "score_tolerance": float(args.score_tolerance),
+        },
         "mechanisms": {"counterfactual_residual_terminal": True, "residual_option_hold": int(getattr(args, "option_hold_steps", 1)) > 1, "recon_integration_eval": True, "gain_mutation": False},
         "wall_clock_seconds": time.perf_counter() - started,
     }
@@ -394,6 +444,8 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Rows: `{ds['row_count']}`, non-noop labels: `{ds['non_noop_count']}`",
         f"Label counts: `{ds['label_counts']}`",
         f"Option hold steps: `{result.get('option_hold_steps', 1)}`",
+        f"Label gates: `{result.get('label_gates', {})}`",
+        f"Mean chosen survival gain: `{ds.get('mean_chosen_survival_gain', 0.0):.3f}`; max best survival gain: `{ds.get('max_best_survival_gain', 0.0):.3f}`",
         "",
         "| evaluator | mean | p10 | cvar | success | mean abs delta | episodes |",
         "|---|---:|---:|---:|---:|---:|---:|",
@@ -439,6 +491,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--margin-weight", type=float, default=1.0)
     parser.add_argument("--shift-penalty", type=float, default=0.02)
     parser.add_argument("--min-score-gap", type=float, default=0.03)
+    parser.add_argument("--min-survival-gain", type=int, default=0)
+    parser.add_argument("--min-margin-gain", type=float, default=0.0)
     parser.add_argument("--score-tolerance", type=float, default=1e-6)
     parser.add_argument("--counterfactual-no-noise", action="store_true")
     parser.add_argument("--hidden-size", type=int, default=64)
