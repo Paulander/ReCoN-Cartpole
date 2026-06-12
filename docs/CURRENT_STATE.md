@@ -489,3 +489,26 @@ Verification for the collector code:
 
 - `uv run ruff check scripts/collect_mingru_hard_seeds.py tests/test_policy_terminal_training.py` -> passed.
 - `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs -q -s` -> passed.
+
+
+## minGRU On-Policy Fine-Tuning Baseline - 2026-06-13
+
+Added `scripts/train_mingru_onpolicy.py`, a conservative actor-critic fine-tuner for minGRU recurrent checkpoints. It rolls out the current recurrent policy on fresh seeds, optimizes discounted survival returns with value loss and entropy, and applies a frozen-reference KL penalty to reduce drift from the DAgger checkpoint. This is not full PPO yet; it is a small on-policy baseline to test whether survival-gradient updates can move the recurrent tail.
+
+Verification and smoke:
+
+- `uv run ruff check scripts/train_mingru_onpolicy.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs tests/test_policy_terminal_training.py::test_mingru_onpolicy_discounted_returns -q -s` -> 2 passed.
+- `reports/smoke_mingru_onpolicy_20260613` completed successfully on a short horizon; this was only an integration smoke.
+
+Held-out eval uses the same 80 mixed seeds from starts `1900000`, `2000000`, `2100000`, and `2200000` as the DAgger plateau reports.
+
+| run | train seeds | update style | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success | interpretation |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---|
+| `reports/n4_mingru_curriculum_subchain_motif_dagger5_20260612_seed4810k` | supervised DAgger baseline | teacher-label DAgger | 487.4 | 443.8 | 0.675 | 487.4 | 443.8 | 0.675 | standing recurrent plateau |
+| `reports/n4_mingru_onpolicy_from_dagger5_20260613_seed6300k` | 96 fresh seeds | LR `1e-6`, KL `0.05` | 487.4 | 443.8 | 0.675 | 486.2 | 440.6 | 0.6625 | too conservative to improve pure policy; wrapper dipped |
+| `reports/n4_mingru_onpolicy_stronger_from_dagger5_20260613_seed6500k` | 48 fresh seeds | LR `5e-6`, KL `0.01` | 487.4 | 443.9 | 0.675 | 486.2 | 440.6 | 0.6625 | stronger updates still did not improve held-out block |
+
+Interpretation: this first on-policy minGRU actor-critic baseline did not crack the DAgger plateau. The pure recurrent policy barely moved, while ReCoN-wrapped performance dipped from 0.675 to 0.6625. The likely issue is that single-policy-gradient updates over sparse survival returns are too noisy and do not target the specific late `pole_1_angle` / `pole_2_angle` failure modes sharply enough.
+
+Next best move: either implement a more faithful PPO-style clipped objective with stored old log-probs and minibatch epochs, or return to the residual/on-policy specialist path where the action space is deliberately small and the objective can focus on late failures without rewriting the whole recurrent controller. No N=4 solve claim is justified from these runs.

@@ -684,6 +684,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     counterfactual_gate = _load_script("train_counterfactual_action_gate")
     mingru_curriculum = _load_script("train_mingru_curriculum")
     mingru_hard_seeds = _load_script("collect_mingru_hard_seeds")
+    mingru_onpolicy = _load_script("train_mingru_onpolicy")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -704,6 +705,15 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(counterfactual_gate.run)
     assert callable(mingru_curriculum.run)
     assert callable(mingru_hard_seeds.run_collect)
+    assert callable(mingru_onpolicy.run)
+
+
+def test_mingru_onpolicy_discounted_returns():
+    onpolicy = _load_script("train_mingru_onpolicy")
+
+    returns = onpolicy.discounted_returns([1.0, 2.0, 3.0], 0.5)
+
+    assert returns.tolist() == pytest.approx([2.75, 3.5, 3.0])
 
 
 def test_action_comparison_summarizes_seed_deltas():
