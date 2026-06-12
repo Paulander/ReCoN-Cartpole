@@ -84,6 +84,8 @@ class MinGRUTerminal:
             raw_state,
             self.n_poles,
             self.config.observation_mode,
+            previous_force=self.prev_force,
+            force_mag=self.force_mag,
         ).astype(np.float32, copy=False)
 
     def _context_vector(self, context: dict[str, Any] | None) -> list[float]:
@@ -107,7 +109,7 @@ class MinGRUTerminal:
             self.n_poles,
             self.config.observation_mode,
         ).size
-        extras = 1 if self.config.include_prev_force else 0
+        extras = 1 if self.config.include_prev_force and "prev_force" not in self.config.observation_mode else 0
         extras += 3 if self.config.include_context else 0
         return int(base + extras)
 
@@ -152,7 +154,7 @@ class MinGRUTerminal:
         self, observation: Any, raw_state: Any | None, context: dict[str, Any] | None = None
     ) -> np.ndarray:
         parts = [self._base_observation(observation, raw_state)]
-        if self.config.include_prev_force:
+        if self.config.include_prev_force and "prev_force" not in self.config.observation_mode:
             parts.append(np.asarray([self.prev_force / max(self.force_mag, 1e-9)], dtype=np.float32))
         context_values = self._context_vector(context)
         if context_values:

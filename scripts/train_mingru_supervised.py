@@ -11,9 +11,13 @@ import numpy as np
 from recon_cartpole.recon.mingru_terminal import MinGRUTerminal, MinGRUTerminalConfig
 
 
+def observation_mode_has_prev_force(mode: str) -> bool:
+    return "prev_force" in str(mode)
+
+
 def build_inputs(data: dict[str, np.ndarray], args: argparse.Namespace) -> np.ndarray:
     parts = [data["observations"].astype(np.float32)]
-    if args.include_prev_force:
+    if args.include_prev_force and not observation_mode_has_prev_force(args.observation_mode):
         parts.append((data["prev_forces"].astype(np.float32) / max(args.force_mag, 1e-9))[:, None])
     if args.include_context:
         # Supervised traces do not yet store ReCoN risk/regime context; keep the input shape
@@ -165,7 +169,7 @@ def main() -> None:
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--force-mag", type=float, default=10.0)
     parser.add_argument("--discrete-action-bins", type=int, default=5)
-    parser.add_argument("--observation-mode", choices=["env", "normalized_raw"], default="normalized_raw")
+    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
     parser.add_argument("--hidden-size", type=int, default=64)
     parser.add_argument("--sequence-length", type=int, default=8)
     parser.add_argument("--include-prev-force", action="store_true", default=True)

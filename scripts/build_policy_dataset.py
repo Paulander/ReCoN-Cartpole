@@ -54,7 +54,7 @@ def make_teacher(args: argparse.Namespace):
                 policy_terminal_path=args.policy_terminal_path,
                 policy_terminal_blend=args.policy_terminal_blend,
                 policy_terminal_scope=args.policy_terminal_scope,
-                policy_terminal_observation_mode=args.observation_mode,
+                policy_terminal_observation_mode=args.teacher_observation_mode,
             )
         )
     raise ValueError(f"unsupported teacher: {args.teacher}")
@@ -84,7 +84,12 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
         for step in range(args.horizon):
             raw = info.get("raw_state")
             policy_obs = policy_observation_from_state(
-                obs, raw, args.n_poles, args.observation_mode
+                obs,
+                raw,
+                args.n_poles,
+                args.observation_mode,
+                previous_force=prev_force,
+                force_mag=args.force_mag,
             )
             if teacher is None:
                 from recon_cartpole.control.sensors import features_from_state
@@ -155,7 +160,8 @@ def main() -> None:
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
-    parser.add_argument("--observation-mode", choices=["env", "normalized_raw"], default="normalized_raw")
+    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
+    parser.add_argument("--teacher-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
     parser.add_argument("--policy-terminal-path", default="")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
@@ -181,6 +187,7 @@ def main() -> None:
             "force_noise": args.force_noise,
             "link_coupling": args.link_coupling,
             "observation_mode": args.observation_mode,
+            "teacher_observation_mode": args.teacher_observation_mode,
         },
     }
     out.with_suffix(".json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")

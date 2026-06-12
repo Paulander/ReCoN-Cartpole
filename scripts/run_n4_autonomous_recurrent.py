@@ -767,7 +767,7 @@ def main() -> None:
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
-    parser.add_argument("--observation-mode", choices=["env", "normalized_raw"], default="normalized_raw")
+    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
     parser.add_argument("--scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
     parser.add_argument("--hidden-sizes", nargs="+", type=int, default=[32, 64])
     parser.add_argument("--sequence-lengths", nargs="+", type=int, default=[4, 8, 16])

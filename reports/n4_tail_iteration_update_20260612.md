@@ -113,3 +113,30 @@ Run: `reports/n4_recurrent_multiblock_tail_20260612_seed2720k`
 - ReCoN recurrent terminal final: mean 465.0, p10 389.5, CVaR 365.7, success 0.492.
 
 Interpretation: direct recurrent PPO from scratch is currently much weaker than the best feedforward ReCoN terminal on the same held-out block. The recurrent path likely needs distillation/warm-start from the feedforward policy or a different recurrent terminal training objective before it is competitive.
+
+
+## Teacher-distilled minGRU warm-start attempt
+
+Code changes:
+
+- minGRU dataset/training/ladder scripts now accept padded policy observation modes: `normalized_raw4`, `normalized_raw_prev_force`, and `normalized_raw4_prev_force`.
+- minGRU previous-force handling now avoids double-counting the force column when the observation mode already includes it.
+- `build_policy_dataset.py` now separates student `--observation-mode` from `--teacher-observation-mode`, so a padded recurrent student can imitate the existing feedforward teacher without changing the teacher checkpoint input shape.
+- `train_recurrent_terminal_ladder.py` now supports multi-block `--validation-seed-starts`.
+
+Run: `reports/n4_mingru_distill_20260612_seed2730k`
+
+- Teacher: current best feedforward ReCoN policy terminal, checkpoint `reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip`.
+- Student observations: `normalized_raw4_prev_force`.
+- Teacher observations: `normalized_raw`.
+- Dataset: 60 episodes from seed start 1720000, 28,999 samples.
+- Supervised minGRU: hidden 64, sequence length 16, 8 epochs.
+- Final validation action accuracy: 0.751.
+- Held-out ladder eval: seed starts 1900000 and 2000000, 60 episodes each.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure_mingru_policy | 462.0 | 377.9 | 0.467 | 120 |
+| recon_mingru_terminal | 463.4 | 382.9 | 0.492 | 120 |
+
+Interpretation: distillation/warm-start made the minGRU path valid and measurable with padded previous-force inputs, but this small supervised student is still far below the feedforward ReCoN terminal. The recurrent path needs either much stronger imitation data/training or a residual recurrent objective rather than replacing the feedforward terminal.

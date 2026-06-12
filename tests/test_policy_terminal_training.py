@@ -505,3 +505,89 @@ def test_recurrent_tail_final_seed_start_fallback():
     args = SimpleNamespace(final_seed_start=10, final_seed_starts=None, final_eval_episodes=2)
 
     assert recurrent_tail.recurrent_final_seeds(args) == [10, 11]
+
+
+def test_mingru_build_inputs_avoids_duplicate_prev_force_column():
+    import numpy as np
+
+    supervised = _load_script("train_mingru_supervised")
+    data = {
+        "observations": np.zeros((2, 11), dtype=np.float32),
+        "prev_forces": np.asarray([0.0, 5.0], dtype=np.float32),
+    }
+    args = SimpleNamespace(
+        include_prev_force=True,
+        include_context=False,
+        observation_mode="normalized_raw4_prev_force",
+        force_mag=10.0,
+    )
+
+    inputs = supervised.build_inputs(data, args)
+
+    assert inputs.shape == (2, 11)
+
+
+def test_mingru_terminal_padded_prev_force_observation_uses_state_force():
+    import numpy as np
+    from recon_cartpole.recon.mingru_terminal import MinGRUTerminal, MinGRUTerminalConfig
+
+    terminal = MinGRUTerminal(
+        3,
+        10.0,
+        5,
+        MinGRUTerminalConfig(
+            enabled=True,
+            observation_mode="normalized_raw4_prev_force",
+            include_prev_force=True,
+            include_context=False,
+        ),
+    )
+    terminal.prev_force = 5.0
+    raw = np.asarray([0.24, 0.5, 0.01, -0.02, -0.03, 0.1, -0.2, 0.3], dtype=np.float32)
+
+    vector = terminal.observation_vector(raw, raw, {})
+
+    assert vector.shape == (11,)
+    assert terminal.input_size == 11
+    assert vector[5] == 0.0
+    assert vector[9] == 0.0
+    assert vector[-1] == 0.5
+
+    prediction = terminal.predict(raw, raw, {})
+
+    assert prediction.valid is True
+    assert len(prediction.logits) == 5
+
+
+def test_policy_dataset_teacher_observation_mode_is_separate(monkeypatch):
+    builder = _load_script("build_policy_dataset")
+    captured = {}
+
+    class FakeController:
+        def __init__(self, config):
+            captured["observation_mode"] = config.policy_terminal_observation_mode
+
+    monkeypatch.setattr(builder, "ReConCartPoleController", FakeController)
+    args = SimpleNamespace(
+        teacher="recon_policy_terminal",
+        n_poles=4,
+        discrete_action_bins=5,
+        force_mag=10.0,
+        selection_mode="hard_select",
+        policy_terminal_path="teacher.zip",
+        policy_terminal_blend=1.0,
+        policy_terminal_scope="stabilize_chain",
+        observation_mode="normalized_raw4_prev_force",
+        teacher_observation_mode="normalized_raw",
+    )
+
+    builder.make_teacher(args)
+
+    assert captured["observation_mode"] == "normalized_raw"
+
+
+def test_recurrent_ladder_validation_seed_starts_expand_blocks():
+    ladder = _load_script("train_recurrent_terminal_ladder")
+    args = SimpleNamespace(validation_seed_start=10, validation_seed_starts=[100, 200], validation_episodes=2)
+
+    assert ladder.ladder_validation_seeds(args) == [100, 101, 200, 201]

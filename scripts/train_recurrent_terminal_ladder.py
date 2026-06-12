@@ -60,6 +60,14 @@ def terminal_config(args: argparse.Namespace, checkpoint_path: str, hidden: int,
     )
 
 
+def ladder_validation_seeds(args: argparse.Namespace) -> list[int]:
+    starts = getattr(args, "validation_seed_starts", None) or [args.validation_seed_start]
+    seeds: list[int] = []
+    for start in starts:
+        seeds.extend(int(start) + idx for idx in range(int(args.validation_episodes)))
+    return seeds
+
+
 def evaluate_recon_mingru(checkpoint_path: str, args: argparse.Namespace, seeds: list[int], hidden: int, seq_len: int) -> dict[str, Any]:
     controller = ReConCartPoleController(
         RunnerConfig(
@@ -166,7 +174,7 @@ def run_ladder(args: argparse.Namespace) -> dict[str, Any]:
     started = time.perf_counter()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    seeds = [args.validation_seed_start + i for i in range(args.validation_episodes)]
+    seeds = ladder_validation_seeds(args)
     rows: list[dict[str, Any]] = []
     for idx, spec in enumerate(candidate_specs(args)):
         c_payload = {
@@ -268,7 +276,7 @@ def main() -> None:
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
-    parser.add_argument("--observation-mode", choices=["env", "normalized_raw"], default="normalized_raw")
+    parser.add_argument("--observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw")
     parser.add_argument("--scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
     parser.add_argument("--blend", type=float, default=1.0)
     parser.add_argument("--confidence-floor", type=float, default=0.05)
@@ -283,6 +291,7 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--train-seed", type=int, default=9117)
     parser.add_argument("--validation-seed-start", type=int, default=820000)
+    parser.add_argument("--validation-seed-starts", type=int, nargs="+", default=None)
     parser.add_argument("--validation-episodes", type=int, default=60)
     parser.add_argument("--min-mean-gate", type=float, default=250.0)
     parser.add_argument("--min-success-gate", type=float, default=0.05)
