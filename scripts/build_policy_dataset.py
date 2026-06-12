@@ -7,10 +7,12 @@ from typing import Any
 
 import numpy as np
 
+from recon_cartpole.control.actuators import action_from_force
 from recon_cartpole.control.controllers import heuristic_force
 from recon_cartpole.control.policy_observation import policy_observation_from_state
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
+from recon_cartpole.recon.mingru_terminal import MinGRUTerminal, MinGRUTerminalConfig
 
 
 def action_force(action: Any, force_mag: float, bins: int) -> float:
@@ -54,10 +56,37 @@ def make_teacher(args: argparse.Namespace):
                 policy_terminal_path=args.policy_terminal_path,
                 policy_terminal_blend=args.policy_terminal_blend,
                 policy_terminal_scope=args.policy_terminal_scope,
-                policy_terminal_observation_mode=args.teacher_observation_mode,
+                policy_terminal_observation_mode=getattr(args, "teacher_observation_mode", args.observation_mode),
             )
         )
     raise ValueError(f"unsupported teacher: {args.teacher}")
+
+
+def make_behavior(args: argparse.Namespace):
+    rollout_policy = getattr(args, "rollout_policy", "teacher")
+    if rollout_policy == "teacher":
+        return None
+    if rollout_policy == "mingru_terminal":
+        if not args.behavior_checkpoint_path:
+            raise ValueError("--behavior-checkpoint-path is required for --rollout-policy mingru_terminal")
+        return MinGRUTerminal(
+            args.n_poles,
+            args.force_mag,
+            args.discrete_action_bins,
+            MinGRUTerminalConfig(
+                enabled=True,
+                hidden_size=args.behavior_hidden_size,
+                sequence_length=args.behavior_sequence_length,
+                observation_mode=args.behavior_observation_mode,
+                include_prev_force=args.behavior_include_prev_force,
+                include_context=args.behavior_include_context,
+                blend=1.0,
+                scope=args.policy_terminal_scope,
+                confidence_floor=args.behavior_confidence_floor,
+                checkpoint_path=args.behavior_checkpoint_path,
+            ),
+        )
+    raise ValueError(f"unsupported rollout policy: {rollout_policy}")
 
 
 def collect(args: argparse.Namespace) -> dict[str, Any]:
@@ -69,16 +98,22 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     failure_within_k: list[float] = []
     seeds: list[int] = []
     sources: list[str] = []
+    rollout_sources: list[str] = []
+    rollout_forces: list[float] = []
+    rollout_actions: list[int] = []
     episodes: list[int] = []
     step_indices: list[int] = []
 
     teacher = make_teacher(args)
+    behavior = make_behavior(args)
     env = make_env(args)
     for ep in range(args.episodes):
         seed = args.seed_start + ep
         obs, info = env.reset(seed=seed)
         if teacher is not None:
             teacher.start_episode()
+        if behavior is not None:
+            behavior.reset()
         episode_rows: list[dict[str, Any]] = []
         prev_force = 0.0
         for step in range(args.horizon):
@@ -100,20 +135,32 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             else:
                 action, diagnostics = teacher.act(obs, raw)
                 force = float(diagnostics.get("force", action_force(action, args.force_mag, args.discrete_action_bins)))
-            next_obs, reward, terminated, truncated, info = env.step(action)
+            if behavior is None:
+                rollout_action = int(action)
+                rollout_force = float(force)
+                rollout_source = args.teacher
+            else:
+                prediction = behavior.predict(obs, raw, {})
+                rollout_force = 0.0 if prediction.force is None else float(prediction.force)
+                rollout_action = int(action_from_force(rollout_force, "discrete", args.force_mag, args.discrete_action_bins))
+                rollout_source = getattr(args, "rollout_policy", "teacher")
+            next_obs, reward, terminated, truncated, info = env.step(rollout_action)
             episode_rows.append(
                 {
                     "observation": policy_obs.astype(np.float32),
                     "prev_force": float(prev_force),
                     "force": float(force),
                     "action": int(action),
+                    "rollout_force": float(rollout_force),
+                    "rollout_action": int(rollout_action),
+                    "rollout_source": rollout_source,
                     "reward": float(reward),
                     "seed": seed,
                     "episode": ep,
                     "step": step,
                 }
             )
-            prev_force = force
+            prev_force = rollout_force
             obs = next_obs
             if terminated or truncated:
                 break
@@ -129,6 +176,9 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             failure_within_k.append(float((last - idx) <= args.failure_window and last + 1 < args.horizon))
             seeds.append(row["seed"])
             sources.append(args.teacher)
+            rollout_sources.append(row["rollout_source"])
+            rollout_forces.append(row["rollout_force"])
+            rollout_actions.append(row["rollout_action"])
             episodes.append(row["episode"])
             step_indices.append(row["step"])
     return {
@@ -140,6 +190,9 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
         "failure_within_k": np.asarray(failure_within_k, dtype=np.float32),
         "seeds": np.asarray(seeds, dtype=np.int64),
         "sources": np.asarray(sources),
+        "rollout_sources": np.asarray(rollout_sources),
+        "rollout_forces": np.asarray(rollout_forces, dtype=np.float32),
+        "rollout_actions": np.asarray(rollout_actions, dtype=np.int64),
         "episodes": np.asarray(episodes, dtype=np.int64),
         "step_indices": np.asarray(step_indices, dtype=np.int64),
     }
@@ -165,6 +218,16 @@ def main() -> None:
     parser.add_argument("--policy-terminal-path", default="")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
+    parser.add_argument("--rollout-policy", choices=["teacher", "mingru_terminal"], default="teacher")
+    parser.add_argument("--behavior-checkpoint-path", default="")
+    parser.add_argument("--behavior-hidden-size", type=int, default=64)
+    parser.add_argument("--behavior-sequence-length", type=int, default=16)
+    parser.add_argument("--behavior-observation-mode", choices=["env", "normalized_raw", "normalized_raw_prev_force", "normalized_raw4", "normalized_raw4_prev_force"], default="normalized_raw4_prev_force")
+    parser.add_argument("--behavior-include-prev-force", action="store_true", default=True)
+    parser.add_argument("--behavior-no-prev-force", dest="behavior_include_prev_force", action="store_false")
+    parser.add_argument("--behavior-include-context", action="store_true", default=True)
+    parser.add_argument("--behavior-no-context", dest="behavior_include_context", action="store_false")
+    parser.add_argument("--behavior-confidence-floor", type=float, default=0.05)
     parser.add_argument("--failure-window", type=int, default=50)
     parser.add_argument("--out", default="reports/mingru_dataset/dataset.npz")
     args = parser.parse_args()
@@ -188,6 +251,9 @@ def main() -> None:
             "link_coupling": args.link_coupling,
             "observation_mode": args.observation_mode,
             "teacher_observation_mode": args.teacher_observation_mode,
+            "rollout_policy": args.rollout_policy,
+            "behavior_checkpoint_path": args.behavior_checkpoint_path,
+            "behavior_observation_mode": args.behavior_observation_mode,
         },
     }
     out.with_suffix(".json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")

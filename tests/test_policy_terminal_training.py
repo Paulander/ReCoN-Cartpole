@@ -586,6 +586,49 @@ def test_policy_dataset_teacher_observation_mode_is_separate(monkeypatch):
     assert captured["observation_mode"] == "normalized_raw"
 
 
+def test_policy_dataset_mingru_behavior_uses_rollout_config(monkeypatch):
+    builder = _load_script("build_policy_dataset")
+    captured = {}
+
+    class FakeMinGRU:
+        def __init__(self, n_poles, force_mag, discrete_action_bins, config):
+            captured["n_poles"] = n_poles
+            captured["force_mag"] = force_mag
+            captured["discrete_action_bins"] = discrete_action_bins
+            captured["config"] = config
+
+    monkeypatch.setattr(builder, "MinGRUTerminal", FakeMinGRU)
+    args = SimpleNamespace(
+        rollout_policy="mingru_terminal",
+        behavior_checkpoint_path="student.pt",
+        behavior_hidden_size=128,
+        behavior_sequence_length=32,
+        behavior_observation_mode="normalized_raw4_prev_force",
+        behavior_include_prev_force=True,
+        behavior_include_context=False,
+        behavior_confidence_floor=0.05,
+        policy_terminal_scope="stabilize_chain",
+        n_poles=4,
+        force_mag=10.0,
+        discrete_action_bins=5,
+    )
+
+    behavior = builder.make_behavior(args)
+
+    assert isinstance(behavior, FakeMinGRU)
+    assert captured["n_poles"] == 4
+    assert captured["config"].hidden_size == 128
+    assert captured["config"].sequence_length == 32
+    assert captured["config"].include_context is False
+    assert captured["config"].checkpoint_path == "student.pt"
+
+
+def test_policy_dataset_default_behavior_is_teacher_rollout():
+    builder = _load_script("build_policy_dataset")
+
+    assert builder.make_behavior(SimpleNamespace()) is None
+
+
 def test_recurrent_ladder_validation_seed_starts_expand_blocks():
     ladder = _load_script("train_recurrent_terminal_ladder")
     args = SimpleNamespace(validation_seed_start=10, validation_seed_starts=[100, 200], validation_episodes=2)
