@@ -9,6 +9,7 @@ import numpy as np
 
 from recon_cartpole.control.actuators import action_from_force
 from recon_cartpole.control.controllers import heuristic_force
+from recon_cartpole.control.motif_features import load_motif_model, motif_score_from_state
 from recon_cartpole.control.policy_observation import policy_observation_from_state
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
@@ -143,11 +144,13 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     rollout_sources: list[str] = []
     rollout_forces: list[float] = []
     rollout_actions: list[int] = []
+    motif_scores: list[float] = []
     episodes: list[int] = []
     step_indices: list[int] = []
 
     teacher = make_teacher(args)
     behavior = make_behavior(args)
+    motif_model = load_motif_model(getattr(args, "motif_model_path", ""))
     env = make_env(args)
     seed_values = collection_seeds(args)
     for ep, seed in enumerate(seed_values):
@@ -189,6 +192,13 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             label_action, label_force, label_source = label_action_and_force(
                 args, int(action), float(force), int(rollout_action), float(rollout_force)
             )
+            motif_score = motif_score_from_state(
+                raw,
+                args.n_poles,
+                motif_model,
+                force_mag=args.force_mag,
+                base_force=prev_force,
+            )
             next_obs, reward, terminated, truncated, info = env.step(rollout_action)
             episode_rows.append(
                 {
@@ -202,6 +212,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
                     "rollout_force": float(rollout_force),
                     "rollout_action": int(rollout_action),
                     "rollout_source": rollout_source,
+                    "motif_score": float(motif_score),
                     "reward": float(reward),
                     "seed": seed,
                     "episode": ep,
@@ -227,6 +238,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             rollout_sources.append(row["rollout_source"])
             rollout_forces.append(row["rollout_force"])
             rollout_actions.append(row["rollout_action"])
+            motif_scores.append(row["motif_score"])
             episodes.append(row["episode"])
             step_indices.append(row["step"])
     return {
@@ -241,6 +253,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
         "rollout_sources": np.asarray(rollout_sources),
         "rollout_forces": np.asarray(rollout_forces, dtype=np.float32),
         "rollout_actions": np.asarray(rollout_actions, dtype=np.int64),
+        "motif_scores": np.asarray(motif_scores, dtype=np.float32),
         "episodes": np.asarray(episodes, dtype=np.int64),
         "step_indices": np.asarray(step_indices, dtype=np.int64),
     }
@@ -279,6 +292,7 @@ def main() -> None:
     parser.add_argument("--behavior-no-context", dest="behavior_include_context", action="store_false")
     parser.add_argument("--behavior-confidence-floor", type=float, default=0.05)
     parser.add_argument("--failure-window", type=int, default=50)
+    parser.add_argument("--motif-model-path", default="")
     parser.add_argument("--out", default="reports/mingru_dataset/dataset.npz")
     args = parser.parse_args()
     out = Path(args.out)
@@ -306,6 +320,7 @@ def main() -> None:
             "label_source": args.label_source,
             "behavior_checkpoint_path": args.behavior_checkpoint_path,
             "behavior_observation_mode": args.behavior_observation_mode,
+            "motif_model_path": args.motif_model_path,
         },
     }
     out.with_suffix(".json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")

@@ -53,6 +53,9 @@ def terminal_config(args: argparse.Namespace, checkpoint_path: str, hidden: int,
         observation_mode=args.observation_mode,
         include_prev_force=args.include_prev_force,
         include_context=args.include_context,
+        include_motif_score=bool(getattr(args, "include_motif_score", False)),
+        motif_model_path=str(getattr(args, "motif_model_path", "") or ""),
+        motif_score_scale=float(getattr(args, "motif_score_scale", 10.0)),
         blend=args.blend,
         scope=args.scope,
         confidence_floor=args.confidence_floor,
@@ -301,6 +304,9 @@ def main() -> None:
     parser.add_argument("--no-prev-force", dest="include_prev_force", action="store_false")
     parser.add_argument("--include-context", action="store_true", default=True)
     parser.add_argument("--no-context", dest="include_context", action="store_false")
+    parser.add_argument("--include-motif-score", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--motif-model-path", default="")
+    parser.add_argument("--motif-score-scale", type=float, default=10.0)
     parser.add_argument("--supervised-epochs", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--learning-rate", type=float, default=3e-4)

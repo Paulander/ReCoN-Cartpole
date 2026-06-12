@@ -23,6 +23,12 @@ def build_inputs(data: dict[str, np.ndarray], args: argparse.Namespace) -> np.nd
         # Supervised traces do not yet store ReCoN risk/regime context; keep the input shape
         # checkpoint-compatible and let future dataset builders fill these columns.
         parts.append(np.zeros((data["observations"].shape[0], 3), dtype=np.float32))
+    if bool(getattr(args, "include_motif_score", False)):
+        scores = data.get("motif_scores")
+        if scores is None:
+            scores = np.zeros((data["observations"].shape[0],), dtype=np.float32)
+        scale = max(float(getattr(args, "motif_score_scale", 10.0)), 1e-9)
+        parts.append((np.asarray(scores, dtype=np.float32).reshape(-1) / scale)[:, None])
     return np.concatenate(parts, axis=1).astype(np.float32)
 
 
@@ -178,6 +184,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         observation_mode=args.observation_mode,
         include_prev_force=args.include_prev_force,
         include_context=args.include_context,
+        include_motif_score=bool(getattr(args, "include_motif_score", False)),
+        motif_model_path=str(getattr(args, "motif_model_path", "") or ""),
+        motif_score_scale=float(getattr(args, "motif_score_scale", 10.0)),
         blend=args.blend,
         scope=args.scope,
         confidence_floor=args.confidence_floor,
@@ -309,6 +318,9 @@ def main() -> None:
     parser.add_argument("--no-prev-force", dest="include_prev_force", action="store_false")
     parser.add_argument("--include-context", action="store_true", default=True)
     parser.add_argument("--no-context", dest="include_context", action="store_false")
+    parser.add_argument("--include-motif-score", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--motif-model-path", default="")
+    parser.add_argument("--motif-score-scale", type=float, default=10.0)
     parser.add_argument("--scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
     parser.add_argument("--blend", type=float, default=1.0)
     parser.add_argument("--confidence-floor", type=float, default=0.05)

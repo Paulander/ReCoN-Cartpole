@@ -410,3 +410,27 @@ Gate sweep: `reports/n4_preserve_motif_recovery_window_residual_ppo_gate_sweep_2
 | 0.900 | 489.4 | 468.8 | 429.0 | 0.650 | matches base-level success, no lift |
 
 Interpretation: adding solved-episode preservation windows was the right guardrail, but this PPO residual formulation still learned harmful residual shifts. The residual path is now better instrumented, yet the evidence argues against spending more short-run budget on post-hoc residual overrides. The higher-signal next path is to put subchain/motif information into the primary recurrent policy or to train a much more conservative residual objective with explicit no-op class imbalance. No N=4 solve claim is justified.
+
+
+## Motif Observable for Primary Recurrent Policy - 2026-06-12
+
+Current answer to the observable question: the controller has raw/padded observation modes for cart position, cart velocity, pole angles, pole angular velocities, previous force, and adjacent-subchain feature modes. It does not yet have a separate learned ReCoN terminal for every primitive observable. The latest change adds a learned motif-score observable that can be fed directly into the primary minGRU terminal. The score is derived from the existing adjacent-subchain success/failure prototype model, so it is a causal policy input rather than a report-only gate.
+
+What this enables: successful-seed and failing-seed local patterns can be recognized online and used by the recurrent policy during supervised/curriculum training and evaluation. This is not a hand-coded recovery action and it is not a solve claim; it is a compact learned feature that can help the policy notice states similar to earlier success/failure motifs on held-out seeds.
+
+Recursive/subchain status: the system still does not recursively execute N=4 as two explicit N=2 ReCoN programs. It now exposes adjacent-link motif information in a reusable way, which is the practical first step toward that structure. The next stronger version would add explicit per-subchain terminals/proposals and an arbiter that composes their advice across overlapping two-link windows.
+
+Implementation notes:
+
+- Added `src/recon_cartpole/control/motif_features.py` for loading prototype models, building adjacent-subchain motif vectors, and scoring online states.
+- `MinGRUTerminalConfig` now supports `include_motif_score`, `motif_model_path`, and `motif_score_scale`; saved checkpoints persist those fields.
+- `build_policy_dataset.py` stores `motif_scores`; supervised minGRU training can append them to inputs; curriculum aggregation remains backward-compatible with old datasets by filling missing motif scores with zero.
+- `train_mingru_curriculum.py` and `train_recurrent_terminal_ladder.py` can pass motif-score observables through training/evaluation configs.
+
+Verification:
+
+- `uv run pytest tests/test_policy_terminal_training.py -q -s` -> 64 passed.
+- `uv run ruff check src/recon_cartpole/control/motif_features.py src/recon_cartpole/recon/mingru_terminal.py scripts/build_policy_dataset.py scripts/train_mingru_supervised.py scripts/train_mingru_curriculum.py scripts/train_recurrent_terminal_ladder.py tests/test_policy_terminal_training.py` -> passed.
+- Integration smoke: `reports/smoke_mingru_motif_curriculum_20260612`, horizon 120, 4 eval seeds, motif score enabled, success 1.0. This is only a wiring smoke, not a robust N=4 result.
+
+No N=4 solve claim is justified from this change. The immediate next experiment is a real motif-enabled recurrent curriculum on the normal horizon/held-out blocks, compared against the same config without motif score.

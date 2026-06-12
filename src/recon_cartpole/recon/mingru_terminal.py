@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 
+from recon_cartpole.control.motif_features import load_motif_model, motif_score_from_state
 from recon_cartpole.control.policy_observation import policy_observation_from_state
 
 
@@ -17,6 +18,9 @@ class MinGRUTerminalConfig:
     observation_mode: str = "normalized_raw"
     include_prev_force: bool = True
     include_context: bool = True
+    include_motif_score: bool = False
+    motif_model_path: str = ""
+    motif_score_scale: float = 10.0
     blend: float = 1.0
     scope: str = "stabilize_chain"
     confidence_floor: float = 0.05
@@ -59,6 +63,7 @@ class MinGRUTerminal:
         self.hidden: Any | None = None
         self.input_size: int | None = None
         self.loaded_checkpoint = ""
+        self.motif_model: dict[str, Any] | None = load_motif_model(self.config.motif_model_path)
         self._build_model()
         if self.config.checkpoint_path:
             self.load_checkpoint(self.config.checkpoint_path)
@@ -114,6 +119,7 @@ class MinGRUTerminal:
         ).size
         extras = 1 if self.config.include_prev_force and "prev_force" not in self.config.observation_mode else 0
         extras += 3 if self.config.include_context else 0
+        extras += 1 if self.config.include_motif_score else 0
         return int(base + extras)
 
     def reset(self) -> None:
@@ -130,6 +136,7 @@ class MinGRUTerminal:
             for key, value in checkpoint_config.items():
                 if hasattr(self.config, key):
                     setattr(self.config, key, value)
+            self.motif_model = load_motif_model(self.config.motif_model_path)
             self._build_model()
         state_dict = checkpoint.get("model_state_dict", checkpoint)
         assert self.model is not None
@@ -162,6 +169,15 @@ class MinGRUTerminal:
         context_values = self._context_vector(context)
         if context_values:
             parts.append(np.asarray(context_values, dtype=np.float32))
+        if self.config.include_motif_score:
+            score = motif_score_from_state(
+                raw_state,
+                self.n_poles,
+                self.motif_model,
+                force_mag=self.force_mag,
+                base_force=self.prev_force,
+            )
+            parts.append(np.asarray([score / max(float(self.config.motif_score_scale), 1e-9)], dtype=np.float32))
         return np.concatenate(parts).astype(np.float32, copy=False)
 
     def predict(

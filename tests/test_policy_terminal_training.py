@@ -1069,6 +1069,69 @@ def test_mingru_build_inputs_avoids_duplicate_prev_force_column():
     assert inputs.shape == (2, 11)
 
 
+def test_mingru_build_inputs_appends_scaled_motif_score():
+    import numpy as np
+
+    supervised = _load_script("train_mingru_supervised")
+    data = {
+        "observations": np.zeros((2, 3), dtype=np.float32),
+        "prev_forces": np.asarray([0.0, 5.0], dtype=np.float32),
+        "motif_scores": np.asarray([5.0, -10.0], dtype=np.float32),
+    }
+    args = SimpleNamespace(
+        include_prev_force=False,
+        include_context=False,
+        include_motif_score=True,
+        motif_score_scale=5.0,
+        observation_mode="env",
+        force_mag=10.0,
+    )
+
+    inputs = supervised.build_inputs(data, args)
+
+    assert inputs.shape == (2, 4)
+    assert inputs[:, -1].tolist() == [1.0, -2.0]
+
+
+def test_mingru_terminal_observation_appends_motif_score(tmp_path):
+    import json
+    import numpy as np
+    from recon_cartpole.recon.mingru_terminal import MinGRUTerminal, MinGRUTerminalConfig
+
+    model_path = tmp_path / "motif.json"
+    model_path.write_text(
+        json.dumps(
+            {
+                "positive_mean": [0.0] * 14,
+                "negative_mean": [10.0] * 14,
+                "scale": [1.0] * 14,
+            }
+        ),
+        encoding="utf-8",
+    )
+    terminal = MinGRUTerminal(
+        4,
+        10.0,
+        5,
+        MinGRUTerminalConfig(
+            enabled=True,
+            observation_mode="normalized_raw4_prev_force",
+            include_prev_force=True,
+            include_context=False,
+            include_motif_score=True,
+            motif_model_path=str(model_path),
+            motif_score_scale=10.0,
+        ),
+    )
+    raw = np.zeros(10, dtype=np.float32)
+
+    vector = terminal.observation_vector(raw, raw, {})
+
+    assert vector.shape == (12,)
+    assert terminal.input_size == 12
+    assert vector[-1] == pytest.approx(10.0)
+
+
 def test_mingru_supervised_filter_training_data_by_episode_survival():
     import numpy as np
 

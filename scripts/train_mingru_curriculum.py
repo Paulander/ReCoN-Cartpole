@@ -31,6 +31,7 @@ ARRAY_KEYS = [
     "rollout_sources",
     "rollout_forces",
     "rollout_actions",
+    "motif_scores",
     "episodes",
     "step_indices",
     "sample_weights",
@@ -122,6 +123,7 @@ def dataset_args(args: argparse.Namespace, stage: dict[str, Any], out_path: Path
         behavior_include_context=args.behavior_include_context,
         behavior_confidence_floor=args.behavior_confidence_floor,
         failure_window=args.failure_window,
+        motif_model_path=args.motif_model_path,
         out=str(out_path),
     )
 
@@ -161,7 +163,10 @@ def aggregate_stage_data(stages: list[dict[str, Any]]) -> dict[str, np.ndarray]:
         data = item["data"]
         stage_episodes = np.asarray(data["episodes"], dtype=np.int64)
         for key in ARRAY_KEYS:
-            arr = np.asarray(data[key])
+            if key == "motif_scores" and key not in data:
+                arr = np.zeros(np.asarray(data["observations"]).shape[0], dtype=np.float32)
+            else:
+                arr = np.asarray(data[key])
             if key == "episodes":
                 arr = arr.astype(np.int64) + episode_offset
             result[key].append(arr)
@@ -194,6 +199,9 @@ def eval_args(args: argparse.Namespace) -> Namespace:
         blend=args.blend,
         scope=args.policy_terminal_scope,
         confidence_floor=args.confidence_floor,
+        include_motif_score=args.include_motif_score,
+        motif_model_path=args.motif_model_path,
+        motif_score_scale=args.motif_score_scale,
         passthrough_enabled=args.passthrough_enabled,
         passthrough_confidence_floor=args.passthrough_confidence_floor,
         passthrough_logit_margin_floor=args.passthrough_logit_margin_floor,
@@ -261,6 +269,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             sequence_length=args.sequence_length,
             include_prev_force=args.include_prev_force,
             include_context=args.include_context,
+            include_motif_score=args.include_motif_score,
+            motif_model_path=args.motif_model_path,
+            motif_score_scale=args.motif_score_scale,
             scope=args.policy_terminal_scope,
             blend=args.blend,
             confidence_floor=args.confidence_floor,
@@ -312,6 +323,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "curriculum_data": True,
             "n3_to_n4_curriculum": True,
             "previous_force_observation": "prev_force" in args.observation_mode or bool(args.include_prev_force),
+            "motif_score_observation": bool(args.include_motif_score),
+            "motif_model_path": str(args.motif_model_path),
             "gain_mutation": False,
         },
         "wall_clock_seconds": time.perf_counter() - started,
@@ -360,6 +373,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--behavior-include-context", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--behavior-confidence-floor", type=float, default=0.05)
     parser.add_argument("--failure-window", type=int, default=80)
+    parser.add_argument("--include-motif-score", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--motif-model-path", default="")
+    parser.add_argument("--motif-score-scale", type=float, default=10.0)
     parser.add_argument("--hidden-size", type=int, default=256)
     parser.add_argument("--sequence-length", type=int, default=32)
     parser.add_argument("--include-prev-force", action=argparse.BooleanOptionalAction, default=True)
