@@ -81,3 +81,20 @@ Run: `reports/n4_highblock_tail_curriculum_20260612_seed2710k`
 - Pure PPO alone on the same final blocks: success 0.508.
 
 Interpretation: 0.700 can appear on a validation slice, but it does not yet generalize to fresh held-out blocks. No N=4 solve claim is justified.
+
+
+## Checkpoint model selection on fresh held-out blocks
+
+Run: `reports/n4_model_selection_1900_2000_20260612`
+
+Compared recent candidate checkpoints on held-out seed blocks 1900000 and 2000000, 120 episodes each:
+
+| checkpoint | mean | p10 | cvar | success |
+|---|---:|---:|---:|---:|
+| base_1520k_025k | 484.4 | 438.0 | 412.6 | 0.683 |
+| targetkl_seed2650k_005k | 484.4 | 438.0 | 412.6 | 0.683 |
+| upright_seed2691k_005k | 484.3 | 438.0 | 412.6 | 0.671 |
+| sweep2700_candidate01_010k | 484.4 | 438.0 | 412.6 | 0.683 |
+| sweep2700_candidate03_010k | 484.4 | 438.0 | 412.6 | 0.683 |
+
+Interpretation: recent promoted checkpoints are mostly action-equivalent to the base under the ReCoN wrapper on these held-out seeds; upright shaping is worse. Model selection does not reveal a hidden better checkpoint.
