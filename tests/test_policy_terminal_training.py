@@ -963,3 +963,34 @@ def test_subchain_motif_vector_uses_adjacent_pairs():
     assert vector[1] == 0.5
     assert vector[2:6].tolist() == [1.0, 2.0, 0.5, 1.0]
 
+def test_motif_gated_passthrough_can_suppress_to_base_force():
+    gate = _load_script("evaluate_motif_gated_passthrough")
+    args = SimpleNamespace(force_mag=10.0, discrete_action_bins=5)
+    diagnostics = {
+        "force": 10.0,
+        "proposal": {"source_node": "mingru_terminal"},
+        "mingru_terminal": {"passthrough_applied": True, "passthrough_base_force": -5.0},
+    }
+
+    action, info = gate.gated_action(4, diagnostics, score=2.0, args=args, gate_mode="suppress_passthrough", threshold=1.0)
+
+    assert action == 1
+    assert info["changed"] is True
+    assert info["reason"] == "suppressed_passthrough"
+
+
+def test_motif_gated_passthrough_can_force_terminal_force():
+    gate = _load_script("evaluate_motif_gated_passthrough")
+    args = SimpleNamespace(force_mag=10.0, discrete_action_bins=5)
+    diagnostics = {
+        "force": -5.0,
+        "proposal": {"source_node": "recover_worst_pole"},
+        "mingru_terminal": {"force": 10.0},
+    }
+
+    action, info = gate.gated_action(1, diagnostics, score=2.0, args=args, gate_mode="force_passthrough", threshold=1.0)
+
+    assert action == 4
+    assert info["changed"] is True
+    assert info["reason"] == "forced_passthrough"
+

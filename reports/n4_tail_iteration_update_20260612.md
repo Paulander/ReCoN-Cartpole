@@ -431,3 +431,18 @@ Runs used the current incumbent h256/seq32 minGRU strict passthrough checkpoint,
 | subchain + ReCoN/minGRU diagnostics | 0.897 | 0.835 | 336 | 0.650 | strong near-failure detector; suitable candidate for a future learned gate/rescue trigger |
 
 Interpretation: this is the first strong evidence that reusable local N=4 structure exists when combined with the recurrent terminal's own uncertainty/value signals. The detector does not yet affect control, so no performance improvement or solve claim is made. The next control-facing experiment should use this score conservatively: trigger additional recovery data collection, adjust passthrough only under high motif-risk, or train a residual option conditioned on motif-risk instead of applying a hand-coded rescue.
+
+## Online motif-gated passthrough control check
+
+Code change: added `scripts/evaluate_motif_gated_passthrough.py`, which fits the subchain+ReCoN diagnostic prototype on non-held-out seeds, then uses motif-risk online during held-out evaluation. It tests reversible action policies outside the core controller: baseline, suppress minGRU passthrough when motif-risk is high, and force minGRU passthrough when motif-risk is high. This is a causal control ablation, not a train-seed solve claim.
+
+Compact held-out weak-block run: `reports/n4_motif_gated_passthrough_20260612_weak20`, train seeds `2420000..2420079`, held-out seeds `2100000..2100019`, failure window 80, thresholds from positive motif-score percentiles.
+
+| mode | best/representative threshold | mean | p10 | success | changed actions |
+|---|---:|---:|---:|---:|---:|
+| baseline | inf | 489.5 | 474.8 | 0.650 | 0 |
+| suppress passthrough | 0.454 | 489.5 | 474.8 | 0.650 | 7 |
+| force passthrough | 5.596 | 489.5 | 474.8 | 0.650 | 34 |
+| force passthrough | 0.454-4.544 | 489.4 | 474.8 | 0.600 | 86-89 |
+
+Interpretation: motif-risk is a strong near-failure detector, but a naive online action gate does not improve control. Forcing passthrough under motif-risk can hurt. Suppressing passthrough is mostly neutral because strict passthrough already changes few high-risk decisions. The next useful route is to use motif-risk for targeted residual-data collection or advantage labeling, not as a direct hand-authored action switch. No N=4 solve claim is justified.
