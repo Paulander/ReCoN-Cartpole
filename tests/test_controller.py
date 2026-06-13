@@ -14,6 +14,11 @@ from recon_cartpole.recon.engine_runner import (
     SubchainBiasConfig,
 )
 from recon_cartpole.recon.mingru_terminal import MinGRUPrediction, MinGRUTerminalConfig
+from recon_cartpole.recon.subchain_terminal import (
+    SharedSubchainTerminal,
+    SubchainTerminalConfig,
+    save_subchain_terminal_checkpoint,
+)
 from recon_cartpole.training.evaluate import rollout
 
 
@@ -660,6 +665,54 @@ def test_subchain_bias_mode_changes_stabilize_chain_force_and_reports_votes():
     assert biased_diag["subchain_bias"]["applied"] is True
     assert [vote["pair"] for vote in biased_diag["subchain_bias"]["votes"]] == [0, 1]
     assert biased_action in range(5)
+
+
+
+def test_learned_subchain_terminal_mode_changes_force_and_reports_votes(tmp_path):
+    torch = pytest.importorskip("torch")
+    raw = np.asarray([0.0, 0.0, 0.01, 0.12, -0.01, 0.0, 0.0, 0.0], dtype=np.float32)
+    checkpoint = tmp_path / "subchain_pair.pt"
+    cfg = SubchainTerminalConfig(hidden_size=8, blend=1.0, min_confidence=0.0, min_pair_pressure=0.0)
+    terminal = SharedSubchainTerminal(n_poles=3, force_mag=10.0, config=cfg)
+    model = terminal.build_model(hidden_size=8)
+    with torch.no_grad():
+        for param in model.parameters():
+            param.zero_()
+        model[-1].bias[0] = 1.2
+        model[-1].bias[1] = 5.0
+    save_subchain_terminal_checkpoint(checkpoint, model, cfg)
+
+    plain = ReConCartPoleController(
+        RunnerConfig(n_poles=3, mode="static_recon", discrete_action_bins=5, selection_mode="hard_select", learn=False)
+    )
+    learned = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=3,
+            mode="recon_learned_subchain_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            learned_subchain_terminal=SubchainTerminalConfig(
+                checkpoint_path=str(checkpoint),
+                blend=1.0,
+                min_confidence=0.0,
+                min_pair_pressure=0.0,
+                confidence_boost=0.0,
+                urgency_boost=0.0,
+            ),
+        )
+    )
+
+    _plain_action, plain_diag = plain.act(raw, raw)
+    learned_action, learned_diag = learned.act(raw, raw)
+
+    assert learned.learning_mechanisms()["learned_subchain_terminal"] is True
+    assert learned_diag["learned_subchain_terminal"]["applied"] is True
+    assert "learned_subchain_terminal" in learned_diag["proposal"]["reason"]
+    assert learned_diag["force"] != pytest.approx(plain_diag["force"])
+    assert learned_diag["force"] == pytest.approx(learned_diag["learned_subchain_terminal"]["subchain_force"])
+    assert [vote["pair"] for vote in learned_diag["learned_subchain_terminal"]["votes"]] == [0, 1]
+    assert learned_action in range(5)
 
 def test_policy_terminal_normalized_raw_prev_force_observation_mode():
     class FakePolicy:

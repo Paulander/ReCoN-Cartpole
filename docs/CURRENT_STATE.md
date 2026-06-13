@@ -566,3 +566,30 @@ Interpretation: PPO-style recurrent fine-tuning is now implemented and working, 
 
 Next best move: stop spending most runtime on small updates to the same flat global recurrent terminal. The evidence now points more strongly toward explicit shared adjacent-subchain composition: train a reusable pair/local terminal over `0-1`, `1-2`, and `2-3` features and let ReCoN arbitrate/globalize those local proposals, rather than feeding subchain diagnostics into one global policy head.
 
+## Learned Shared Subchain Terminal Slice - 2026-06-13
+
+Added a structural ReCoN subchain path instead of another global policy micro-update:
+
+- New controller mode/config path: `recon_learned_subchain_terminal` plus `learned_subchain_terminal=SubchainTerminalConfig(...)`.
+- New module: `src/recon_cartpole/recon/subchain_terminal.py`.
+- New trainer: `scripts/train_subchain_pair_terminal.py`.
+
+The learned terminal applies one shared MLP to every adjacent pair (`0-1`, `1-2`, `2-3` for N=4). Each pair sees cart state, local delta angle/velocity, local mean angle/velocity, and optional pair-position. ReCoN aggregates confidence/pressure-weighted pair force votes and blends the resulting local subchain force into the active proposal. Traces now expose `learned_subchain_terminal` diagnostics with per-pair votes, weights, confidence, pressure, base force, subchain force, and final proposal force.
+
+Verification and smoke:
+
+- `uv run ruff check src/recon_cartpole/recon/subchain_terminal.py src/recon_cartpole/recon/engine_runner.py src/recon_cartpole/control/controllers.py scripts/train_subchain_pair_terminal.py tests/test_controller.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_controller.py::test_learned_subchain_terminal_mode_changes_force_and_reports_votes tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs -q -s` -> 2 passed.
+- `reports/smoke_subchain_pair_terminal_20260613` completed a short low-angle integration smoke.
+
+Bounded N=4 probe: `reports/n4_subchain_pair_distill_probe_20260613_seed8300k`
+
+Setup: distilled the frozen survival PPO teacher (`reports/n4_survival_ppo_sweep_20260612_seed2700k/candidate_01/checkpoint_010000.zip`) into the shared pair terminal from 16 full N=4 current-distribution teacher episodes, then evaluated on held-out starts `1500000` and `1600000` with 20 episodes per block. The learned terminal was enabled as a conservative augmentation with blend `0.10`.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| frozen PPO ReCoN base | 485.6 | 443.7 | 0.700 | 40 |
+| base + learned shared subchain terminal | 485.6 | 443.7 | 0.700 | 40 |
+
+Interpretation: the structural path is implemented and traceable, and the first conservative distillation probe did not damage the PPO base on this small held-out slice. It also did not add lift; simple teacher-force distillation appears mostly action-neutral at low blend. This is not a solve claim because the evaluation is only 40 episodes and reproduces the base on the same slice. The next useful experiment is not more plain distillation, but training the pair terminal on counterfactual/local recovery labels or residual advantages so pair votes can differ from the global teacher in the failure tail.
+

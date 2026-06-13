@@ -47,6 +47,7 @@ from .fired_edges import fired_edges_from_requests
 from .graph_factory import GraphConfig, build_cartpole_graph, trainable_edge_whitelist
 from .mingru_terminal import MinGRUPrediction, MinGRUTerminal, MinGRUTerminalConfig
 from .mlp_terminal import MlpTerminalConfig, MlpTerminalState
+from .subchain_terminal import SharedSubchainTerminal, SubchainTerminalConfig
 from .node_params import (
     NodeParamConfig,
     RegimeParamState,
@@ -182,6 +183,7 @@ class RunnerConfig:
     pole1_fix: Pole1FixConfig = field(default_factory=Pole1FixConfig)
     rescue: RescueConfig = field(default_factory=RescueConfig)
     subchain_bias: SubchainBiasConfig = field(default_factory=SubchainBiasConfig)
+    learned_subchain_terminal: SubchainTerminalConfig = field(default_factory=SubchainTerminalConfig)
 
 
 class ReConCartPoleController:
@@ -206,6 +208,16 @@ class ReConCartPoleController:
             self.config.pole1_fix.enabled = True
         if self._uses_subchain_bias() and not self.config.subchain_bias.enabled:
             self.config.subchain_bias.enabled = True
+        self.learned_subchain_terminal: SharedSubchainTerminal | None = None
+        self.last_learned_subchain_terminal: dict[str, Any] = {}
+        if self._uses_learned_subchain_terminal() and not self.config.learned_subchain_terminal.enabled:
+            self.config.learned_subchain_terminal.enabled = True
+        if self._uses_learned_subchain_terminal():
+            self.learned_subchain_terminal = SharedSubchainTerminal(
+                self.config.n_poles,
+                self.config.force_mag,
+                self.config.learned_subchain_terminal,
+            )
         self.mlp_terminal_state = MlpTerminalState.create(
             self.config.n_poles, self.config.mlp_terminal.hidden_size
         )
@@ -326,6 +338,9 @@ class ReConCartPoleController:
     def _uses_subchain_bias(self) -> bool:
         return self.config.mode == "recon_subchain_terminal" or bool(self.config.subchain_bias.enabled)
 
+    def _uses_learned_subchain_terminal(self) -> bool:
+        return self.config.mode == "recon_learned_subchain_terminal" or bool(self.config.learned_subchain_terminal.enabled)
+
     def learning_mechanisms(self) -> dict[str, bool]:
         return {
             "edge_plasticity": self._uses_fast_plasticity(),
@@ -337,7 +352,8 @@ class ReConCartPoleController:
             "recurrent_policy_terminal": self._uses_policy_terminal()
             and self.config.policy_terminal_recurrent,
             "minGRU_terminal": self._uses_mingru_terminal(),
-            "subchain_terminal": self._uses_subchain_bias(),
+            "subchain_terminal": self._uses_subchain_bias() or self._uses_learned_subchain_terminal(),
+            "learned_subchain_terminal": self._uses_learned_subchain_terminal(),
             "pole1_fix": self.config.pole1_fix.enabled or self._uses_pole1_fix(),
             "rescue_patches": self.config.rescue.enabled,
             "gain_mutation": self.config.mode
@@ -365,6 +381,7 @@ class ReConCartPoleController:
         self.last_mingru_terminal = {}
         self.last_rescue = {}
         self.last_subchain_bias = {}
+        self.last_learned_subchain_terminal = {}
         self.episode_step = 0
         self.recent_forces = []
         if self.mingru_terminal is not None:
@@ -490,6 +507,7 @@ class ReConCartPoleController:
             "graph_ticks": graph_ticks,
             "subchain_sensors": dict(context.get("subchain_sensor_values", {})),
             "subchain_bias": dict(context.get("subchain_bias", self.last_subchain_bias)),
+            "learned_subchain_terminal": dict(context.get("learned_subchain_terminal", self.last_learned_subchain_terminal)),
             "rescue": dict(context.get("rescue", {})),
         }
         self.last_rescue = dict(context.get("rescue", {}))
@@ -585,6 +603,7 @@ class ReConCartPoleController:
                 "node_params_config": self.config.node_params.__dict__,
                 "consolidation_config": self.config.consolidation.__dict__,
                 "subchain_bias_config": self.config.subchain_bias.__dict__,
+                "learned_subchain_terminal_config": self.config.learned_subchain_terminal.__dict__,
                 "mlp_terminal_config": self.config.mlp_terminal.__dict__,
                 "policy_terminal_path": self.config.policy_terminal_path,
                 "policy_terminal_blend": self.config.policy_terminal_blend,
@@ -1141,6 +1160,59 @@ class ReConCartPoleController:
         return proposal
 
 
+    def _apply_learned_subchain_terminal(self, proposal: ForceProposal, env: dict[str, Any]) -> ForceProposal:
+        cfg = self.config.learned_subchain_terminal
+        if not self._uses_learned_subchain_terminal() or self.learned_subchain_terminal is None:
+            return proposal
+        if proposal.source_node not in set(cfg.regimes):
+            return proposal
+        features = env.get("features")
+        if features is None or len(features.poles) < 2:
+            return proposal
+        votes = self.learned_subchain_terminal.votes(features)
+        total_weight = sum(float(vote.weight) for vote in votes)
+        applied = bool(total_weight > 1e-9)
+        base_force = float(proposal.force)
+        subchain_force = base_force
+        if applied:
+            subchain_force = float(sum(v.force * v.weight for v in votes) / total_weight)
+        info = {
+            "enabled": True,
+            "applied": applied,
+            "checkpoint_path": cfg.checkpoint_path,
+            "loaded_checkpoint": self.learned_subchain_terminal.loaded_checkpoint,
+            "regime": proposal.source_node,
+            "base_force": base_force,
+            "subchain_force": subchain_force,
+            "blend": max(0.0, min(1.0, float(cfg.blend))),
+            "total_weight": float(total_weight),
+            "max_pressure": float(max((vote.pressure for vote in votes), default=0.0)),
+            "votes": [vote.__dict__ for vote in votes],
+        }
+        if not applied:
+            info["proposal_force"] = float(proposal.force)
+            env["learned_subchain_terminal"] = info
+            self.last_learned_subchain_terminal = info
+            return proposal
+        blend = float(info["blend"])
+        proposal.force = float(
+            np.clip(
+                proposal.force + blend * (subchain_force - proposal.force),
+                -self.config.force_mag,
+                self.config.force_mag,
+            )
+        )
+        pressure_scale = min(1.0, float(info["max_pressure"]))
+        proposal.confidence = min(1.0, proposal.confidence + float(cfg.confidence_boost) * pressure_scale)
+        proposal.urgency = min(1.5, proposal.urgency + float(cfg.urgency_boost) * pressure_scale)
+        proposal.reason = f"{proposal.reason}; learned_subchain_terminal"
+        info["proposal_force"] = float(proposal.force)
+        info["confidence"] = float(proposal.confidence)
+        info["urgency"] = float(proposal.urgency)
+        env["learned_subchain_terminal"] = info
+        self.last_learned_subchain_terminal = info
+        return proposal
+
     def _apply_subchain_bias(self, proposal: ForceProposal, env: dict[str, Any]) -> ForceProposal:
         cfg = self.config.subchain_bias
         if not self._uses_subchain_bias():
@@ -1369,6 +1441,7 @@ class ReConCartPoleController:
             )
             env["_mingru_terminal_applied_regimes"] = mingru_info["applied_regimes"]
             self.last_mingru_terminal = mingru_info
+        proposal = self._apply_learned_subchain_terminal(proposal, env)
         proposal = self._apply_subchain_bias(proposal, env)
         proposal = self._apply_pole1_emergency_guard(proposal, env)
         proposal = self._apply_pole1_fix(proposal, env)
