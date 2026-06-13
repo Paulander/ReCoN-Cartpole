@@ -213,6 +213,21 @@ def test_counterfactual_residual_train_model_oversamples_non_noop_labels():
     assert meta["label_counts"]["1"] == 4
 
 
+
+
+def test_counterfactual_residual_builds_two_phase_option_sequences():
+    residual = _load_script("train_counterfactual_residual_terminal")
+    args = SimpleNamespace(residual_action_bins=5, option_hold_steps=3, option_tail_steps=2)
+
+    center = residual.candidate_residual_sequences(args, 2)
+    shifted = residual.candidate_residual_sequences(args, 4)
+
+    assert center == [([2], [1])]
+    assert len(shifted) == 5
+    assert shifted[0] == ([4, 0], [3, 2])
+    assert shifted[-1] == ([4, 4], [3, 2])
+
+
 def test_counterfactual_residual_label_state_respects_advantage_gates(monkeypatch):
     residual = _load_script("train_counterfactual_residual_terminal")
 

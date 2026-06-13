@@ -239,11 +239,83 @@ def collect_episode_states(args: argparse.Namespace, seed: int) -> dict[str, Any
     return {"seed": seed, "steps": args.horizon, "return": total, "success": True, "states": states}
 
 
-def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step: int, base_force: float, residual_class: int) -> dict[str, Any]:
-    max_shift = int(args.residual_action_bins) // 2
-    shift = int(residual_class) - max_shift
-    base_idx = force_to_index(base_force, args)
-    first_action = int(np.clip(base_idx + shift, 0, int(args.discrete_action_bins) - 1))
+def residual_center_class(args: argparse.Namespace) -> int:
+    return int(args.residual_action_bins) // 2
+
+
+def residual_shift_for_class(args: argparse.Namespace, residual_class: int) -> int:
+    return int(residual_class) - residual_center_class(args)
+
+
+def candidate_residual_sequences(args: argparse.Namespace, residual_class: int) -> list[tuple[list[int], list[int]]]:
+    first_class = int(residual_class)
+    shift = residual_shift_for_class(args, first_class)
+    first_steps = max(1, int(getattr(args, "option_hold_steps", 1))) if shift != 0 else 1
+    tail_steps = max(0, int(getattr(args, "option_tail_steps", 0)))
+    if tail_steps <= 0 or shift == 0:
+        return [([first_class], [first_steps])]
+    return [
+        ([first_class, int(tail_class)], [first_steps, tail_steps])
+        for tail_class in range(int(args.residual_action_bins))
+    ]
+
+
+def _score_from_rollout(
+    args: argparse.Namespace,
+    residual_class: int,
+    sequence: list[int],
+    sequence_steps: list[int],
+    survived: int,
+    final_raw: Any,
+    pressures: list[float],
+) -> dict[str, Any]:
+    initial_pressure = float(pressures[0]) if pressures else 0.0
+    margin = stability_margin(final_raw, args)
+    pressure_mean = float(np.mean(pressures)) if pressures else 0.0
+    pressure_max = float(np.max(pressures)) if pressures else 0.0
+    pressure_final = float(pressures[-1]) if pressures else 0.0
+    pressure_drop = float(initial_pressure - pressure_final)
+    first_shift = residual_shift_for_class(args, int(residual_class))
+    tail_class = int(sequence[1]) if len(sequence) > 1 else residual_center_class(args)
+    tail_shift = residual_shift_for_class(args, tail_class)
+    tail_penalty = float(getattr(args, "tail_shift_penalty", 0.0)) * abs(tail_shift)
+    score = (
+        float(survived)
+        + float(args.margin_weight) * margin
+        + float(getattr(args, "pressure_drop_weight", 0.0)) * pressure_drop
+        - float(getattr(args, "pressure_mean_weight", 0.0)) * pressure_mean
+        - float(getattr(args, "pressure_max_weight", 0.0)) * pressure_max
+        - float(getattr(args, "pressure_final_weight", 0.0)) * pressure_final
+        - float(args.shift_penalty) * abs(first_shift)
+        - tail_penalty
+    )
+    return {
+        "class": int(residual_class),
+        "shift": int(first_shift),
+        "tail_class": tail_class,
+        "tail_shift": int(tail_shift),
+        "sequence": [int(item) for item in sequence],
+        "sequence_steps": [int(item) for item in sequence_steps],
+        "forced_steps": int(sum(sequence_steps)),
+        "survived": int(survived),
+        "margin": float(margin),
+        "pressure_initial": float(initial_pressure),
+        "pressure_mean": pressure_mean,
+        "pressure_max": pressure_max,
+        "pressure_final": pressure_final,
+        "pressure_drop": pressure_drop,
+        "score": score,
+    }
+
+
+def simulate_residual_sequence(
+    args: argparse.Namespace,
+    raw_state: list[float],
+    step: int,
+    residual_class: int,
+    sequence: list[int],
+    sequence_steps: list[int],
+) -> dict[str, Any]:
     env = make_env(args, force_noise=0.0 if args.counterfactual_no_noise else args.force_noise)
     controller = make_controller(args)
     set_env_state(env, raw_state, step)
@@ -251,17 +323,25 @@ def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step:
     controller.start_episode()
     survived = 0
     final_raw = np.asarray(raw_state, dtype=float)
-    initial_pressure = recovery_pressure(final_raw, int(args.n_poles))
-    pressures: list[float] = [float(initial_pressure)]
-    forced_steps = max(1, int(getattr(args, "option_hold_steps", 1))) if shift != 0 else 1
+    pressures: list[float] = [recovery_pressure(final_raw, int(args.n_poles))]
     terminated = False
     truncated = False
     info: dict[str, Any] = {"raw_state": raw_state}
-    for forced_idx in range(forced_steps):
-        obs, _reward, terminated, truncated, info = env.step(first_action)
-        survived += 1
-        final_raw = np.asarray(info.get("raw_state", []), dtype=float)
-        pressures.append(recovery_pressure(final_raw, int(args.n_poles)))
+    first_action: int | None = None
+    for class_idx, hold_steps in zip(sequence, sequence_steps):
+        shift = residual_shift_for_class(args, int(class_idx))
+        for _ in range(max(1, int(hold_steps))):
+            raw = np.asarray(info["raw_state"], dtype=float).copy()
+            base_action, _diagnostics = controller.act(obs, raw)
+            action = int(np.clip(int(base_action) + shift, 0, int(args.discrete_action_bins) - 1))
+            if first_action is None:
+                first_action = action
+            obs, _reward, terminated, truncated, info = env.step(action)
+            survived += 1
+            final_raw = np.asarray(info.get("raw_state", []), dtype=float)
+            pressures.append(recovery_pressure(final_raw, int(args.n_poles)))
+            if terminated or truncated:
+                break
         if terminated or truncated:
             break
     if not (terminated or truncated):
@@ -274,34 +354,18 @@ def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step:
             pressures.append(recovery_pressure(final_raw, int(args.n_poles)))
             if terminated or truncated:
                 break
-    margin = stability_margin(final_raw, args)
-    pressure_mean = float(np.mean(pressures)) if pressures else 0.0
-    pressure_max = float(np.max(pressures)) if pressures else 0.0
-    pressure_final = float(pressures[-1]) if pressures else 0.0
-    pressure_drop = float(initial_pressure - pressure_final)
-    score = (
-        float(survived)
-        + float(args.margin_weight) * margin
-        + float(getattr(args, "pressure_drop_weight", 0.0)) * pressure_drop
-        - float(getattr(args, "pressure_mean_weight", 0.0)) * pressure_mean
-        - float(getattr(args, "pressure_max_weight", 0.0)) * pressure_max
-        - float(getattr(args, "pressure_final_weight", 0.0)) * pressure_final
-        - float(args.shift_penalty) * abs(shift)
-    )
-    return {
-        "class": int(residual_class),
-        "shift": shift,
-        "first_action": first_action,
-        "forced_steps": int(forced_steps),
-        "survived": int(survived),
-        "margin": float(margin),
-        "pressure_initial": float(initial_pressure),
-        "pressure_mean": pressure_mean,
-        "pressure_max": pressure_max,
-        "pressure_final": pressure_final,
-        "pressure_drop": pressure_drop,
-        "score": score,
-    }
+    result = _score_from_rollout(args, residual_class, sequence, sequence_steps, survived, final_raw, pressures)
+    result["first_action"] = int(first_action if first_action is not None else 0)
+    return result
+
+
+def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step: int, base_force: float, residual_class: int) -> dict[str, Any]:
+    del base_force  # The simulator asks the frozen controller for the base action at each forced tick.
+    options = [
+        simulate_residual_sequence(args, raw_state, step, residual_class, sequence, sequence_steps)
+        for sequence, sequence_steps in candidate_residual_sequences(args, int(residual_class))
+    ]
+    return max(options, key=lambda item: float(item["score"]))
 
 
 def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, Any]:
@@ -702,6 +766,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--residual-action-bins", type=int, default=5)
     parser.add_argument("--residual-gate-threshold", type=float, default=0.60)
     parser.add_argument("--option-hold-steps", type=int, default=1)
+    parser.add_argument("--option-tail-steps", type=int, default=0)
+    parser.add_argument("--tail-shift-penalty", type=float, default=0.0)
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--dt", type=float, default=0.0005)

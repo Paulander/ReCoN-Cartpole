@@ -629,3 +629,42 @@ Run: `reports/n4_ppo_targeted_continue_20260613_seed8800k`
 
 Interpretation: this sweep did not solve N=4 and did not beat the incumbent final success. All four candidates could trade validation up from `0.6750` to `0.6833`, but final held-out success remained `0.6917` with unchanged p10/cvar. This is useful negative evidence: the current 5-bin feedforward PPO terminal is not failing because the last continuation LR/clip/late-bonus setting is slightly off. The next attempt should change structure or information, for example a stronger learned local/subchain option search, a residual trained from longer counterfactual options, or a recurrent/cached-teacher curriculum that adds useful state memory without perturbing solved seeds.
 
+## Long-Option Counterfactual Residual Labels - 2026-06-13
+
+Extended `scripts/train_counterfactual_residual_terminal.py` so counterfactual residual labels can score multi-tick options instead of single near-instant perturbations. The simulator now asks the frozen ReCoN/PPO controller for the base action at each forced tick and applies the residual shift relative to that base action, matching the real residual-terminal integration more closely. New knobs: `--option-tail-steps` and `--tail-shift-penalty`. With `--option-hold-steps 20 --option-tail-steps 20`, the labeler can discover sustained “push, then tail/no-op” interventions that were invisible under 2-tick probes at `dt=0.0005`.
+
+Verification:
+
+- `uv run ruff check scripts/train_counterfactual_residual_terminal.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_counterfactual_residual_builds_two_phase_option_sequences tests/test_policy_terminal_training.py::test_counterfactual_residual_label_state_respects_advantage_gates tests/test_policy_terminal_training.py::test_counterfactual_residual_label_state_can_use_pressure_advantage tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs -q -s` -> 4 passed.
+- `reports/smoke_counterfactual_residual_twophase_20260613` completed a short integration smoke.
+
+Bounded N=4 long-option probe: `reports/n4_counterfactual_residual_longoption_probe_20260613_seed8910k`
+
+Setup: frozen survival PPO base, `subchain_diagnostics` residual features, 5 residual bins, 20-tick residual hold, 20-tick tail option search, hard-seed collection from `reports/hard_seeds_n4_combined_nearmiss_600/hard_seeds.json`, failure windows biased to 20-180 ticks before failure, and held-out eval on starts `1500000` and `1600000` with 20 episodes per block.
+
+| item | value |
+|---|---:|
+| rows | 31 |
+| non-noop labels | 7 |
+| max score gap | 0.976 |
+| mean score gap | 0.219 |
+| non-noop recall | 0.857 |
+
+| evaluator | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|
+| frozen PPO ReCoN base | 485.6 | 443.7 | 423.8 | 0.700 | 0.000 |
+| long-option residual, gate 0.65 | 485.5 | 443.6 | 422.5 | 0.700 | 0.306 |
+
+Gate sweep: `reports/n4_counterfactual_residual_longoption_gate_sweep_20260613`
+
+| gate | mean | p10 | cvar | success |
+|---:|---:|---:|---:|---:|
+| 0.65 | 485.5 | 443.6 | 422.5 | 0.700 |
+| 0.75 | 485.5 | 443.6 | 422.8 | 0.700 |
+| 0.85 | 485.6 | 443.7 | 423.5 | 0.700 |
+| 0.95 | 485.6 | 443.7 | 423.3 | 0.700 |
+| 1.05 | 485.6 | 443.7 | 423.8 | 0.700 |
+
+Interpretation: this fixes an important learning-signal problem. The earlier residual probes were too short to affect the physics at `dt=0.0005`; long options finally produce real non-noop labels. However, the first learned residual still does not improve held-out N=4 and slightly hurts tail metrics when allowed to intervene. Higher gates simply suppress it back to the base. The next residual attempt should use more diverse positive windows plus success-preservation rows, and should probably train/evaluate a confidence/gating head instead of relying only on the scalar risk gate.
+
