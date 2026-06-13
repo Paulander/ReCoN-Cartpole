@@ -668,3 +668,25 @@ Gate sweep: `reports/n4_counterfactual_residual_longoption_gate_sweep_20260613`
 
 Interpretation: this fixes an important learning-signal problem. The earlier residual probes were too short to affect the physics at `dt=0.0005`; long options finally produce real non-noop labels. However, the first learned residual still does not improve held-out N=4 and slightly hurts tail metrics when allowed to intervene. Higher gates simply suppress it back to the base. The next residual attempt should use more diverse positive windows plus success-preservation rows, and should probably train/evaluate a confidence/gating head instead of relying only on the scalar risk gate.
 
+
+### Broader Long-Option Residual Probe
+
+Run: `reports/n4_counterfactual_residual_longoption_broad_20260613_seed8920k`
+
+This repeated the long-option residual setup with 16 hard/near-miss collection seeds, wider 20-200 tick pre-failure windows, success-preservation rows from solved collection episodes, and a 120-episode held-out final eval on starts `1500000` and `1600000`.
+
+| item | value |
+|---|---:|
+| rows | 78 |
+| non-noop labels | 13 |
+| max score gap | 0.975 |
+| mean score gap | 0.160 |
+| non-noop recall | 0.769 |
+
+| evaluator | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|
+| frozen PPO ReCoN base | 483.5 | 441.9 | 411.8 | 0.6917 | 0.000 |
+| broad long-option residual, gate 0.75 | 483.2 | 441.0 | 409.9 | 0.6833 | 0.425 |
+
+Interpretation: the broader run made the residual more active but reduced held-out success by one episode and degraded p10/cvar. So the bottleneck has moved: long-option counterfactual labels now create a learnable signal, but the policy does not know when to abstain. The next residual iteration should add explicit confidence/gating supervision or a two-head residual (`action`, `apply/no-apply`) trained with stronger success-preservation negatives, rather than only raising/lowering the scalar risk gate.
+
