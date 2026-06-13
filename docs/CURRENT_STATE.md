@@ -1095,3 +1095,32 @@ Setup: resumed from DAgger9, hard-tail stage used the 159 freshly mined DAgger9 
 | ReCoN-routed minGRU | 486.7 | 441.8 | 0.675 | 80 |
 
 Interpretation: targeted fresh-tail DAgger did move the frontier: DAgger9 improved the recurrent held-out success from `0.675` to `0.6875` and raised pure p10 to `449.9`. DAgger10 did not improve and slightly hurt ReCoN-routed behavior, so the current best recurrent checkpoint is DAgger9, not DAgger10. No N=4 solve claim is justified because the best success is still below the `0.70` gate on the 80-episode held-out block. The next attempt should avoid simply repeating hard-tail DAgger; more promising variants are pole_1/pole_2-balanced tail sampling, lower tail sample weight, or a learned gate/recovery specialist for those two failure classes.
+
+
+## Balanced-Tail DAgger And Routing Ablation - 2026-06-13
+
+After DAgger9 reached the best recurrent held-out score so far (`0.6875`), two low-cost follow-ups tested whether the last gap was caused by tail imbalance or overly hard routing. Both were negative.
+
+Balanced tail seed list: `reports/n4_mingru_dagger9_balanced_tail_seeds_20260613`
+
+This used the DAgger9 hard-seed mining report and interleaved equal counts of `pole_1_angle` and `pole_2_angle` failures: 62 seeds from each class, 124 total. It excluded 31 extra `pole_1_angle` failures so the tail would not over-represent the dominant failure mode.
+
+DAgger11 balanced/lower-weight tail: `reports/n4_mingru_curriculum_subchain_motif_dagger11_balanced_tail_20260613_seed9111k`
+
+Setup: resumed from DAgger9, used the balanced 124-seed hard-tail list, reduced hard-tail sample weight from `2.0` to `1.5`, and otherwise kept the conservative DAgger recipe. Held-out eval used starts `1900000`, `2000000`, `2100000`, and `2200000` with 20 episodes each.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure minGRU | 486.8 | 441.9 | 0.675 | 80 |
+| ReCoN-routed minGRU | 486.1 | 440.8 | 0.675 | 80 |
+
+Routing ablation: `reports/n4_mingru_dagger9_soft_select_eval_20260613`
+
+Setup: evaluated the best DAgger9 checkpoint with `selection_mode=soft_select`, same held-out seeds.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure minGRU | 486.7 | 449.9 | 0.6875 | 80 |
+| ReCoN-routed minGRU soft-select | 473.2 | 402.4 | 0.5125 | 80 |
+
+Interpretation: balancing pole_1/pole_2 hard-tail seeds and lowering tail weight did not preserve the DAgger9 gain, and soft-select routing is actively harmful for the current minGRU checkpoint. The current best remains DAgger9 under hard-select routing. The next useful performance move should be a targeted pole_1/pole_2 recovery specialist or learned gate, not another generic DAgger replay or softer ReCoN routing. No N=4 solve claim is justified.
