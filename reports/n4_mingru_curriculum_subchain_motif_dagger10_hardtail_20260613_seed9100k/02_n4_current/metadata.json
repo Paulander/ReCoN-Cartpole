@@ -1,0 +1,15 @@
+{
+  "name": "n4_current",
+  "n_poles": 4,
+  "teacher": "recon_policy_terminal",
+  "rollout_policy": "teacher",
+  "label_source": "teacher",
+  "episodes": 20,
+  "seed_start": 9102000,
+  "seed_list": "",
+  "initial_angle_range": 0.05,
+  "force_noise": 0.02,
+  "samples": 9465,
+  "sample_weight": 1.0,
+  "dataset": "reports/n4_mingru_curriculum_subchain_motif_dagger10_hardtail_20260613_seed9100k/02_n4_current/dataset.npz"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "n3_stable",
+  "n_poles": 3,
+  "teacher": "static_recon",
+  "rollout_policy": "teacher",
+  "label_source": "teacher",
+  "episodes": 5,
+  "seed_start": 9100000,
+  "seed_list": "",
+  "initial_angle_range": 0.03,
+  "force_noise": 0.01,
+  "samples": 2500,
+  "sample_weight": 1.0,
+  "dataset": "reports/n4_mingru_curriculum_subchain_motif_dagger10_hardtail_20260613_seed9100k/00_n3_stable/dataset.npz"
+}

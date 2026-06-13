@@ -1026,3 +1026,72 @@ Setup: reused the balanced DAgger7 curriculum dataset, trained 4-epoch candidate
 | 128 | 16 | 410.6 | 302.0 | 0.150 | false |
 
 Interpretation: the recurrent passthrough/config plumbing is now correct, but it did not produce a performance breakthrough by itself. The tail-heavy 24-epoch seq64/h256 model remains worse than the balanced DAgger7 checkpoint, and the compact capacity screen suggests that naive retraining with extra tail/late weighting over-pulls the policy toward brittle teacher behavior. The best recurrent evidence remains the original balanced DAgger7 checkpoint at `0.675` success over 80 held-out episodes. No N=4 solve claim is justified. The next high-signal recurrent move should reproduce the DAgger7 recipe exactly before changing one variable at a time, or mine failure windows into a separate gate/recovery model instead of increasing global imitation pressure.
+
+
+## DAgger Continuation Reproduction And Fresh-Tail Recurrent Iterations - 2026-06-13
+
+The recurrent path was rechecked after the passthrough plumbing fix. The key finding is that the strong balanced DAgger7 result was not reproduced by training from scratch on the same dataset; it depended on continuing the DAgger checkpoint chain. This is useful evidence that the improvement is curriculum/iteration learning rather than just static behavior cloning data.
+
+Controlled DAgger7 reproduction from scratch: `reports/n4_mingru_dagger7_recipe_repro_20260613_seed5200`
+
+Setup: same balanced DAgger7 dataset, hidden `128`, sequence `16`, motif/subchain/previous-force observation, 4 epochs, gentle sample weights `0.4/0.4/0.4`, but no resume checkpoint. Held-out starts were `1900000`, `2000000`, `2100000`, and `2200000` with 20 episodes each.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure minGRU | 440.0 | 371.5 | 0.275 | 80 |
+| ReCoN-routed minGRU | 474.3 | 405.3 | 0.525 | 80 |
+
+Controlled DAgger7 continuation reproduction: `reports/n4_mingru_dagger7_resume_repro_20260613_seed5200`
+
+Setup: same dataset and training recipe, but resumed from `reports/n4_mingru_curriculum_subchain_motif_dagger5_20260612_seed4810k/supervised_mingru/mingru_terminal.pt`, matching the original DAgger7 continuation structure.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure minGRU | 486.5 | 442.8 | 0.675 | 80 |
+| ReCoN-routed minGRU | 486.3 | 441.1 | 0.6625 | 80 |
+
+Interpretation: the DAgger chain matters. Higher validation imitation accuracy from scratch did not translate to rollout robustness, while checkpoint continuation recovered the near-frontier behavior.
+
+DAgger8 continuation: `reports/n4_mingru_curriculum_subchain_motif_dagger8_20260613_seed9090k`
+
+Setup: resumed from the balanced DAgger7 checkpoint, used DAgger7 as the hard-tail rollout behavior, kept the same conservative 4-epoch recipe, and evaluated on the same held-out N=4 blocks.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure minGRU | 486.8 | 440.8 | 0.675 | 80 |
+| ReCoN-routed minGRU | 486.4 | 440.8 | 0.675 | 80 |
+
+Fresh DAgger8 hard-seed mining: `reports/n4_mingru_dagger8_hardseed_mine_20260613_seed9093k`
+
+This scanned fresh seeds `9093000..` using ReCoN-routed DAgger8 and collected 160 hard seeds before the limit. Scan success was `0.6708`; failures were mostly `pole_1_angle` (`86`) and `pole_2_angle` (`71`).
+
+DAgger9 fresh-tail continuation: `reports/n4_mingru_curriculum_subchain_motif_dagger9_hardtail_20260613_seed9099k`
+
+Setup: resumed from DAgger8, hard-tail stage used the 160 freshly mined DAgger8 hard seeds, same conservative training recipe.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure minGRU | 486.7 | 449.9 | 0.6875 | 80 |
+| ReCoN-routed minGRU | 487.1 | 442.9 | 0.6875 | 80 |
+
+DAgger9 with runtime passthrough enabled: `reports/n4_mingru_dagger9_passthrough_eval_20260613`
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure minGRU | 486.7 | 449.9 | 0.6875 | 80 |
+| ReCoN-routed minGRU + passthrough | 486.7 | 449.9 | 0.6875 | 80 |
+
+Fresh DAgger9 hard-seed mining: `reports/n4_mingru_dagger9_hardseed_mine_20260613_seed9098k`
+
+This scanned 500 fresh episodes, found 159 hard seeds, and measured scan success `0.682`. Failures remained concentrated in `pole_1_angle` (`93`) and `pole_2_angle` (`62`).
+
+DAgger10 fresh-tail continuation: `reports/n4_mingru_curriculum_subchain_motif_dagger10_hardtail_20260613_seed9100k`
+
+Setup: resumed from DAgger9, hard-tail stage used the 159 freshly mined DAgger9 hard seeds, same training recipe.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| pure minGRU | 487.5 | 442.7 | 0.6875 | 80 |
+| ReCoN-routed minGRU | 486.7 | 441.8 | 0.675 | 80 |
+
+Interpretation: targeted fresh-tail DAgger did move the frontier: DAgger9 improved the recurrent held-out success from `0.675` to `0.6875` and raised pure p10 to `449.9`. DAgger10 did not improve and slightly hurt ReCoN-routed behavior, so the current best recurrent checkpoint is DAgger9, not DAgger10. No N=4 solve claim is justified because the best success is still below the `0.70` gate on the 80-episode held-out block. The next attempt should avoid simply repeating hard-tail DAgger; more promising variants are pole_1/pole_2-balanced tail sampling, lower tail sample weight, or a learned gate/recovery specialist for those two failure classes.

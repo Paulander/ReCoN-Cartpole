@@ -1,0 +1,32 @@
+{
+  "candidate_id": "101a8e3937ba",
+  "checkpoint_path": "reports/n4_mingru_dagger7_recipe_repro_20260613_seed5200/candidate_00_101a8e3937ba/mingru_terminal.pt",
+  "hidden_size": 128,
+  "sequence_length": 16,
+  "pure_mingru_policy": {
+    "mean_survival": 439.9875,
+    "p10_survival": 371.5,
+    "success_rate": 0.275,
+    "max_survival": 500.0,
+    "returns_mean": 439.2625,
+    "episodes": 80
+  },
+  "recon_mingru_terminal": {
+    "mean_survival": 474.275,
+    "p10_survival": 405.3,
+    "success_rate": 0.525,
+    "max_survival": 500.0,
+    "returns_mean": 473.8,
+    "episodes": 80
+  },
+  "kept": false,
+  "mechanisms": {
+    "minGRU_terminal": true,
+    "pure_policy_baseline": true,
+    "feedforward_policy_terminal": false,
+    "edge_plasticity": false,
+    "bandit_persistence": false,
+    "slow_consolidation": false,
+    "gain_mutation": false
+  }
+}
