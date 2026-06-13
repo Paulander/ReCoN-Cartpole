@@ -897,3 +897,49 @@ Three follow-up recurrent attempts used the same held-out N=4 block: starts `190
 
 Interpretation: option traces contain a real but weak signal. Mixing every sidecar row into the full curriculum degrades ReCoN-routed behavior, and replaying the full curriculum after the tiny auxiliary finetune washes the routing gain back out. Filtering to `counterfactual_recovery` and `counterfactual_recovery_option` avoids that regression and matches the best ReCoN-routed success seen so far (`0.675`), but it still does not crack the N=4 robustness gap. The next stronger direction should treat option traces as a learned gate/routing or recovery-window mining signal, not as global action imitation sprinkled into the full behavior-cloning dataset.
 
+## Systematic From-Scratch PPO Stage-1 Sweep - 2026-06-13
+
+Run: `reports/n4_ppo_systematic_stage1_20260613_seed9070k`
+
+This is the first real from-scratch PPO sweep where network architecture is meaningful. It used the current N=4 5-bin serial-Lagrange setup, mixed validation starts `900000`, `930000`, `970000`, `1010000`, `1040000`, `1070000`, `1140000`, and `1300000`, with 4 episodes per start. It sampled 24 sparse candidates across learning rate, clip range, `n_steps`, `n_epochs`, GAE lambda, entropy, net arch (`64,64`, `128,128`, `256,128`), VecNormalize on/off, and late-survival bonus. `final_eval_episodes` was set to 0, so this stage is model-selection evidence only and not a solve claim.
+
+Top stage-1 rows:
+
+| idx | grid | lr | clip | steps | epochs | gae | ent | net | VecNorm | late bonus | mean | p10 | cvar | success |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---:|---:|
+| 1 | 157 | 2.5e-6 | 0.015 | 512 | 4 | 0.95 | 0.0 | 256,128 | false | 0.02 | 482.1 | 440.3 | 416.3 | 0.656 |
+| 20 | 3140 | 1e-5 | 0.025 | 512 | 4 | 0.90 | 0.0 | 128,128 | false | 0.05 | 482.3 | 430.8 | 409.5 | 0.688 |
+| 17 | 2669 | 1e-5 | 0.015 | 512 | 2 | 0.98 | 0.0 | 64,64 | true | 0.05 | 479.9 | 434.4 | 413.3 | 0.625 |
+
+Promotion follow-up 1: `reports/n4_ppo_promote_success_c20_20260613_seed9080k`
+
+The highest-success row from stage 1 did not hold up under broader 80-episode validation. It was intentionally interrupted after repeated regression; the generated summary may still say `running`.
+
+| checkpoint | mean | p10 | cvar | success | promoted |
+|---|---:|---:|---:|---:|---|
+| start | 478.5 | 425.8 | 395.8 | 0.600 | true |
+| chunk_1 | 472.5 | 418.8 | 394.3 | 0.575 | false |
+| chunk_2 | 476.6 | 423.9 | 387.9 | 0.550 | false |
+| chunk_3 | 471.3 | 398.4 | 372.9 | 0.525 | false |
+
+Promotion follow-up 2: `reports/n4_ppo_promote_tail_c01_20260613_seed9081k`
+
+The best lower-tail row held up slightly better and produced one promoted checkpoint, but still did not solve N=4.
+
+| checkpoint | mean | p10 | cvar | success | promoted |
+|---|---:|---:|---:|---:|---|
+| start | 479.9 | 429.1 | 402.9 | 0.613 | true |
+| chunk_1 | 480.4 | 429.9 | 399.5 | 0.625 | true |
+| chunk_2 | 478.1 | 420.7 | 386.3 | 0.613 | false |
+| chunk_3 | 474.5 | 410.4 | 382.4 | 0.575 | false |
+| chunk_4 | 477.6 | 418.5 | 382.6 | 0.650 | false |
+
+Final held-out eval used the best promoted checkpoint, `reports/n4_ppo_promote_tail_c01_20260613_seed9081k/checkpoint_025000.zip`, on starts `1500000`, `1600000`, and `1700000` with 50 episodes per start:
+
+| evaluator | mean | p10 | cvar | success | episodes |
+|---|---:|---:|---:|---:|---:|
+| pure PPO | 459.7 | 363.0 | n/a | 0.540 | 150 |
+| ReCoN-routed policy terminal | 481.4 | 428.9 | 395.5 | 0.667 | 150 |
+
+Interpretation: the systematic sweep produced useful knob evidence, especially that from-scratch architecture sweeps are meaningful and that late-survival bonus can help early survival, but longer training still trades successes rather than crossing the N=4 robustness gate. The best promoted from-scratch PPO result is below the incumbent near-solved terminal and below the configured solve threshold. No N=4 solve claim is justified. The next PPO move should either promote the tail-score candidate with a more conservative update schedule, or use the from-scratch sweep result as a teacher/source for recurrent or residual-gated learning rather than continuing to push brittle feedforward PPO alone.
+
