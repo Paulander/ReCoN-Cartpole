@@ -46,6 +46,7 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "n_poles": 3,
             "episodes": args.n3_episodes,
             "seed_start": args.n3_seed_start,
+            "seed_starts": list(getattr(args, "n3_seed_starts", []) or []),
             "initial_angle_range": min(float(args.initial_angle_range), 0.03),
             "force_noise": min(float(args.force_noise), 0.01),
             "rollout_policy": "teacher",
@@ -58,6 +59,7 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "n_poles": 4,
             "episodes": args.low_angle_episodes,
             "seed_start": args.low_angle_seed_start,
+            "seed_starts": list(getattr(args, "low_angle_seed_starts", []) or []),
             "initial_angle_range": 0.02,
             "force_noise": 0.0,
             "rollout_policy": "teacher",
@@ -70,6 +72,7 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "n_poles": 4,
             "episodes": args.current_episodes,
             "seed_start": args.current_seed_start,
+            "seed_starts": list(getattr(args, "current_seed_starts", []) or []),
             "initial_angle_range": args.initial_angle_range,
             "force_noise": args.force_noise,
             "rollout_policy": "teacher",
@@ -82,6 +85,7 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "n_poles": 4,
             "episodes": args.tail_episodes,
             "seed_start": args.tail_seed_start,
+            "seed_starts": list(getattr(args, "tail_seed_starts", []) or []),
             "seed_list": args.tail_seed_list,
             "initial_angle_range": args.initial_angle_range,
             "force_noise": args.force_noise,
@@ -90,6 +94,26 @@ def default_stages(args: argparse.Namespace) -> list[dict[str, Any]]:
             "sample_weight": args.tail_sample_weight,
         },
     ]
+
+
+def mixed_seed_values(seed_starts: list[int], episodes: int) -> list[int]:
+    starts = [int(item) for item in seed_starts]
+    if not starts:
+        return []
+    return [starts[idx % len(starts)] + idx // len(starts) for idx in range(int(episodes))]
+
+
+def stage_seed_list(stage: dict[str, Any], stage_dir: Path) -> str:
+    explicit = str(stage.get("seed_list", "") or "").strip()
+    if explicit:
+        return explicit
+    starts = [int(item) for item in stage.get("seed_starts", []) or []]
+    if not starts:
+        return ""
+    seeds = mixed_seed_values(starts, int(stage["episodes"]))
+    path = stage_dir / "collection_seeds.txt"
+    path.write_text("\n".join(str(seed) for seed in seeds) + "\n", encoding="utf-8")
+    return str(path)
 
 
 def dataset_args(args: argparse.Namespace, stage: dict[str, Any], out_path: Path) -> Namespace:
@@ -131,7 +155,9 @@ def dataset_args(args: argparse.Namespace, stage: dict[str, Any], out_path: Path
 def collect_stage(args: argparse.Namespace, stage: dict[str, Any], out_dir: Path, index: int) -> dict[str, Any]:
     stage_dir = out_dir / f"{index:02d}_{stage['name']}"
     stage_dir.mkdir(parents=True, exist_ok=True)
-    data = collect_policy_dataset(dataset_args(args, stage, stage_dir / "dataset.npz"))
+    stage_for_dataset = dict(stage)
+    stage_for_dataset["seed_list"] = stage_seed_list(stage_for_dataset, stage_dir)
+    data = collect_policy_dataset(dataset_args(args, stage_for_dataset, stage_dir / "dataset.npz"))
     sample_weight = max(0.0, float(stage.get("sample_weight", 1.0)))
     data = {**data, "sample_weights": np.full(data["teacher_actions"].shape[0], sample_weight, dtype=np.float32)}
     np.savez_compressed(stage_dir / "dataset.npz", **data)
@@ -143,7 +169,8 @@ def collect_stage(args: argparse.Namespace, stage: dict[str, Any], out_dir: Path
         "label_source": stage.get("label_source", "teacher"),
         "episodes": int(stage["episodes"]),
         "seed_start": int(stage.get("seed_start", 0)),
-        "seed_list": str(stage.get("seed_list", "") or ""),
+        "seed_starts": [int(item) for item in stage.get("seed_starts", []) or []],
+        "seed_list": str(stage_for_dataset.get("seed_list", "") or ""),
         "initial_angle_range": float(stage["initial_angle_range"]),
         "force_noise": float(stage["force_noise"]),
         "samples": int(data["observations"].shape[0]),
@@ -398,9 +425,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--current-episodes", type=int, default=60)
     parser.add_argument("--tail-episodes", type=int, default=60)
     parser.add_argument("--n3-seed-start", type=int, default=2_810_000)
+    parser.add_argument("--n3-seed-starts", type=int, nargs="*", default=[])
     parser.add_argument("--low-angle-seed-start", type=int, default=2_910_000)
+    parser.add_argument("--low-angle-seed-starts", type=int, nargs="*", default=[])
     parser.add_argument("--current-seed-start", type=int, default=3_010_000)
+    parser.add_argument("--current-seed-starts", type=int, nargs="*", default=[])
     parser.add_argument("--tail-seed-start", type=int, default=3_110_000)
+    parser.add_argument("--tail-seed-starts", type=int, nargs="*", default=[])
     parser.add_argument("--tail-seed-list", default="")
     parser.add_argument("--n3-sample-weight", type=float, default=1.0)
     parser.add_argument("--low-angle-sample-weight", type=float, default=1.0)

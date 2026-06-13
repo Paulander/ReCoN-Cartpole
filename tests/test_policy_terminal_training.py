@@ -1501,6 +1501,29 @@ def test_mingru_curriculum_heldout_score_prioritizes_success():
     assert curriculum.heldout_score(high_success) > curriculum.heldout_score(low_success)
 
 
+def test_mingru_curriculum_mixed_seed_values_round_robin():
+    curriculum = _load_script("train_mingru_curriculum")
+
+    assert curriculum.mixed_seed_values([100, 200], 5) == [100, 200, 101, 201, 102]
+    assert curriculum.mixed_seed_values([], 3) == []
+
+
+def test_mingru_curriculum_stage_seed_list_materializes_file(tmp_path):
+    curriculum = _load_script("train_mingru_curriculum")
+    stage = {"episodes": 5, "seed_starts": [1000, 2000]}
+
+    seed_list = curriculum.stage_seed_list(stage, tmp_path)
+
+    assert seed_list == str(tmp_path / "collection_seeds.txt")
+    assert (tmp_path / "collection_seeds.txt").read_text(encoding="utf-8").splitlines() == [
+        "1000",
+        "2000",
+        "1001",
+        "2001",
+        "1002",
+    ]
+
+
 def test_mingru_curriculum_default_stages_progress_n3_to_n4():
     curriculum = _load_script("train_mingru_curriculum")
     args = SimpleNamespace(
