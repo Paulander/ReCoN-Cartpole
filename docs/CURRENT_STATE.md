@@ -690,3 +690,45 @@ This repeated the long-option residual setup with 16 hard/near-miss collection s
 
 Interpretation: the broader run made the residual more active but reduced held-out success by one episode and degraded p10/cvar. So the bottleneck has moved: long-option counterfactual labels now create a learnable signal, but the policy does not know when to abstain. The next residual iteration should add explicit confidence/gating supervision or a two-head residual (`action`, `apply/no-apply`) trained with stronger success-preservation negatives, rather than only raising/lowering the scalar risk gate.
 
+### Gated Long-Option Residual Probe
+
+Implemented a two-head counterfactual residual terminal format: one head predicts the residual class, and a separate apply head predicts whether the residual should be allowed to change the frozen PPO action. Old residual `.pt` checkpoints remain backward-compatible; new gated checkpoints save `apply_state_dict` and report `apply_probability`, `apply_threshold`, and `apply_allowed` in the ReCoN policy-terminal trace.
+
+Verification:
+
+- `uv run ruff check src/recon_cartpole/recon/engine_runner.py scripts/train_counterfactual_residual_terminal.py tests/test_controller.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_controller.py::test_torch_residual_policy_terminal_can_be_loaded tests/test_controller.py::test_torch_gated_residual_policy_terminal_reports_apply_probability tests/test_controller.py::test_residual_policy_terminal_apply_gate_can_suppress_shift tests/test_controller.py::test_residual_policy_terminal_bin_delta_can_hold_option_across_ticks tests/test_policy_terminal_training.py::test_counterfactual_residual_train_model_oversamples_non_noop_labels tests/test_policy_terminal_training.py::test_counterfactual_residual_train_model_can_emit_apply_gate tests/test_policy_terminal_training.py::test_counterfactual_residual_builds_two_phase_option_sequences -q -s` -> 7 passed.
+- `reports/smoke_gated_counterfactual_residual_20260613` completed a gated integration smoke.
+
+Bounded gated probe: `reports/n4_gated_counterfactual_residual_probe_20260613_seed8930k`
+
+Setup: frozen survival PPO base, `subchain_diagnostics` residual features, 5 residual bins, 20-tick residual hold, 20-tick tail option search, 8 hard/near-miss collection seeds, success-preservation negatives from solved collection episodes, and held-out eval on starts `1500000` and `1600000` with 20 episodes per block.
+
+| item | value |
+|---|---:|
+| rows | 41 |
+| non-noop labels | 3 |
+| apply labels after oversampling | 12 positive / 38 negative |
+| action train accuracy | 0.740 |
+| non-noop recall | 0.667 |
+| apply accuracy | 0.880 |
+| max score gap | 0.964 |
+
+| evaluator | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|
+| frozen PPO ReCoN base | 485.6 | 443.7 | 423.8 | 0.700 | 0.000 |
+| gated residual, apply threshold 0.55 | 485.5 | 443.5 | 423.0 | 0.700 | 0.678 |
+
+Apply-threshold sweep: `reports/n4_gated_counterfactual_residual_probe_20260613_seed8930k/apply_gate_sweep.json`
+
+| apply threshold | mean | p10 | cvar | success | mean abs residual delta |
+|---:|---:|---:|---:|---:|---:|
+| 0.55 | 485.5 | 443.5 | 423.0 | 0.700 | 0.678 |
+| 0.65 | 485.5 | 443.5 | 422.3 | 0.700 | 0.389 |
+| 0.75 | 485.4 | 443.5 | 422.0 | 0.700 | 0.156 |
+| 0.85 | 485.6 | 443.6 | 423.5 | 0.700 | 0.036 |
+| 0.95 | 485.6 | 443.7 | 423.8 | 0.700 | 0.000 |
+| 0.99 | 485.6 | 443.7 | 423.8 | 0.700 | 0.000 |
+
+Interpretation: the apply gate is wired correctly and can abstain back to the frozen PPO baseline, but this small gated dataset still does not improve held-out N=4. The next useful residual move is not looser gating; it is more/better positive recovery labels, likely via broader hard-seed mining, motif-ranked failure windows, or a learned apply gate trained on counterfactual harm/benefit rather than just non-noop labels.
+

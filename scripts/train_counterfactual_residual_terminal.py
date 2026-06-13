@@ -54,6 +54,7 @@ def make_controller(args: argparse.Namespace, residual_model_path: str = "", gat
             residual_policy_terminal_mode="bin_delta",
             residual_policy_terminal_action_bins=args.residual_action_bins,
             residual_policy_terminal_gate_threshold=args.residual_gate_threshold if gate_threshold is None else gate_threshold,
+            residual_policy_terminal_apply_threshold=float(getattr(args, "residual_apply_threshold", 0.5)),
             residual_policy_terminal_feature_mode=args.residual_feature_mode,
             residual_policy_terminal_hold_steps=getattr(args, "option_hold_steps", 1),
         )
@@ -407,6 +408,7 @@ def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, An
     return {
         "feature": feature.tolist(),
         "label": int(label),
+        "apply_label": int(label != center),
         "seed": int(state.get("seed", -1)),
         "step": int(state["step"]),
         "base_force": float(state["force"]),
@@ -529,7 +531,7 @@ def collect_dataset(args: argparse.Namespace) -> dict[str, Any]:
                 selected = states[:: int(args.success_negative_stride)][-int(args.max_success_states) :]
                 for state in selected:
                     feature = residual_observation(args, state["raw_before"], float(state["force"]), int(state["step"]))
-                    rows.append({"feature": feature.tolist(), "label": int(args.residual_action_bins) // 2, "seed": episode["seed"], "step": int(state["step"]), "success_negative": True})
+                    rows.append({"feature": feature.tolist(), "label": int(args.residual_action_bins) // 2, "apply_label": 0, "seed": episode["seed"], "step": int(state["step"]), "success_negative": True})
         else:
             selected = select_failure_states(args, episode)
             for state in selected:
@@ -555,6 +557,10 @@ def train_model(rows: list[dict[str, Any]], args: argparse.Namespace) -> tuple[A
             train_rows.extend(non_noop_rows)
     x = torch.tensor([row["feature"] for row in train_rows], dtype=torch.float32)
     y = torch.tensor([int(row["label"]) for row in train_rows], dtype=torch.long)
+    apply_y = torch.tensor(
+        [int(row.get("apply_label", int(int(row["label"]) != center))) for row in train_rows],
+        dtype=torch.float32,
+    ).reshape(-1, 1)
     model = nn.Sequential(nn.Linear(x.shape[1], int(args.hidden_size)), nn.ReLU(), nn.Linear(int(args.hidden_size), classes))
     counts = torch.bincount(y, minlength=classes).float()
     weights = torch.clamp(counts.sum() / torch.clamp(counts, min=1.0), max=float(args.max_class_weight))
@@ -570,6 +576,33 @@ def train_model(rows: list[dict[str, Any]], args: argparse.Namespace) -> tuple[A
             opt.zero_grad()
             loss.backward()
             opt.step()
+
+    apply_model = None
+    apply_accuracy = 0.0
+    apply_positive_rate = float(apply_y.mean().item()) if apply_y.numel() else 0.0
+    if bool(getattr(args, "train_apply_gate", True)):
+        apply_model = nn.Sequential(nn.Linear(x.shape[1], int(args.hidden_size)), nn.ReLU(), nn.Linear(int(args.hidden_size), 1))
+        positives = torch.clamp(apply_y.sum(), min=0.0)
+        negatives = torch.clamp(torch.tensor(float(apply_y.numel())) - positives, min=0.0)
+        pos_weight_value = float(getattr(args, "apply_positive_weight", 0.0))
+        if pos_weight_value <= 0.0:
+            pos_weight_value = float((negatives / torch.clamp(positives, min=1.0)).item())
+        pos_weight = torch.tensor([max(1.0, min(float(getattr(args, "max_apply_positive_weight", 12.0)), pos_weight_value))], dtype=torch.float32)
+        apply_loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        apply_opt = torch.optim.Adam(apply_model.parameters(), lr=float(args.learning_rate))
+        apply_rng = torch.Generator().manual_seed(int(args.train_seed) + 17)
+        for _ in range(int(getattr(args, "apply_epochs", args.epochs))):
+            order = torch.randperm(x.shape[0], generator=apply_rng)
+            for start in range(0, x.shape[0], int(args.batch_size)):
+                batch = order[start : start + int(args.batch_size)]
+                loss = apply_loss_fn(apply_model(x[batch]), apply_y[batch])
+                apply_opt.zero_grad()
+                loss.backward()
+                apply_opt.step()
+        with torch.no_grad():
+            apply_pred = (torch.sigmoid(apply_model(x)) >= float(getattr(args, "residual_apply_threshold", 0.5))).float()
+            apply_accuracy = float((apply_pred == apply_y).float().mean().item())
+
     with torch.no_grad():
         pred = model(x).argmax(dim=1)
         acc = float((pred == y).float().mean().item())
@@ -580,21 +613,33 @@ def train_model(rows: list[dict[str, Any]], args: argparse.Namespace) -> tuple[A
         "hidden_size": int(args.hidden_size),
         "classes": classes,
         "label_counts": {str(i): int(counts[i].item()) for i in range(classes)},
+        "apply_label_counts": {"0": int((apply_y == 0).sum().item()), "1": int((apply_y == 1).sum().item())},
         "original_row_count": int(len(rows)),
         "expanded_row_count": int(len(train_rows)),
         "non_noop_oversample_factor": int(factor),
         "train_accuracy": acc,
         "non_noop_recall": non_noop_recall,
-        "format": "counterfactual_residual_terminal_v1",
+        "apply_gate_enabled": apply_model is not None,
+        "apply_positive_rate": apply_positive_rate,
+        "apply_accuracy": apply_accuracy,
+        "apply_threshold": float(getattr(args, "residual_apply_threshold", 0.5)),
+        "format": "counterfactual_gated_residual_terminal_v2" if apply_model is not None else "counterfactual_residual_terminal_v1",
     }
-    return model, meta
+    return (model, apply_model) if apply_model is not None else model, meta
 
 
 def save_model(model: Any, meta: dict[str, Any], path: Path) -> None:
     import torch
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save({"state_dict": model.state_dict(), "meta": meta}, path)
+    if isinstance(model, tuple):
+        action_model, apply_model = model
+        payload = {"state_dict": action_model.state_dict(), "meta": meta}
+        if apply_model is not None:
+            payload["apply_state_dict"] = apply_model.state_dict()
+    else:
+        payload = {"state_dict": model.state_dict(), "meta": meta}
+    torch.save(payload, path)
 
 
 def tail_metrics(steps: list[float], horizon: int) -> dict[str, Any]:
@@ -717,7 +762,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "pressure_max_weight": float(getattr(args, "pressure_max_weight", 0.0)),
             "pressure_final_weight": float(getattr(args, "pressure_final_weight", 0.0)),
         },
-        "mechanisms": {"counterfactual_residual_terminal": True, "residual_option_hold": int(getattr(args, "option_hold_steps", 1)) > 1, "recon_integration_eval": True, "gain_mutation": False},
+        "mechanisms": {"counterfactual_residual_terminal": True, "residual_apply_gate": bool(meta.get("apply_gate_enabled", False)), "residual_option_hold": int(getattr(args, "option_hold_steps", 1)) > 1, "recon_integration_eval": True, "gain_mutation": False},
         "wall_clock_seconds": time.perf_counter() - started,
     }
     (out / "report.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -765,6 +810,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--residual-feature-mode", choices=["basic", "proposal_diagnostics", "subchain_diagnostics"], default="proposal_diagnostics")
     parser.add_argument("--residual-action-bins", type=int, default=5)
     parser.add_argument("--residual-gate-threshold", type=float, default=0.60)
+    parser.add_argument("--residual-apply-threshold", type=float, default=0.50)
     parser.add_argument("--option-hold-steps", type=int, default=1)
     parser.add_argument("--option-tail-steps", type=int, default=0)
     parser.add_argument("--tail-shift-penalty", type=float, default=0.0)
@@ -819,6 +865,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-class-weight", type=float, default=8.0)
     parser.add_argument("--noop-class-weight", type=float, default=1.0)
     parser.add_argument("--non-noop-oversample-factor", type=float, default=1.0)
+    parser.add_argument("--train-apply-gate", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--apply-epochs", type=int, default=120)
+    parser.add_argument("--apply-positive-weight", type=float, default=0.0)
+    parser.add_argument("--max-apply-positive-weight", type=float, default=12.0)
     parser.add_argument("--train-seed", type=int, default=2380)
     parser.add_argument("--eval-seed-start", type=int, default=2100000)
     parser.add_argument("--eval-seed-starts", type=int, nargs="*", default=[])

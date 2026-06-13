@@ -1047,6 +1047,51 @@ def test_torch_residual_policy_terminal_can_be_loaded(tmp_path):
     assert int(action) == 4
 
 
+
+def test_torch_gated_residual_policy_terminal_reports_apply_probability(tmp_path):
+    import torch
+    import torch.nn as nn
+
+    action_model = nn.Sequential(nn.Linear(7, 4), nn.ReLU(), nn.Linear(4, 5))
+    apply_model = nn.Sequential(nn.Linear(7, 4), nn.ReLU(), nn.Linear(4, 1))
+    with torch.no_grad():
+        for param in action_model.parameters():
+            param.zero_()
+        for param in apply_model.parameters():
+            param.zero_()
+        action_model[2].bias[4] = 1.0
+        apply_model[2].bias[0] = -4.0
+    path = tmp_path / "gated_residual.pt"
+    torch.save(
+        {
+            "state_dict": action_model.state_dict(),
+            "apply_state_dict": apply_model.state_dict(),
+            "meta": {
+                "input_size": 7,
+                "hidden_size": 4,
+                "classes": 5,
+                "format": "counterfactual_gated_residual_terminal_v2",
+            },
+        },
+        path,
+    )
+
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=1,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            residual_policy_terminal_path=str(path),
+        )
+    )
+
+    action, state = controller.residual_policy_terminal_model.predict(np.zeros(7, dtype=np.float32))
+
+    assert int(action) == 4
+    assert state is not None
+    assert state["apply_probability"] < 0.05
+
+
 def test_residual_policy_terminal_subchain_feature_mode_expands_observation():
     from recon_cartpole.control.residual_features import residual_aux_feature_size
 
@@ -1128,6 +1173,44 @@ def test_residual_policy_terminal_bin_delta_changes_policy_force():
     assert info["residual_policy_terminal"]["mode"] == "bin_delta"
     assert info["residual_policy_terminal"]["residual_delta"] == controller.config.force_mag
     assert residual.observation.shape == (7,)
+
+
+
+def test_residual_policy_terminal_apply_gate_can_suppress_shift():
+    class FakeBasePolicy:
+        def predict(self, observation, deterministic=True):
+            return 2, None
+
+    class FakeResidualPolicy:
+        def predict(self, observation, deterministic=True):
+            return 4, {"apply_probability": 0.1}
+
+    raw = np.asarray([0.0, 0.0, 0.18, 0.0], dtype=np.float32)
+    controller = ReConCartPoleController(
+        RunnerConfig(
+            n_poles=1,
+            mode="recon_policy_terminal",
+            discrete_action_bins=5,
+            selection_mode="hard_select",
+            learn=False,
+            policy_terminal_observation_mode="normalized_raw",
+            residual_policy_terminal_mode="bin_delta",
+            residual_policy_terminal_action_bins=5,
+            residual_policy_terminal_gate_threshold=0.0,
+            residual_policy_terminal_apply_threshold=0.5,
+        )
+    )
+    controller.policy_terminal_model = FakeBasePolicy()
+    controller.residual_policy_terminal_model = FakeResidualPolicy()
+
+    force, info = controller._policy_terminal_force(raw, raw)
+    residual = info["residual_policy_terminal"]
+
+    assert force == 0.0
+    assert residual["requested_shift"] == 2
+    assert residual["applied_shift"] == 0
+    assert residual["apply_probability"] == 0.1
+    assert residual["apply_allowed"] is False
 
 
 def test_residual_policy_terminal_bin_delta_can_hold_option_across_ticks():

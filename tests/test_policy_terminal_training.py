@@ -215,6 +215,44 @@ def test_counterfactual_residual_train_model_oversamples_non_noop_labels():
 
 
 
+
+def test_counterfactual_residual_train_model_can_emit_apply_gate(tmp_path):
+    import torch
+
+    residual = _load_script("train_counterfactual_residual_terminal")
+    rows = [
+        {"feature": [0.0, 0.0], "label": 2, "apply_label": 0},
+        {"feature": [1.0, 0.0], "label": 2, "apply_label": 0},
+        {"feature": [0.0, 1.0], "label": 1, "apply_label": 1},
+    ]
+    args = SimpleNamespace(
+        residual_action_bins=5,
+        hidden_size=4,
+        max_class_weight=8.0,
+        noop_class_weight=1.0,
+        learning_rate=1e-3,
+        train_seed=7,
+        epochs=1,
+        batch_size=2,
+        non_noop_oversample_factor=1,
+        train_apply_gate=True,
+        apply_epochs=1,
+        apply_positive_weight=1.0,
+        max_apply_positive_weight=4.0,
+        residual_apply_threshold=0.5,
+    )
+
+    model, meta = residual.train_model(rows, args)
+    path = tmp_path / "gated.pt"
+    residual.save_model(model, meta, path)
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+
+    assert meta["apply_gate_enabled"] is True
+    assert meta["apply_label_counts"] == {"0": 2, "1": 1}
+    assert meta["format"] == "counterfactual_gated_residual_terminal_v2"
+    assert "apply_state_dict" in payload
+
+
 def test_counterfactual_residual_builds_two_phase_option_sequences():
     residual = _load_script("train_counterfactual_residual_terminal")
     args = SimpleNamespace(residual_action_bins=5, option_hold_steps=3, option_tail_steps=2)

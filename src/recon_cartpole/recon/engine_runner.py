@@ -82,6 +82,15 @@ class TorchResidualPolicy:
             nn.ReLU(),
             nn.Linear(hidden_size, classes),
         )
+        self.apply_model = None
+        if "apply_state_dict" in payload:
+            self.apply_model = nn.Sequential(
+                nn.Linear(input_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, 1),
+            )
+            self.apply_model.load_state_dict(payload["apply_state_dict"])
+            self.apply_model.eval()
         self.model.load_state_dict(payload["state_dict"])
         self.model.eval()
 
@@ -91,9 +100,14 @@ class TorchResidualPolicy:
         if obs.shape[1] != expected:
             raise ValueError(f"torch residual terminal observation size mismatch: obs={obs.shape[1]} expected={expected}")
         with self.torch.no_grad():
-            logits = self.model(self.torch.as_tensor(obs, dtype=self.torch.float32))
+            tensor = self.torch.as_tensor(obs, dtype=self.torch.float32)
+            logits = self.model(tensor)
             action = int(self.torch.argmax(logits, dim=1).cpu().numpy()[0])
-        return action, None
+            if self.apply_model is None:
+                return action, None
+            apply_logit = self.apply_model(tensor)
+            apply_probability = float(self.torch.sigmoid(apply_logit).cpu().numpy().reshape(-1)[0])
+        return action, {"apply_probability": apply_probability}
 
 
 @dataclass
@@ -177,6 +191,7 @@ class RunnerConfig:
     residual_policy_terminal_action_bins: int = 5
     residual_policy_terminal_max_force: float = 4.0
     residual_policy_terminal_gate_threshold: float = 0.30
+    residual_policy_terminal_apply_threshold: float = 0.50
     residual_policy_terminal_feature_mode: str = "basic"
     residual_policy_terminal_hold_steps: int = 1
     mingru_terminal: MinGRUTerminalConfig = field(default_factory=MinGRUTerminalConfig)
@@ -615,6 +630,7 @@ class ReConCartPoleController:
                 "residual_policy_terminal_path": self.config.residual_policy_terminal_path,
                 "residual_policy_terminal_mode": self.config.residual_policy_terminal_mode,
                 "residual_policy_terminal_feature_mode": self.config.residual_policy_terminal_feature_mode,
+                "residual_policy_terminal_apply_threshold": self.config.residual_policy_terminal_apply_threshold,
                 "mingru_terminal_config": self.config.mingru_terminal.__dict__,
                 "pole1_fix_config": self.config.pole1_fix.__dict__,
                 "rescue_config": self.config.rescue.__dict__,
@@ -766,7 +782,11 @@ class ReConCartPoleController:
                 aux_features,
             ]
         ).astype(np.float32, copy=False)
-        action, _state = self.residual_policy_terminal_model.predict(residual_obs, deterministic=True)
+        action, residual_state = self.residual_policy_terminal_model.predict(residual_obs, deterministic=True)
+        residual_state = residual_state if isinstance(residual_state, dict) else {}
+        apply_probability = residual_state.get("apply_probability")
+        apply_threshold = float(self.config.residual_policy_terminal_apply_threshold)
+        apply_allowed = apply_probability is None or float(apply_probability) >= apply_threshold
         action_idx = int(
             np.clip(
                 int(np.asarray(action).reshape(-1)[0]),
@@ -789,7 +809,7 @@ class ReConCartPoleController:
                 applied_shift = int(self.residual_option_shift)
                 self.residual_option_remaining -= 1
                 option_reused = True
-            elif gate >= float(self.config.residual_policy_terminal_gate_threshold):
+            elif gate >= float(self.config.residual_policy_terminal_gate_threshold) and apply_allowed:
                 applied_shift = requested_shift
                 if applied_shift != 0 and hold_steps > 1:
                     self.residual_option_shift = int(applied_shift)
@@ -816,7 +836,7 @@ class ReConCartPoleController:
                 max(2, int(self.config.residual_policy_terminal_action_bins)),
             )
             requested_delta = float(values[action_idx])
-            delta = gate * requested_delta
+            delta = gate * requested_delta if apply_allowed else 0.0
             final_force = float(
                 np.clip(base_force + delta, -self.config.force_mag, self.config.force_mag)
             )
@@ -829,6 +849,9 @@ class ReConCartPoleController:
             "observation_size": int(residual_obs.size),
             "action": [action_idx],
             "risk_gate": gate,
+            "apply_probability": None if apply_probability is None else float(apply_probability),
+            "apply_threshold": apply_threshold,
+            "apply_allowed": bool(apply_allowed),
             "requested_shift": int(requested_shift),
             "applied_shift": int(applied_shift),
             "hold_steps": int(hold_steps),
