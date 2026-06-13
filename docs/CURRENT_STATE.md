@@ -1244,3 +1244,43 @@ Setup: filtered the fresh sidecar to the 359 recovery/recovery-option rows, resu
 
 Interpretation: fresh DAgger9 hard-seed option traces improved the density and quality of the recovery sidecar and nudged p10 upward, but still did not change the binary success count. This is progress on failure severity, not a solve. The remaining gap likely needs either more diverse fresh option traces across the held-out failure modes or an objective that explicitly optimizes recovery timing/gating rather than simple action imitation on option traces.
 
+## Fresh Option-Aux Hard-Seed Mine And Iter2 - 2026-06-13
+
+Mined a fresh 500-seed block from the fresh option-only auxiliary checkpoint (`reports/n4_mingru_dagger9_fresh_option_aux_20260613_seed9131k/supervised_mingru/mingru_terminal.pt`) to see whether the slight p10 improvement changed the hard-tail distribution.
+
+Hard-seed mine: `reports/n4_mingru_fresh_option_aux_hardseed_mine_20260613_seed9140k`
+
+| checkpoint | scan episodes | mean | p10 | success | hard seeds | failure counts |
+|---|---:|---:|---:|---:|---:|---|
+| DAgger9 reference mine | 500 | 483.3 | 434.9 | 0.682 | 159 | `pole_1_angle`: 93, `pole_2_angle`: 62, `pole_0_angle`: 4 |
+| fresh option-aux mine | 500 | 484.1 | 437.0 | 0.690 | 155 | `pole_1_angle`: 81, `pole_2_angle`: 70, `pole_0_angle`: 4 |
+
+The fresh option-aux checkpoint is slightly better on this fresh scan, but still not solved and still fails mostly through pole_1/pole_2 angle.
+
+Generated a second option-trace sidecar from 16 newly mined hard seeds: `reports/n4_option_policy_freshaux_hardseed_dataset_20260613_seed9141k`. It produced 304 policy rows, including 29 `counterfactual_recovery` rows and 226 `counterfactual_recovery_option` rows.
+
+Iter2 auxiliary finetune: `reports/n4_mingru_fresh_option_aux_iter2_20260613_seed9142k`
+
+Setup: filtered the second fresh sidecar to 255 recovery/recovery-option rows, resumed from the fresh option-aux checkpoint, trained 10 low-LR supervised epochs, and evaluated on held-out starts `1900000`, `2000000`, `2100000`, and `2200000`, 20 episodes each.
+
+| candidate | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success |
+|---|---:|---:|---:|---:|---:|---:|
+| fresh option-aux iter1 | 486.7 | 451.9 | 0.6875 | 487.1 | 443.8 | 0.6875 |
+| fresh option-aux iter2 | 486.6 | 451.7 | 0.6875 | 487.1 | 443.8 | 0.6875 |
+
+Interpretation: repeated option-trace imitation is flattening. It can improve p10 and fresh-scan success slightly, but a second iteration did not move held-out success or improve over iter1. The next useful move should not be another identical option-only finetune. Better candidates are: broader/diversified option-trace collection across more independent fresh blocks, an objective that learns when to trigger recovery rather than imitating every option state, or a different recurrent/on-policy update that explicitly optimizes the remaining success boundary.
+
+## Low-LR PPO Tail Stage-2 Partial Sweep - 2026-06-13
+
+Ran a bounded PPO continuation sweep around the previously useful low-learning-rate corner, then stopped it early after three candidates because the results repeated the same held-out plateau. The run starts from the current best feedforward PPO terminal (`reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip`), uses the current 5-bin serial-lagrange N=4 setup, trains with hard-tail seed replay, and evaluates on held-out starts `1900000`, `2000000`, `2100000`, and `2200000`, 20 episodes each.
+
+Partial sweep: `reports/n4_ppo_lowlr_tail_stage2_20260613_seed9150k`
+
+| candidate | lr | clip | ent | late bonus | best checkpoint | held-out mean | held-out p10 | held-out success |
+|---:|---:|---:|---:|---:|---|---:|---:|---:|
+| 0 | `1e-7` | `0.001` | `0.0` | `0.0` | start | 487.7 | 442.9 | 0.6875 |
+| 1 | `1e-7` | `0.001` | `0.0` | `0.005` | start | 487.7 | 442.9 | 0.6875 |
+| 2 | `1e-7` | `0.001` | `0.001` | `0.0` | chunk 2 | 487.7 | 443.8 | 0.6875 |
+
+Interpretation: this tiny-update PPO corner mostly preserves the incumbent. Candidate 2 promoted a trained checkpoint and nudged p10 by `+0.9`, but the binary held-out success stayed fixed at `0.6875`. I stopped the remaining near-duplicate candidates rather than spend more time confirming the same plateau. This points away from more ultra-low-LR PPO micro-sweeps as the next best solve attempt.
+
