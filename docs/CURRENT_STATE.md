@@ -1347,3 +1347,14 @@ Promotion result: candidate score `1180.0125`, incumbent score `1180.01375`, `pr
 
 Interpretation: protected PPO was stable and did not cause the larger regressions seen in earlier recurrent PPO/on-policy attempts, but it also did not move the binary success count. The promotion guard is now useful infrastructure for further recurrent experiments: future runs can try stronger updates without accidentally replacing a near-equal or worse incumbent.
 
+## minGRU Curriculum Promotion Guard - 2026-06-13
+
+Added incumbent comparison/promotion reporting to `scripts/train_mingru_curriculum.py`, matching the protected minGRU PPO runner. When a curriculum run resumes from an existing checkpoint, the runner now evaluates both the resumed-from checkpoint and the newly trained candidate on the same held-out N=4 seed blocks, records `start_pure_mingru_policy`, `start_recon_mingru_terminal`, candidate metrics, a promotion score (`1000*success_rate + p10_survival + 0.1*mean_survival`), `promoted`, and `best_checkpoint_path`.
+
+This directly addresses the DAgger12 regression: future recurrent curriculum runs can still explore stronger N=3->N=4->hard-tail datasets, but the report will explicitly preserve the incumbent when the new curriculum checkpoint regresses or only ties within the configured promotion margin.
+
+Focused verification:
+
+- `uv run ruff check scripts/train_mingru_curriculum.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs tests/test_policy_terminal_training.py::test_mingru_curriculum_heldout_score_prioritizes_success tests/test_policy_terminal_training.py::test_mingru_curriculum_default_stages_progress_n3_to_n4 tests/test_policy_terminal_training.py::test_mingru_curriculum_forwards_passthrough_to_supervised_training -q -s` -> 4 passed.
+

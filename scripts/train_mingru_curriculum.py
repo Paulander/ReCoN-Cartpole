@@ -182,6 +182,14 @@ def eval_seeds(args: argparse.Namespace) -> list[int]:
     return seeds
 
 
+def heldout_score(summary: dict[str, Any]) -> float:
+    return (
+        1000.0 * float(summary.get("success_rate", 0.0))
+        + float(summary.get("p10_survival", 0.0))
+        + 0.10 * float(summary.get("mean_survival", 0.0))
+    )
+
+
 def eval_args(args: argparse.Namespace) -> Namespace:
     return Namespace(
         n_poles=4,
@@ -225,18 +233,30 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
             f"| {stage['name']} | {stage['n_poles']} | {stage['teacher']} | {stage['rollout_policy']} | "
             f"{stage['initial_angle_range']:.3f} | {stage['force_noise']:.3f} | {stage.get('sample_weight', 1.0):.3f} | {stage['samples']} |"
         )
+    start_pure = result.get("start_pure_mingru_policy", {})
+    start_recon = result.get("start_recon_mingru_terminal", {})
     pure = result.get("pure_mingru_policy", {})
     recon = result.get("recon_mingru_terminal", {})
     eval_status = result.get("eval_status", "completed")
+    promotion = result.get("promotion", {})
     lines.extend([
         "",
         "## Held-Out N=4 Eval",
         "",
         f"Eval status: `{eval_status}`",
+        f"Promoted: `{result.get('promoted', False)}`",
+        f"Best checkpoint: `{result.get('best_checkpoint_path', result.get('checkpoint_path', ''))}`",
+        f"Promotion score: candidate `{promotion.get('candidate_score', 0.0):.4f}`, incumbent `{promotion.get('incumbent_score', 0.0):.4f}`",
         "",
         "| evaluator | mean | p10 | success | episodes |",
         "|---|---:|---:|---:|---:|",
-        f"| pure_mingru_policy | {pure.get('mean_survival', 0.0):.1f} | {pure.get('p10_survival', 0.0):.1f} | {pure.get('success_rate', 0.0):.3f} | {pure.get('episodes', 0)} |",
+    ])
+    if start_pure:
+        lines.append(f"| start_pure_mingru_policy | {start_pure.get('mean_survival', 0.0):.1f} | {start_pure.get('p10_survival', 0.0):.1f} | {start_pure.get('success_rate', 0.0):.3f} | {start_pure.get('episodes', 0)} |")
+    lines.append(f"| pure_mingru_policy | {pure.get('mean_survival', 0.0):.1f} | {pure.get('p10_survival', 0.0):.1f} | {pure.get('success_rate', 0.0):.3f} | {pure.get('episodes', 0)} |")
+    if start_recon:
+        lines.append(f"| start_recon_mingru_terminal | {start_recon.get('mean_survival', 0.0):.1f} | {start_recon.get('p10_survival', 0.0):.1f} | {start_recon.get('success_rate', 0.0):.3f} | {start_recon.get('episodes', 0)} |")
+    lines.extend([
         f"| recon_mingru_terminal | {recon.get('mean_survival', 0.0):.1f} | {recon.get('p10_survival', 0.0):.1f} | {recon.get('success_rate', 0.0):.3f} | {recon.get('episodes', 0)} |",
         "",
         "## Claim Discipline",
@@ -301,17 +321,37 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if seeds:
         pure = evaluate_pure_mingru(checkpoint, ladder_args, seeds, args.hidden_size, args.sequence_length)
         recon = evaluate_recon_mingru(checkpoint, ladder_args, seeds, args.hidden_size, args.sequence_length)
+        compare_resume = bool(getattr(args, "compare_resume_checkpoint", True)) and bool(str(args.resume_checkpoint or ""))
+        if compare_resume:
+            start_pure = evaluate_pure_mingru(str(args.resume_checkpoint), ladder_args, seeds, args.hidden_size, args.sequence_length)
+            start_recon = evaluate_recon_mingru(str(args.resume_checkpoint), ladder_args, seeds, args.hidden_size, args.sequence_length)
+        else:
+            start_pure = {}
+            start_recon = {}
         eval_status = "completed"
     else:
         pure = {"episodes": 0, "mean_survival": 0.0, "p10_survival": 0.0, "success_rate": 0.0, "max_survival": 0.0}
         recon = dict(pure)
+        start_pure = {}
+        start_recon = {}
         eval_status = "skipped_no_eval_seeds"
+    candidate_score = heldout_score(recon)
+    incumbent_score = heldout_score(start_recon) if start_recon else float("-inf")
+    promoted = bool(candidate_score > incumbent_score + float(getattr(args, "min_promotion_delta", 0.0)))
     result = {
         "status": "completed",
         "out": str(out),
         "dataset": str(dataset_path),
         "samples": int(aggregated["observations"].shape[0]),
         "checkpoint_path": checkpoint,
+        "best_checkpoint_path": str(checkpoint if promoted or not start_recon else args.resume_checkpoint),
+        "promoted": promoted,
+        "promotion": {
+            "metric": "1000*success_rate + p10_survival + 0.1*mean_survival",
+            "candidate_score": candidate_score,
+            "incumbent_score": incumbent_score,
+            "min_promotion_delta": float(getattr(args, "min_promotion_delta", 0.0)),
+        },
         "observation_mode": args.observation_mode,
         "sequence_length": int(args.sequence_length),
         "hidden_size": int(args.hidden_size),
@@ -319,6 +359,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "train_report": train_report,
         "eval_seeds": seeds,
         "eval_status": eval_status,
+        "start_pure_mingru_policy": start_pure,
+        "start_recon_mingru_terminal": start_recon,
         "pure_mingru_policy": pure,
         "recon_mingru_terminal": recon,
         "mechanisms": {
@@ -403,13 +445,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--train-seed", type=int, default=2810)
     parser.add_argument("--final-seed-starts", type=int, nargs="+", default=[1_900_000, 2_000_000, 2_100_000, 2_200_000])
     parser.add_argument("--final-eval-episodes", type=int, default=60)
+    parser.add_argument("--compare-resume-checkpoint", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--min-promotion-delta", type=float, default=0.0)
     parser.add_argument("--out", default="reports/mingru_curriculum")
     return parser
 
 
 def main() -> None:
     result = run(build_parser().parse_args())
-    print(json.dumps({"out": result["out"], "checkpoint_path": result["checkpoint_path"], "success": result["recon_mingru_terminal"].get("success_rate", 0.0)}, indent=2))
+    print(json.dumps({"out": result["out"], "checkpoint_path": result["checkpoint_path"], "best_checkpoint_path": result.get("best_checkpoint_path", result["checkpoint_path"]), "promoted": result.get("promoted", False), "success": result["recon_mingru_terminal"].get("success_rate", 0.0)}, indent=2))
 
 
 if __name__ == "__main__":

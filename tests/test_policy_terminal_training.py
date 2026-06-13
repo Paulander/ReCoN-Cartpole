@@ -1317,6 +1317,15 @@ def test_recurrent_tail_final_seed_start_fallback():
     assert recurrent_tail.recurrent_final_seeds(args) == [10, 11]
 
 
+def test_mingru_curriculum_heldout_score_prioritizes_success():
+    curriculum = _load_script("train_mingru_curriculum")
+
+    high_success = {"success_rate": 0.70, "p10_survival": 430.0, "mean_survival": 480.0}
+    low_success = {"success_rate": 0.69, "p10_survival": 435.0, "mean_survival": 480.0}
+
+    assert curriculum.heldout_score(high_success) > curriculum.heldout_score(low_success)
+
+
 def test_mingru_curriculum_default_stages_progress_n3_to_n4():
     curriculum = _load_script("train_mingru_curriculum")
     args = SimpleNamespace(
