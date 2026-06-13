@@ -779,6 +779,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     mingru_onpolicy = _load_script("train_mingru_onpolicy")
     mingru_ppo = _load_script("train_mingru_ppo")
     mingru_action_gate = _load_script("train_mingru_action_gate")
+    mingru_gate_grid = _load_script("evaluate_mingru_action_gate_grid")
     subchain_pair = _load_script("train_subchain_pair_terminal")
 
     assert callable(dataset_builder.collect)
@@ -803,6 +804,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(mingru_onpolicy.run)
     assert callable(mingru_ppo.run)
     assert callable(mingru_action_gate.run)
+    assert callable(mingru_gate_grid.run_grid)
     assert callable(subchain_pair.run)
 
 
@@ -1153,6 +1155,27 @@ def test_counterfactual_gate_summarizes_positive_labels():
     assert summary["label_counts"]["3"] == 1
     assert summary["max_survival_gap"] == 3.0
     assert summary["max_score_gap"] == 3.5
+
+
+def test_mingru_action_gate_grid_parses_float_lists_and_ranks():
+    grid = _load_script("evaluate_mingru_action_gate_grid")
+
+    assert grid._floats("0.1, 0.2,,0.3") == [0.1, 0.2, 0.3]
+
+    args = SimpleNamespace(
+        gate_confidences="0.7,0.8",
+        gate_margins="0.1,0.2",
+        gate_apply_thresholds="0.5,0.9",
+        max_candidates=3,
+    )
+    assert grid.candidate_configs(args) == [(0.7, 0.1, 0.5), (0.7, 0.1, 0.9), (0.7, 0.2, 0.5)]
+
+    weaker = {"success_rate": 0.5, "p10_survival": 490.0, "cvar_survival": 490.0, "mean_survival": 490.0, "override_count": 0}
+    stronger = {"success_rate": 0.6, "p10_survival": 450.0, "cvar_survival": 420.0, "mean_survival": 480.0, "override_count": 10}
+    assert grid.candidate_key(stronger) > grid.candidate_key(weaker)
+
+    noisy = {"success_rate": 0.6, "p10_survival": 450.0, "cvar_survival": 420.0, "mean_survival": 480.0, "override_count": 20}
+    assert grid.candidate_key(stronger) > grid.candidate_key(noisy)
 
 
 def test_mingru_action_gate_collect_seed_values_reads_txt_and_json(tmp_path):
