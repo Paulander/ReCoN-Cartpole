@@ -880,3 +880,20 @@ This resumed from the balanced DAgger7 minGRU checkpoint and trained conservativ
 | option-trace auxiliary ReCoN-routed minGRU | 486.7 | 442.5 | 0.675 | 80 |
 
 Interpretation: this does not solve N=4, but it is the first useful sign that long-option counterfactual traces are better used as auxiliary primary-policy/recurrent data than as direct subchain actuator authority. The improvement is small: ReCoN-routed minGRU recovers from `0.6625` to `0.675` success on this block, and pure minGRU p10 improves slightly. The next stronger experiment should mix these option-trace rows with the full DAgger curriculum dataset instead of finetuning on the tiny sidecar alone.
+
+## Option-Trace Mixed Recurrent Replay - 2026-06-13
+
+Added `scripts/merge_policy_datasets.py`, a reusable policy-dataset merge tool for recurrent/minGRU datasets. It validates observation shapes, offsets episode ids so sequence windows do not cross dataset boundaries, preserves source labels with optional prefixes, applies explicit dataset weight multipliers, and can include/exclude source labels. Focused checks passed: `uv run ruff check scripts/merge_policy_datasets.py tests/test_policy_terminal_training.py` and `uv run pytest tests/test_policy_terminal_training.py::test_merge_policy_datasets_offsets_episodes_and_weights -q -s`.
+
+Three follow-up recurrent attempts used the same held-out N=4 block: starts `1900000`, `2000000`, `2100000`, and `2200000`, 20 episodes per start. All are no-solve results.
+
+| candidate | data/training | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success |
+|---|---|---:|---:|---:|---:|---:|---:|
+| DAgger7 reference | balanced DAgger7 curriculum | 486.8 | 444.9 | 0.675 | 486.4 | 442.4 | 0.6625 |
+| option-trace auxiliary | tiny sidecar finetune only | 486.4 | 446.1 | 0.675 | 486.7 | 442.5 | 0.675 |
+| full option mix | DAgger7 + all 146 option rows, option weight 8 | 486.8 | 443.8 | 0.675 | 486.2 | 440.3 | 0.6625 |
+| option-aux anchor | option-aux checkpoint replayed on DAgger7 | 486.6 | 444.0 | 0.675 | 486.4 | 441.4 | 0.6625 |
+| recovery-only option mix | DAgger7 + 81 recovery/recovery-option rows, option weight 10 | 486.8 | 443.9 | 0.675 | 486.3 | 440.3 | 0.675 |
+
+Interpretation: option traces contain a real but weak signal. Mixing every sidecar row into the full curriculum degrades ReCoN-routed behavior, and replaying the full curriculum after the tiny auxiliary finetune washes the routing gain back out. Filtering to `counterfactual_recovery` and `counterfactual_recovery_option` avoids that regression and matches the best ReCoN-routed success seen so far (`0.675`), but it still does not crack the N=4 robustness gap. The next stronger direction should treat option traces as a learned gate/routing or recovery-window mining signal, not as global action imitation sprinkled into the full behavior-cloning dataset.
+

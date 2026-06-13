@@ -1189,6 +1189,80 @@ def test_mingru_curriculum_aggregate_offsets_episode_ids():
     assert merged["sample_weights"].tolist() == [0.25, 0.25, 2.0]
 
 
+def test_merge_policy_datasets_offsets_episodes_and_weights(tmp_path):
+    merger = _load_script("merge_policy_datasets")
+
+    def save(path, values):
+        payload = {key: merger.np.asarray(value) for key, value in values.items()}
+        merger.np.savez_compressed(path, **payload)
+
+    first = tmp_path / "first.npz"
+    second = tmp_path / "second.npz"
+    save(
+        first,
+        {
+            "observations": [[1.0], [2.0]],
+            "prev_forces": [0.0, 1.0],
+            "teacher_forces": [0.0, 1.0],
+            "teacher_actions": [2, 3],
+            "returns_to_go": [2.0, 1.0],
+            "failure_within_k": [0.0, 1.0],
+            "seeds": [10, 10],
+            "sources": ["teacher", "teacher"],
+            "rollout_sources": ["teacher", "teacher"],
+            "rollout_forces": [0.0, 1.0],
+            "rollout_actions": [2, 3],
+            "episodes": [0, 0],
+            "step_indices": [0, 1],
+            "sample_weights": [1.0, 1.0],
+        },
+    )
+    save(
+        second,
+        {
+            "observations": [[3.0]],
+            "prev_forces": [0.0],
+            "teacher_forces": [0.0],
+            "teacher_actions": [2],
+            "returns_to_go": [1.0],
+            "failure_within_k": [0.0],
+            "seeds": [20],
+            "sources": ["counterfactual_recovery"],
+            "rollout_sources": ["counterfactual_option"],
+            "rollout_forces": [0.0],
+            "rollout_actions": [2],
+            "episodes": [0],
+            "step_indices": [0],
+            "sample_weights": [0.5],
+        },
+    )
+
+    merged, metadata = merger.merge_datasets(
+        [
+            merger.DatasetSpec(first, weight=1.0, source_prefix="base"),
+            merger.DatasetSpec(second, weight=4.0, source_prefix="option"),
+        ]
+    )
+
+    assert merged["observations"].shape == (3, 1)
+    assert merged["episodes"].tolist() == [0, 0, 1]
+    assert merged["sample_weights"].tolist() == [1.0, 1.0, 2.0]
+    assert merged["motif_scores"].tolist() == [0.0, 0.0, 0.0]
+    assert merged["sources"].tolist() == ["base:teacher", "base:teacher", "option:counterfactual_recovery"]
+    assert metadata["samples"] == 3
+
+    filtered, filtered_meta = merger.merge_datasets(
+        [
+            merger.DatasetSpec(first, weight=1.0, source_prefix="base"),
+            merger.DatasetSpec(second, weight=4.0, source_prefix="option"),
+        ],
+        include_sources={"teacher", "counterfactual_recovery"},
+    )
+
+    assert filtered["observations"].shape == (3, 1)
+    assert filtered_meta["include_sources"] == ["counterfactual_recovery", "teacher"]
+
+
 def test_subchain_observation_mode_adds_adjacent_pair_features():
     from recon_cartpole.control.policy_observation import (
         adjacent_subchain_features,
