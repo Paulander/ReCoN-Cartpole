@@ -55,7 +55,7 @@ def tail_metrics(steps: list[float], horizon: int, cvar_fraction: float = 0.10) 
     return summary
 
 
-def controller_for(args: argparse.Namespace, threshold: float, max_force: float) -> ReConCartPoleController:
+def controller_for(args: argparse.Namespace, threshold: float, apply_threshold: float, max_force: float) -> ReConCartPoleController:
     return ReConCartPoleController(
         RunnerConfig(
             n_poles=args.n_poles,
@@ -76,14 +76,15 @@ def controller_for(args: argparse.Namespace, threshold: float, max_force: float)
             residual_policy_terminal_action_bins=args.residual_action_bins,
             residual_policy_terminal_max_force=max_force,
             residual_policy_terminal_gate_threshold=threshold,
+            residual_policy_terminal_apply_threshold=apply_threshold,
             residual_policy_terminal_feature_mode=args.residual_feature_mode,
             residual_policy_terminal_hold_steps=int(getattr(args, "residual_hold_steps", 1)),
         )
     )
 
 
-def evaluate_candidate(args: argparse.Namespace, seed_values: list[int], threshold: float, max_force: float) -> dict[str, Any]:
-    controller = controller_for(args, threshold, max_force)
+def evaluate_candidate(args: argparse.Namespace, seed_values: list[int], threshold: float, apply_threshold: float, max_force: float) -> dict[str, Any]:
+    controller = controller_for(args, threshold, apply_threshold, max_force)
     steps: list[float] = []
     returns: list[float] = []
     per_seed: list[dict[str, Any]] = []
@@ -97,6 +98,7 @@ def evaluate_candidate(args: argparse.Namespace, seed_values: list[int], thresho
     summary.update(
         {
             "threshold": float(threshold),
+            "apply_threshold": float(apply_threshold),
             "max_residual_force": float(max_force),
             "episodes": len(seed_values),
             "returns_mean": float(np.mean(returns)) if returns else 0.0,
@@ -116,17 +118,17 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Residual feature mode: `{result.get('residual_feature_mode')}`",
         f"Residual hold steps: `{result.get('residual_hold_steps', 1)}`",
         "",
-        "| threshold | max force | mean | p10 | cvar | success | episodes |",
-        "|---:|---:|---:|---:|---:|---:|---:|",
+        "| risk threshold | apply threshold | max force | mean | p10 | cvar | success | episodes |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in result.get("candidates", []):
         lines.append(
-            f"| {row['threshold']:.3f} | {row['max_residual_force']:.2f} | {row['mean_survival']:.1f} | "
+            f"| {row['threshold']:.3f} | {row.get('apply_threshold', 0.5):.3f} | {row['max_residual_force']:.2f} | {row['mean_survival']:.1f} | "
             f"{row['p10_survival']:.1f} | {row['cvar_survival']:.1f} | {row['success_rate']:.3f} | {row['episodes']} |"
         )
     best = result.get("best") or {}
     if best:
-        lines.extend(["", f"Best candidate: threshold `{best['threshold']:.3f}`, max force `{best['max_residual_force']:.2f}`."])
+        lines.extend(["", f"Best candidate: risk threshold `{best['threshold']:.3f}`, apply threshold `{best.get('apply_threshold', 0.5):.3f}`, max force `{best['max_residual_force']:.2f}`."])
     lines.extend([
         "",
         "## Claim Discipline",
@@ -143,22 +145,23 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
     seed_values = seeds(args)
     rows: list[dict[str, Any]] = []
     for threshold in _floats(args.thresholds):
-        for max_force in _floats(args.max_residual_forces):
-            row = evaluate_candidate(args, seed_values, threshold, max_force)
-            rows.append(row)
-            partial = {
-                "status": "running",
-                "base_model_path": args.base_model_path,
-                "residual_model_path": args.residual_model_path,
-                "residual_feature_mode": args.residual_feature_mode,
-                "residual_hold_steps": int(getattr(args, "residual_hold_steps", 1)),
-                "seed_starts": args.seed_starts or [args.seed_start],
-                "episodes_per_start": args.episodes_per_start,
-                "candidates": rows,
-                "best": max(rows, key=lambda item: (item["success_rate"], item["p10_survival"], item["cvar_survival"], item["mean_survival"])),
-            }
-            (out / "summary.json").write_text(json.dumps(partial, indent=2), encoding="utf-8")
-            write_markdown(partial, out / "summary.md")
+        for apply_threshold in _floats(args.apply_thresholds):
+            for max_force in _floats(args.max_residual_forces):
+                row = evaluate_candidate(args, seed_values, threshold, apply_threshold, max_force)
+                rows.append(row)
+                partial = {
+                    "status": "running",
+                    "base_model_path": args.base_model_path,
+                    "residual_model_path": args.residual_model_path,
+                    "residual_feature_mode": args.residual_feature_mode,
+                    "residual_hold_steps": int(getattr(args, "residual_hold_steps", 1)),
+                    "seed_starts": args.seed_starts or [args.seed_start],
+                    "episodes_per_start": args.episodes_per_start,
+                    "candidates": rows,
+                    "best": max(rows, key=lambda item: (item["success_rate"], item["p10_survival"], item["cvar_survival"], item["mean_survival"])),
+                }
+                (out / "summary.json").write_text(json.dumps(partial, indent=2), encoding="utf-8")
+                write_markdown(partial, out / "summary.md")
     best = max(rows, key=lambda item: (item["success_rate"], item["p10_survival"], item["cvar_survival"], item["mean_survival"])) if rows else None
     result = {
         "status": "completed",
@@ -189,6 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--residual-action-bins", type=int, default=5)
     parser.add_argument("--residual-hold-steps", type=int, default=1)
     parser.add_argument("--thresholds", default="0.30,0.50,0.62,0.75,0.90")
+    parser.add_argument("--apply-thresholds", default="0.50", help="Comma-separated learned apply-gate thresholds to evaluate.")
     parser.add_argument("--max-residual-forces", default="4.0")
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)

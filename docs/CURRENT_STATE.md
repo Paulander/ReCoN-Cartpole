@@ -943,3 +943,43 @@ Final held-out eval used the best promoted checkpoint, `reports/n4_ppo_promote_t
 
 Interpretation: the systematic sweep produced useful knob evidence, especially that from-scratch architecture sweeps are meaningful and that late-survival bonus can help early survival, but longer training still trades successes rather than crossing the N=4 robustness gate. The best promoted from-scratch PPO result is below the incumbent near-solved terminal and below the configured solve threshold. No N=4 solve claim is justified. The next PPO move should either promote the tail-score candidate with a more conservative update schedule, or use the from-scratch sweep result as a teacher/source for recurrent or residual-gated learning rather than continuing to push brittle feedforward PPO alone.
 
+## Conservative PPO Continuation And Residual Apply-Gate Split - 2026-06-13
+
+Conservative PPO follow-up: `reports/n4_ppo_conservative_tail_c01_20260613_seed9082k`
+
+This resumed from the best from-scratch tail checkpoint (`reports/n4_ppo_promote_tail_c01_20260613_seed9081k/checkpoint_025000.zip`) with smaller updates: LR `5e-7`, clip `0.005`, one epoch, `10000`-step chunks, late-survival bonus `0.01`, and the same broad mixed validation starts. It was intentionally interrupted after the first two chunks because both regressed from the start checkpoint.
+
+| checkpoint | mean | p10 | cvar | success | promoted |
+|---|---:|---:|---:|---:|---|
+| start | 480.4 | 429.9 | 399.5 | 0.625 | true |
+| chunk_1 | 479.6 | 429.6 | 400.3 | 0.5875 | false |
+| chunk_2 | 477.8 | 420.7 | 395.0 | 0.5875 | false |
+
+Interpretation: even conservative continuation from the best from-scratch PPO sweep artifact drifts rather than improving. This strengthens the conclusion that the next gains should come from structure, gating, or recurrent distribution handling rather than another feedforward PPO micro-update.
+
+Residual apply-gate implementation update:
+
+- `scripts/train_counterfactual_residual_terminal.py` now separates the residual action label from the learned apply-gate label.
+- New CLI thresholds `--apply-min-score-gap`, `--apply-min-survival-gain`, `--apply-min-margin-gain`, and `--apply-min-pressure-gain` allow the action head to learn weak counterfactual advantages while the apply head only learns to intervene on stronger evidence.
+- `scripts/evaluate_recon_residual_grid.py` now sweeps the learned `residual_policy_terminal_apply_threshold` in addition to the outer residual risk threshold.
+- Focused verification passed: `uv run ruff check scripts/train_counterfactual_residual_terminal.py scripts/evaluate_recon_residual_grid.py tests/test_policy_terminal_training.py` and the four residual label/apply-gate tests in `tests/test_policy_terminal_training.py`.
+
+Strict apply-gate probe: `reports/n4_gated_residual_strict_apply_20260613_seed9083k`
+
+Setup: frozen survival PPO base, subchain diagnostics, 20-tick residual hold, 20-tick tail option search, motif/pressure-ranked hard-seed failure windows, 16 collection episodes, held-out eval starts `1500000` and `1600000` with 30 episodes per start. The action head had a real signal (`128` rows, `10` non-noop labels), but the apply thresholds were too strict and produced zero apply positives.
+
+| evaluator | mean | p10 | cvar | success | mean abs residual delta | episodes |
+|---|---:|---:|---:|---:|---:|---:|
+| frozen base | 486.8 | 443.7 | 425.3 | 0.7167 | 0.000 | 60 |
+| strict apply residual | 486.8 | 443.7 | 425.3 | 0.7167 | 0.000 | 60 |
+
+Moderate apply-gate probe: `reports/n4_gated_residual_moderate_apply_20260613_seed9084k`
+
+This relaxed the apply thresholds to `apply_min_score_gap=0.15`, `apply_min_survival_gain=1`, and `apply_min_pressure_gain=0.02`, but the pressure threshold still yielded zero apply positives on the collected dataset. It therefore also abstained fully and matched base.
+
+Residual apply-threshold sweep: `reports/n4_residual_apply_threshold_sweep_20260613_motifmine`
+
+The existing motif-mined residual model was evaluated across risk thresholds `0.75`, `0.85`, `0.95` and learned apply thresholds `0.5`, `0.7`, `0.85`, `0.95` on starts `1500000` and `1600000`, 10 episodes per start. All candidates stayed at success `0.600`; the best row was risk `0.85`, apply `0.5`, mean `483.4`, p10 `445.9`, CVaR `436.0`, success `0.600` over 20 episodes. This suggests simple threshold tuning is not enough to turn the current residual into a rescue mechanism.
+
+Interpretation: the new independent apply gate is useful infrastructure and prevents harmful over-application, but the current residual label set is not producing confident rescue interventions. Pressure-gain thresholds are too selective for this data; survival/score-only apply labels may be worth one more targeted attempt, but the stronger direction remains recurrent/curriculum learning or residual labels from broader counterfactual option traces rather than threshold-only tuning.
+

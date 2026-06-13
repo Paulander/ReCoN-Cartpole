@@ -303,6 +303,44 @@ def test_counterfactual_residual_label_state_respects_advantage_gates(monkeypatc
     assert allowed["chosen_survival_gain"] == 1
 
 
+def test_counterfactual_residual_apply_gate_can_be_stricter_than_action_label(monkeypatch):
+    residual = _load_script("train_counterfactual_residual_terminal")
+
+    def fake_score(_args, _raw_state, _step, _base_force, residual_class):
+        options = {
+            0: {"survived": 8, "margin": -0.2, "pressure_final": 0.9, "score": 7.8},
+            1: {"survived": 10, "margin": 0.0, "pressure_final": 0.5, "score": 10.0},
+            2: {"survived": 10, "margin": 0.0, "pressure_final": 0.5, "score": 10.0},
+            3: {"survived": 11, "margin": 0.0, "pressure_final": 0.45, "score": 11.0},
+            4: {"survived": 9, "margin": 0.0, "pressure_final": 0.8, "score": 9.0},
+        }
+        item = dict(options[int(residual_class)])
+        item.update({"class": int(residual_class), "shift": int(residual_class) - 2, "first_action": 2, "forced_steps": 1})
+        return item
+
+    monkeypatch.setattr(residual, "counterfactual_score", fake_score)
+    monkeypatch.setattr(residual, "residual_observation", lambda *_args, **_kwargs: residual.np.zeros(3, dtype=residual.np.float32))
+    args = SimpleNamespace(
+        residual_action_bins=5,
+        score_tolerance=1e-6,
+        min_score_gap=0.1,
+        min_survival_gain=1,
+        min_margin_gain=0.0,
+        min_pressure_gain=-999.0,
+        apply_min_score_gap=0.1,
+        apply_min_survival_gain=2,
+        apply_min_margin_gain=0.0,
+        apply_min_pressure_gain=-999.0,
+    )
+
+    row = residual.label_state(args, {"raw_before": [0.0] * 10, "step": 100, "force": 0.0, "seed": 1})
+
+    assert row["label"] == 3
+    assert row["chosen_survival_gain"] == 1
+    assert row["apply_label"] == 0
+    assert row["chosen_score_gap"] == pytest.approx(1.0)
+
+
 def test_counterfactual_residual_label_state_can_use_pressure_advantage(monkeypatch):
     residual = _load_script("train_counterfactual_residual_terminal")
 

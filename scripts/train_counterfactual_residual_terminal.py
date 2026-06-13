@@ -369,6 +369,11 @@ def counterfactual_score(args: argparse.Namespace, raw_state: list[float], step:
     return max(options, key=lambda item: float(item["score"]))
 
 
+def _gate_threshold(args: argparse.Namespace, name: str, fallback: float | int) -> float:
+    value = getattr(args, name, None)
+    return float(fallback if value is None else value)
+
+
 def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, Any]:
     options = [counterfactual_score(args, state["raw_before"], int(state["step"]), float(state["force"]), cls) for cls in range(int(args.residual_action_bins))]
     center = int(args.residual_action_bins) // 2
@@ -405,10 +410,21 @@ def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, An
         label = int(max(eligible, key=lambda item: float(item["score"]))["class"])
     feature = residual_observation(args, state["raw_before"], float(state["force"]), int(state["step"]))
     chosen = options[int(label)]
+    chosen_survival_gain = int(chosen["survived"]) - center_survived
+    chosen_margin_gain = float(chosen["margin"]) - center_margin
+    chosen_pressure_gain = center_pressure_final - float(chosen.get("pressure_final", center_pressure_final))
+    chosen_score_gap = float(chosen["score"]) - center_score
+    apply_label = int(
+        label != center
+        and chosen_score_gap >= _gate_threshold(args, "apply_min_score_gap", float(args.min_score_gap))
+        and chosen_survival_gain >= _gate_threshold(args, "apply_min_survival_gain", int(getattr(args, "min_survival_gain", 0)))
+        and chosen_margin_gain >= _gate_threshold(args, "apply_min_margin_gain", float(getattr(args, "min_margin_gain", 0.0)))
+        and chosen_pressure_gain >= _gate_threshold(args, "apply_min_pressure_gain", float(getattr(args, "min_pressure_gain", -999.0)))
+    )
     return {
         "feature": feature.tolist(),
         "label": int(label),
-        "apply_label": int(label != center),
+        "apply_label": apply_label,
         "seed": int(state.get("seed", -1)),
         "step": int(state["step"]),
         "base_force": float(state["force"]),
@@ -417,9 +433,10 @@ def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, An
         "best_score": float(best_score),
         "score_gap": float(best_score - center_score),
         "chosen_score": float(chosen["score"]),
-        "chosen_survival_gain": int(chosen["survived"]) - center_survived,
-        "chosen_margin_gain": float(chosen["margin"]) - center_margin,
-        "chosen_pressure_gain": center_pressure_final - float(chosen.get("pressure_final", center_pressure_final)),
+        "chosen_score_gap": float(chosen_score_gap),
+        "chosen_survival_gain": chosen_survival_gain,
+        "chosen_margin_gain": chosen_margin_gain,
+        "chosen_pressure_gain": chosen_pressure_gain,
         "best_survival_gain": int(best_option["survived"]) - center_survived,
         "best_margin_gain": float(best_option["margin"]) - center_margin,
         "best_pressure_gain": center_pressure_final - float(best_option.get("pressure_final", center_pressure_final)),
@@ -756,6 +773,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "min_survival_gain": int(getattr(args, "min_survival_gain", 0)),
             "min_margin_gain": float(getattr(args, "min_margin_gain", 0.0)),
             "min_pressure_gain": float(getattr(args, "min_pressure_gain", -999.0)),
+            "apply_min_score_gap": getattr(args, "apply_min_score_gap", None),
+            "apply_min_survival_gain": getattr(args, "apply_min_survival_gain", None),
+            "apply_min_margin_gain": getattr(args, "apply_min_margin_gain", None),
+            "apply_min_pressure_gain": getattr(args, "apply_min_pressure_gain", None),
             "score_tolerance": float(args.score_tolerance),
             "pressure_drop_weight": float(getattr(args, "pressure_drop_weight", 0.0)),
             "pressure_mean_weight": float(getattr(args, "pressure_mean_weight", 0.0)),
@@ -853,6 +874,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-survival-gain", type=int, default=0)
     parser.add_argument("--min-margin-gain", type=float, default=0.0)
     parser.add_argument("--min-pressure-gain", type=float, default=-999.0)
+    parser.add_argument("--apply-min-score-gap", type=float, default=None)
+    parser.add_argument("--apply-min-survival-gain", type=float, default=None)
+    parser.add_argument("--apply-min-margin-gain", type=float, default=None)
+    parser.add_argument("--apply-min-pressure-gain", type=float, default=None)
     parser.add_argument("--pressure-drop-weight", type=float, default=0.0)
     parser.add_argument("--pressure-mean-weight", type=float, default=0.0)
     parser.add_argument("--pressure-max-weight", type=float, default=0.0)
