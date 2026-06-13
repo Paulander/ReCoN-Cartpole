@@ -1,0 +1,32 @@
+{
+  "candidate_id": "488388d63657",
+  "checkpoint_path": "reports/n4_mingru_balanced_capacity_screen_20260613_seed9087/candidate_00_488388d63657/mingru_terminal.pt",
+  "hidden_size": 128,
+  "sequence_length": 16,
+  "pure_mingru_policy": {
+    "mean_survival": 410.65,
+    "p10_survival": 302.0,
+    "success_rate": 0.15,
+    "max_survival": 500.0,
+    "returns_mean": 409.775,
+    "episodes": 40
+  },
+  "recon_mingru_terminal": {
+    "mean_survival": 410.65,
+    "p10_survival": 302.0,
+    "success_rate": 0.15,
+    "max_survival": 500.0,
+    "returns_mean": 409.775,
+    "episodes": 40
+  },
+  "kept": false,
+  "mechanisms": {
+    "minGRU_terminal": true,
+    "pure_policy_baseline": true,
+    "feedforward_policy_terminal": false,
+    "edge_plasticity": false,
+    "bandit_persistence": false,
+    "slow_consolidation": false,
+    "gain_mutation": false
+  }
+}

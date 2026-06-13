@@ -983,3 +983,46 @@ The existing motif-mined residual model was evaluated across risk thresholds `0.
 
 Interpretation: the new independent apply gate is useful infrastructure and prevents harmful over-application, but the current residual label set is not producing confident rescue interventions. Pressure-gain thresholds are too selective for this data; survival/score-only apply labels may be worth one more targeted attempt, but the stronger direction remains recurrent/curriculum learning or residual labels from broader counterfactual option traces rather than threshold-only tuning.
 
+
+
+## Recurrent Passthrough Plumbing And Capacity Screen - 2026-06-13
+
+Implementation update:
+
+- `scripts/train_mingru_curriculum.py` now forwards `--passthrough-enabled`, `--passthrough-confidence-floor`, and `--passthrough-logit-margin-floor` into supervised minGRU training.
+- `scripts/train_mingru_supervised.py` now saves those passthrough fields in the `MinGRUTerminalConfig` checkpoint/report.
+- `scripts/train_recurrent_terminal_ladder.py` now forwards motif-score and passthrough fields when it trains supervised candidates, so ladder-trained checkpoints match the evaluated terminal semantics.
+- Focused verification passed: `uv run ruff check scripts/train_mingru_curriculum.py scripts/train_mingru_supervised.py scripts/train_recurrent_terminal_ladder.py tests/test_policy_terminal_training.py` and five recurrent passthrough/plumbing tests in `tests/test_policy_terminal_training.py`.
+
+The bug mattered because `reports/n4_mingru_curriculum_seq64_h256_tailheavy_20260613_seed9085k/supervised_mingru/report.json` recorded `passthrough_enabled: false` even though the curriculum command requested passthrough. The fixed retrain reused the existing collected dataset to avoid another data-collection confound.
+
+Fixed passthrough retrain: `reports/n4_mingru_seq64_h256_tailheavy_passthrough_fix_20260613_seed9086k`
+
+Setup: same tail-heavy seq64/h256 curriculum dataset from `reports/n4_mingru_curriculum_seq64_h256_tailheavy_20260613_seed9085k/curriculum_dataset.npz`, 24 supervised epochs, motif score enabled, passthrough enabled in the saved checkpoint, held-out starts `1900000`, `2000000`, `2100000`, and `2200000` with 20 episodes per start.
+
+| evaluator | mean | p10 | success | episodes | kept |
+|---|---:|---:|---:|---:|---|
+| pure minGRU | 478.65 | 428.4 | 0.625 | 80 | false |
+| ReCoN-routed minGRU | 478.65 | 428.4 | 0.625 | 80 | false |
+
+DAgger7 passthrough eval: `reports/n4_mingru_dagger7_passthrough_eval_20260613`
+
+Setup: existing stronger balanced DAgger7 checkpoint `reports/n4_mingru_curriculum_subchain_motif_balanced_dagger7_20260613_seed5200k/supervised_mingru/mingru_terminal.pt`, runtime passthrough enabled, same held-out starts and 20 episodes per start.
+
+| evaluator | mean | p10 | success | episodes | kept |
+|---|---:|---:|---:|---:|---|
+| pure minGRU | 486.75 | 444.9 | 0.675 | 80 | false |
+| ReCoN-routed minGRU | 486.75 | 444.9 | 0.675 | 80 | false |
+
+Balanced recurrent capacity screen: `reports/n4_mingru_balanced_capacity_screen_20260613_seed9087`
+
+Setup: reused the balanced DAgger7 curriculum dataset, trained 4-epoch candidates across hidden sizes `128/256` and sequence lengths `16/32`, with motif and passthrough fields correctly forwarded. This was a 40-episode screen over the same four held-out starts with 10 episodes per start, not a solve evaluation.
+
+| hidden | seq | mean | p10 | success | kept |
+|---:|---:|---:|---:|---:|---|
+| 256 | 16 | 464.1 | 396.9 | 0.475 | false |
+| 256 | 32 | 461.6 | 396.9 | 0.400 | false |
+| 128 | 32 | 420.8 | 329.1 | 0.175 | false |
+| 128 | 16 | 410.6 | 302.0 | 0.150 | false |
+
+Interpretation: the recurrent passthrough/config plumbing is now correct, but it did not produce a performance breakthrough by itself. The tail-heavy 24-epoch seq64/h256 model remains worse than the balanced DAgger7 checkpoint, and the compact capacity screen suggests that naive retraining with extra tail/late weighting over-pulls the policy toward brittle teacher behavior. The best recurrent evidence remains the original balanced DAgger7 checkpoint at `0.675` success over 80 held-out episodes. No N=4 solve claim is justified. The next high-signal recurrent move should reproduce the DAgger7 recipe exactly before changing one variable at a time, or mine failure windows into a separate gate/recovery model instead of increasing global imitation pressure.

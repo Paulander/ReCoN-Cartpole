@@ -1,0 +1,307 @@
+{
+  "status": "completed",
+  "rows": [
+    {
+      "candidate_id": "11506457b6d5",
+      "checkpoint_path": "reports/n4_mingru_balanced_capacity_screen_20260613_seed9087/candidate_02_11506457b6d5/mingru_terminal.pt",
+      "hidden_size": 256,
+      "sequence_length": 16,
+      "pure_mingru_policy": {
+        "mean_survival": 464.125,
+        "p10_survival": 396.9,
+        "success_rate": 0.475,
+        "max_survival": 500.0,
+        "returns_mean": 463.6,
+        "episodes": 40
+      },
+      "recon_mingru_terminal": {
+        "mean_survival": 464.125,
+        "p10_survival": 396.9,
+        "success_rate": 0.475,
+        "max_survival": 500.0,
+        "returns_mean": 463.6,
+        "episodes": 40
+      },
+      "kept": false,
+      "mechanisms": {
+        "minGRU_terminal": true,
+        "pure_policy_baseline": true,
+        "feedforward_policy_terminal": false,
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "gain_mutation": false
+      }
+    },
+    {
+      "candidate_id": "fa12e6c1dbe5",
+      "checkpoint_path": "reports/n4_mingru_balanced_capacity_screen_20260613_seed9087/candidate_03_fa12e6c1dbe5/mingru_terminal.pt",
+      "hidden_size": 256,
+      "sequence_length": 32,
+      "pure_mingru_policy": {
+        "mean_survival": 461.6,
+        "p10_survival": 396.9,
+        "success_rate": 0.4,
+        "max_survival": 500.0,
+        "returns_mean": 461.0,
+        "episodes": 40
+      },
+      "recon_mingru_terminal": {
+        "mean_survival": 461.6,
+        "p10_survival": 396.9,
+        "success_rate": 0.4,
+        "max_survival": 500.0,
+        "returns_mean": 461.0,
+        "episodes": 40
+      },
+      "kept": false,
+      "mechanisms": {
+        "minGRU_terminal": true,
+        "pure_policy_baseline": true,
+        "feedforward_policy_terminal": false,
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "gain_mutation": false
+      }
+    },
+    {
+      "candidate_id": "4c219435c1ba",
+      "checkpoint_path": "reports/n4_mingru_balanced_capacity_screen_20260613_seed9087/candidate_01_4c219435c1ba/mingru_terminal.pt",
+      "hidden_size": 128,
+      "sequence_length": 32,
+      "pure_mingru_policy": {
+        "mean_survival": 420.8,
+        "p10_survival": 329.1,
+        "success_rate": 0.175,
+        "max_survival": 500.0,
+        "returns_mean": 419.95,
+        "episodes": 40
+      },
+      "recon_mingru_terminal": {
+        "mean_survival": 420.8,
+        "p10_survival": 329.1,
+        "success_rate": 0.175,
+        "max_survival": 500.0,
+        "returns_mean": 419.95,
+        "episodes": 40
+      },
+      "kept": false,
+      "mechanisms": {
+        "minGRU_terminal": true,
+        "pure_policy_baseline": true,
+        "feedforward_policy_terminal": false,
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "gain_mutation": false
+      }
+    },
+    {
+      "candidate_id": "488388d63657",
+      "checkpoint_path": "reports/n4_mingru_balanced_capacity_screen_20260613_seed9087/candidate_00_488388d63657/mingru_terminal.pt",
+      "hidden_size": 128,
+      "sequence_length": 16,
+      "pure_mingru_policy": {
+        "mean_survival": 410.65,
+        "p10_survival": 302.0,
+        "success_rate": 0.15,
+        "max_survival": 500.0,
+        "returns_mean": 409.775,
+        "episodes": 40
+      },
+      "recon_mingru_terminal": {
+        "mean_survival": 410.65,
+        "p10_survival": 302.0,
+        "success_rate": 0.15,
+        "max_survival": 500.0,
+        "returns_mean": 409.775,
+        "episodes": 40
+      },
+      "kept": false,
+      "mechanisms": {
+        "minGRU_terminal": true,
+        "pure_policy_baseline": true,
+        "feedforward_policy_terminal": false,
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "gain_mutation": false
+      }
+    }
+  ],
+  "all_rows": [
+    {
+      "candidate_id": "11506457b6d5",
+      "checkpoint_path": "reports/n4_mingru_balanced_capacity_screen_20260613_seed9087/candidate_02_11506457b6d5/mingru_terminal.pt",
+      "hidden_size": 256,
+      "sequence_length": 16,
+      "pure_mingru_policy": {
+        "mean_survival": 464.125,
+        "p10_survival": 396.9,
+        "success_rate": 0.475,
+        "max_survival": 500.0,
+        "returns_mean": 463.6,
+        "episodes": 40
+      },
+      "recon_mingru_terminal": {
+        "mean_survival": 464.125,
+        "p10_survival": 396.9,
+        "success_rate": 0.475,
+        "max_survival": 500.0,
+        "returns_mean": 463.6,
+        "episodes": 40
+      },
+      "kept": false,
+      "mechanisms": {
+        "minGRU_terminal": true,
+        "pure_policy_baseline": true,
+        "feedforward_policy_terminal": false,
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "gain_mutation": false
+      }
+    },
+    {
+      "candidate_id": "fa12e6c1dbe5",
+      "checkpoint_path": "reports/n4_mingru_balanced_capacity_screen_20260613_seed9087/candidate_03_fa12e6c1dbe5/mingru_terminal.pt",
+      "hidden_size": 256,
+      "sequence_length": 32,
+      "pure_mingru_policy": {
+        "mean_survival": 461.6,
+        "p10_survival": 396.9,
+        "success_rate": 0.4,
+        "max_survival": 500.0,
+        "returns_mean": 461.0,
+        "episodes": 40
+      },
+      "recon_mingru_terminal": {
+        "mean_survival": 461.6,
+        "p10_survival": 396.9,
+        "success_rate": 0.4,
+        "max_survival": 500.0,
+        "returns_mean": 461.0,
+        "episodes": 40
+      },
+      "kept": false,
+      "mechanisms": {
+        "minGRU_terminal": true,
+        "pure_policy_baseline": true,
+        "feedforward_policy_terminal": false,
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "gain_mutation": false
+      }
+    },
+    {
+      "candidate_id": "4c219435c1ba",
+      "checkpoint_path": "reports/n4_mingru_balanced_capacity_screen_20260613_seed9087/candidate_01_4c219435c1ba/mingru_terminal.pt",
+      "hidden_size": 128,
+      "sequence_length": 32,
+      "pure_mingru_policy": {
+        "mean_survival": 420.8,
+        "p10_survival": 329.1,
+        "success_rate": 0.175,
+        "max_survival": 500.0,
+        "returns_mean": 419.95,
+        "episodes": 40
+      },
+      "recon_mingru_terminal": {
+        "mean_survival": 420.8,
+        "p10_survival": 329.1,
+        "success_rate": 0.175,
+        "max_survival": 500.0,
+        "returns_mean": 419.95,
+        "episodes": 40
+      },
+      "kept": false,
+      "mechanisms": {
+        "minGRU_terminal": true,
+        "pure_policy_baseline": true,
+        "feedforward_policy_terminal": false,
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "gain_mutation": false
+      }
+    },
+    {
+      "candidate_id": "488388d63657",
+      "checkpoint_path": "reports/n4_mingru_balanced_capacity_screen_20260613_seed9087/candidate_00_488388d63657/mingru_terminal.pt",
+      "hidden_size": 128,
+      "sequence_length": 16,
+      "pure_mingru_policy": {
+        "mean_survival": 410.65,
+        "p10_survival": 302.0,
+        "success_rate": 0.15,
+        "max_survival": 500.0,
+        "returns_mean": 409.775,
+        "episodes": 40
+      },
+      "recon_mingru_terminal": {
+        "mean_survival": 410.65,
+        "p10_survival": 302.0,
+        "success_rate": 0.15,
+        "max_survival": 500.0,
+        "returns_mean": 409.775,
+        "episodes": 40
+      },
+      "kept": false,
+      "mechanisms": {
+        "minGRU_terminal": true,
+        "pure_policy_baseline": true,
+        "feedforward_policy_terminal": false,
+        "edge_plasticity": false,
+        "bandit_persistence": false,
+        "slow_consolidation": false,
+        "gain_mutation": false
+      }
+    }
+  ],
+  "validation_seeds": [
+    1900000,
+    1900001,
+    1900002,
+    1900003,
+    1900004,
+    1900005,
+    1900006,
+    1900007,
+    1900008,
+    1900009,
+    2000000,
+    2000001,
+    2000002,
+    2000003,
+    2000004,
+    2000005,
+    2000006,
+    2000007,
+    2000008,
+    2000009,
+    2100000,
+    2100001,
+    2100002,
+    2100003,
+    2100004,
+    2100005,
+    2100006,
+    2100007,
+    2100008,
+    2100009,
+    2200000,
+    2200001,
+    2200002,
+    2200003,
+    2200004,
+    2200005,
+    2200006,
+    2200007,
+    2200008,
+    2200009
+  ],
+  "claim_discipline": "No solved claim is made by this ladder; run final held-out seeds once thresholds pass.",
+  "wall_clock_seconds": 632.716028290044
+}

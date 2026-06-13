@@ -1177,6 +1177,131 @@ def test_mingru_curriculum_default_stages_progress_n3_to_n4():
     assert stages[-1]["rollout_policy"] == "mingru_terminal"
 
 
+def test_mingru_curriculum_forwards_passthrough_to_supervised_training(monkeypatch, tmp_path):
+    curriculum = _load_script("train_mingru_curriculum")
+    captured = {}
+
+    def fake_collect_stage(_args, stage, _out, index):
+        data = {
+            "observations": curriculum.np.asarray([[0.0]], dtype=curriculum.np.float32),
+            "prev_forces": curriculum.np.asarray([0.0], dtype=curriculum.np.float32),
+            "teacher_forces": curriculum.np.asarray([0.0], dtype=curriculum.np.float32),
+            "teacher_actions": curriculum.np.asarray([2], dtype=curriculum.np.int64),
+            "returns_to_go": curriculum.np.asarray([1.0], dtype=curriculum.np.float32),
+            "failure_within_k": curriculum.np.asarray([0.0], dtype=curriculum.np.float32),
+            "seeds": curriculum.np.asarray([index], dtype=curriculum.np.int64),
+            "sources": curriculum.np.asarray(["teacher"]),
+            "rollout_sources": curriculum.np.asarray(["teacher"]),
+            "rollout_forces": curriculum.np.asarray([0.0], dtype=curriculum.np.float32),
+            "rollout_actions": curriculum.np.asarray([2], dtype=curriculum.np.int64),
+            "episodes": curriculum.np.asarray([0], dtype=curriculum.np.int64),
+            "step_indices": curriculum.np.asarray([0], dtype=curriculum.np.int64),
+            "sample_weights": curriculum.np.asarray([1.0], dtype=curriculum.np.float32),
+        }
+        metadata = {
+            "name": stage["name"],
+            "n_poles": stage["n_poles"],
+            "teacher": stage["teacher"],
+            "rollout_policy": stage.get("rollout_policy", "teacher"),
+            "label_source": stage.get("label_source", "teacher"),
+            "episodes": stage["episodes"],
+            "seed_start": stage.get("seed_start", 0),
+            "seed_list": stage.get("seed_list", ""),
+            "initial_angle_range": stage["initial_angle_range"],
+            "force_noise": stage["force_noise"],
+            "samples": 1,
+            "sample_weight": stage.get("sample_weight", 1.0),
+            "dataset": str(_out / f"stage_{index}.npz"),
+        }
+        return {"data": data, "metadata": metadata}
+
+    def fake_train_mingru(args):
+        captured["passthrough_enabled"] = args.passthrough_enabled
+        captured["passthrough_confidence_floor"] = args.passthrough_confidence_floor
+        captured["passthrough_logit_margin_floor"] = args.passthrough_logit_margin_floor
+        return {"checkpoint_path": str(tmp_path / "mingru.pt"), "samples": 4}
+
+    monkeypatch.setattr(curriculum, "collect_stage", fake_collect_stage)
+    monkeypatch.setattr(curriculum, "train_mingru", fake_train_mingru)
+    monkeypatch.setattr(curriculum, "evaluate_pure_mingru", lambda *_args, **_kwargs: {"success_rate": 0.0, "mean_survival": 0.0, "p10_survival": 0.0, "episodes": 0})
+    monkeypatch.setattr(curriculum, "evaluate_recon_mingru", lambda *_args, **_kwargs: {"success_rate": 0.0, "mean_survival": 0.0, "p10_survival": 0.0, "episodes": 0})
+    args = SimpleNamespace(
+        out=str(tmp_path / "out"),
+        policy_terminal_path="teacher.zip",
+        resume_checkpoint="",
+        resume_partial_input=False,
+        behavior_checkpoint_path="",
+        horizon=1,
+        dt=0.02,
+        dynamics_mode="parallel",
+        discrete_action_bins=5,
+        force_mag=10.0,
+        initial_angle_range=0.05,
+        force_noise=0.02,
+        link_coupling=0.35,
+        n3_episodes=1,
+        low_angle_episodes=1,
+        current_episodes=1,
+        tail_episodes=1,
+        n3_seed_start=10,
+        low_angle_seed_start=20,
+        current_seed_start=30,
+        tail_seed_start=40,
+        tail_seed_list="",
+        n3_sample_weight=1.0,
+        low_angle_sample_weight=1.0,
+        current_sample_weight=1.0,
+        tail_sample_weight=1.0,
+        selection_mode="hard_select",
+        observation_mode="normalized_raw4_subchains_prev_force",
+        teacher_observation_mode="normalized_raw",
+        policy_terminal_blend=1.0,
+        policy_terminal_scope="stabilize_chain",
+        behavior_hidden_size=128,
+        behavior_sequence_length=16,
+        behavior_observation_mode="normalized_raw4_subchains_prev_force",
+        behavior_include_prev_force=True,
+        behavior_include_context=False,
+        behavior_confidence_floor=0.05,
+        failure_window=80,
+        include_motif_score=False,
+        motif_model_path="",
+        motif_score_scale=10.0,
+        hidden_size=128,
+        sequence_length=16,
+        include_prev_force=True,
+        include_context=False,
+        blend=1.0,
+        confidence_floor=0.05,
+        passthrough_enabled=True,
+        passthrough_confidence_floor=0.33,
+        passthrough_logit_margin_floor=0.44,
+        epochs=1,
+        batch_size=2,
+        learning_rate=1e-3,
+        validation_fraction=0.1,
+        value_weight=0.0,
+        failure_weight=0.0,
+        confidence_weight=0.0,
+        failure_sample_weight=0.0,
+        late_sample_weight=0.0,
+        low_return_sample_weight=0.0,
+        max_grad_norm=1.0,
+        device="cpu",
+        train_seed=1,
+        final_seed_starts=[100],
+        final_eval_episodes=1,
+    )
+
+    curriculum.run(args)
+
+    assert captured == {
+        "passthrough_enabled": True,
+        "passthrough_confidence_floor": 0.33,
+        "passthrough_logit_margin_floor": 0.44,
+    }
+
+
 def test_mingru_curriculum_aggregate_offsets_episode_ids():
     curriculum = _load_script("train_mingru_curriculum")
 
@@ -1553,6 +1678,9 @@ def test_mingru_supervised_resume_checkpoint_records_source(tmp_path):
             scope="stabilize_chain",
             blend=1.0,
             confidence_floor=0.05,
+            passthrough_enabled=True,
+            passthrough_confidence_floor=0.42,
+            passthrough_logit_margin_floor=0.17,
             epochs=1,
             batch_size=2,
             learning_rate=1e-4,
@@ -1566,6 +1694,9 @@ def test_mingru_supervised_resume_checkpoint_records_source(tmp_path):
     )
 
     assert report["resume_checkpoint"] == str(resume)
+    assert report["config"]["passthrough_enabled"] is True
+    assert report["config"]["passthrough_confidence_floor"] == 0.42
+    assert report["config"]["passthrough_logit_margin_floor"] == 0.17
     assert Path(report["checkpoint_path"]).exists()
 
 
@@ -1774,6 +1905,57 @@ def test_recurrent_ladder_terminal_config_exposes_passthrough():
     assert config.passthrough_confidence_floor == 0.90
     assert config.passthrough_logit_margin_floor == 0.10
     assert config.checkpoint_path == "candidate.pt"
+
+
+def test_recurrent_ladder_train_candidate_forwards_terminal_training_fields(monkeypatch, tmp_path):
+    ladder = _load_script("train_recurrent_terminal_ladder")
+    captured = {}
+
+    def fake_train(args):
+        captured.update(args.__dict__)
+        return {"checkpoint_path": str(tmp_path / "candidate.pt")}
+
+    monkeypatch.setitem(sys.modules, "train_mingru_supervised", SimpleNamespace(train=fake_train))
+    args = SimpleNamespace(
+        supervised_dataset="dataset.npz",
+        n_poles=4,
+        horizon=500,
+        force_mag=10.0,
+        discrete_action_bins=5,
+        observation_mode="normalized_raw4_subchains_prev_force",
+        include_prev_force=True,
+        include_context=False,
+        include_motif_score=True,
+        motif_model_path="motif.json",
+        motif_score_scale=7.0,
+        scope="stabilize_chain",
+        blend=1.0,
+        confidence_floor=0.05,
+        passthrough_enabled=True,
+        passthrough_confidence_floor=0.31,
+        passthrough_logit_margin_floor=0.22,
+        supervised_epochs=1,
+        batch_size=2,
+        learning_rate=1e-4,
+        min_sample_episode_survival=0.0,
+        max_sample_episode_survival=0.0,
+        failure_sample_weight=0.0,
+        late_sample_weight=0.0,
+        low_return_sample_weight=0.0,
+        device="cpu",
+        train_seed=123,
+    )
+
+    checkpoint = ladder.train_supervised_candidate(args, hidden=256, seq_len=64, out=tmp_path)
+
+    assert checkpoint.endswith("candidate.pt")
+    assert captured["include_motif_score"] is True
+    assert captured["motif_model_path"] == "motif.json"
+    assert captured["motif_score_scale"] == 7.0
+    assert captured["passthrough_enabled"] is True
+    assert captured["passthrough_confidence_floor"] == 0.31
+    assert captured["passthrough_logit_margin_floor"] == 0.22
+
 
 def test_subchain_motif_prototype_scores_separate_classes():
     motif = _load_script("train_subchain_motif_gate")

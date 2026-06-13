@@ -190,6 +190,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         blend=args.blend,
         scope=args.scope,
         confidence_floor=args.confidence_floor,
+        passthrough_enabled=bool(getattr(args, "passthrough_enabled", False)),
+        passthrough_confidence_floor=float(getattr(args, "passthrough_confidence_floor", 0.05)),
+        passthrough_logit_margin_floor=float(getattr(args, "passthrough_logit_margin_floor", 0.0)),
     )
     terminal = MinGRUTerminal(args.n_poles, args.force_mag, args.discrete_action_bins, config)
     model = terminal.model
@@ -324,6 +327,9 @@ def main() -> None:
     parser.add_argument("--scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
     parser.add_argument("--blend", type=float, default=1.0)
     parser.add_argument("--confidence-floor", type=float, default=0.05)
+    parser.add_argument("--passthrough-enabled", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--passthrough-confidence-floor", type=float, default=0.05)
+    parser.add_argument("--passthrough-logit-margin-floor", type=float, default=0.0)
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
