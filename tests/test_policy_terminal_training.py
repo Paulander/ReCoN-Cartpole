@@ -765,6 +765,45 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(subchain_pair.run)
 
 
+
+def test_subchain_pair_counterfactual_expands_tail_options(monkeypatch):
+    subchain_pair = _load_script("train_subchain_pair_terminal")
+    args = SimpleNamespace(
+        option_hold_steps=3,
+        option_tail_steps=5,
+        force_mag=10.0,
+        discrete_action_bins=5,
+    )
+
+    sequences = subchain_pair.candidate_force_sequences(args, first_force=0.0)
+
+    assert len(sequences) == 5
+    assert sequences[0]["forces"] == [0.0, -10.0]
+    assert sequences[-1]["forces"] == [0.0, 10.0]
+    assert all(item["steps"] == [3, 5] for item in sequences)
+    assert subchain_pair.baseline_force_sequence(args, base_force=5.0) == {
+        "forces": [5.0, 5.0],
+        "steps": [3, 5],
+    }
+
+    def fake_sequence_score(_args, _raw_state, _step, _base_force, sequence):
+        tail_force = float(sequence["forces"][-1])
+        return {
+            "force": float(sequence["forces"][0]),
+            "tail_force": tail_force,
+            "forces": list(sequence["forces"]),
+            "score": tail_force,
+        }
+
+    monkeypatch.setattr(subchain_pair, "counterfactual_sequence_score", fake_sequence_score)
+
+    best = subchain_pair.counterfactual_score(args, raw_state=[0.0], step=0, base_force=0.0, candidate_force=0.0)
+
+    assert best["force"] == 0.0
+    assert best["tail_force"] == 10.0
+    assert best["score"] == 10.0
+
+
 def test_mingru_onpolicy_discounted_returns():
     onpolicy = _load_script("train_mingru_onpolicy")
 

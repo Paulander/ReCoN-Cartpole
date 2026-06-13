@@ -784,3 +784,40 @@ Rollout training stats were noisy rather than consistently improving: per-iterat
 
 Interpretation: stronger KL preservation avoided large policy drift, but did not improve the recurrent held-out plateau. As with prior minGRU PPO attempts, the pure policy remains flat and the ReCoN wrapper can dip. This reinforces the current direction: small updates to the same global recurrent terminal are unlikely to crack N=4; future learning should either change the architecture toward explicit local/subchain option composition or use a substantially different PPO setup for the primary 5-bin policy rather than another recurrent micro-update.
 
+## Long-Option Shared Subchain Probe - 2026-06-13
+
+Upgraded `scripts/train_subchain_pair_terminal.py` so counterfactual shared-subchain labels can score two-phase local options instead of only a single short forced action. Each candidate now has an initial force phase plus optional tail force phase. The baseline comparison is a true base-force sequence, and successful counterfactual options can add sampled forced-trace states back into the pair-terminal dataset. This lets the shared adjacent-pair terminal learn short local force patterns over time rather than only one isolated initial force.
+
+Verification:
+
+- `uv run ruff check scripts/train_subchain_pair_terminal.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_subchain_pair_counterfactual_expands_tail_options -q -s` -> 1 passed.
+
+Smoke: `reports/smoke_subchain_pair_optiontrace_20260613`
+
+The earlier long-option smoke with only initial-state labels still produced no recoveries. After switching to true base-sequence comparison plus option-trace rows, the same weak-block smoke produced actionable labels: `counterfactual_recovery: 9`, `counterfactual_recovery_option: 72`, `counterfactual_no_better: 15`, and `preserve_success: 24` pair rows. Tiny held-out eval remained neutral at success `0.50` for both base and learned, so this is wiring/label evidence only.
+
+Bounded probe: `reports/n4_subchain_pair_optiontrace_probe_20260613_seed8960k`
+
+Setup: frozen survival PPO teacher (`reports/n4_survival_ppo_sweep_20260612_seed2700k/candidate_01/checkpoint_010000.zip`), collection seeds from the weak `980000` block, two-phase options of `20 + 20` ticks, option trace stride `4`, hidden size `48`, conservative subchain blend `0.12`, and held-out eval on starts `1500000` and `1600000` with 20 episodes per block.
+
+Dataset source counts: `counterfactual_recovery: 27`, `counterfactual_recovery_option: 216`, `counterfactual_no_better: 78`, `preserve_success: 117`, total pair rows `438`.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| frozen PPO ReCoN base | 485.6 | 443.7 | 0.700 | 40 |
+| base + option-trace shared subchain, blend 0.12 | 485.6 | 443.7 | 0.700 | 40 |
+
+Blend sweep on the same checkpoint and held-out seeds:
+
+| blend | mean | p10 | success |
+|---:|---:|---:|---:|
+| 0.05 | 485.6 | 443.7 | 0.700 |
+| 0.12 | 485.6 | 443.7 | 0.700 |
+| 0.25 | 483.2 | 443.6 | 0.675 |
+| 0.40 | 480.3 | 430.0 | 0.675 |
+| 0.60 | 480.3 | 429.1 | 0.675 |
+| 0.85 | 465.2 | 394.1 | 0.450 |
+| 1.00 | 465.2 | 394.1 | 0.450 |
+
+Interpretation: the improved labeler now finds nontrivial local option recoveries, but the learned shared-subchain terminal does not improve held-out N=4 at conservative authority and degrades once given enough blend to matter. This is useful infrastructure and negative evidence. The next performance move should not be higher subchain blend; it should either use the option-trace labels as auxiliary data for the primary recurrent/policy terminal, or return to a broader primary PPO/curriculum update. No N=4 solve claim is justified.

@@ -51,6 +51,31 @@ def force_to_index(force: float, args: argparse.Namespace) -> int:
     return int(np.argmin(np.abs(values - float(force))))
 
 
+def candidate_force_sequences(args: argparse.Namespace, first_force: float) -> list[dict[str, Any]]:
+    first_steps = max(1, int(args.option_hold_steps))
+    tail_steps = max(0, int(getattr(args, "option_tail_steps", 0)))
+    if tail_steps <= 0:
+        return [{"forces": [float(first_force)], "steps": [first_steps]}]
+    return [
+        {
+            "forces": [float(first_force), float(tail_force)],
+            "steps": [first_steps, tail_steps],
+        }
+        for tail_force in force_values(args)
+    ]
+
+
+def baseline_force_sequence(args: argparse.Namespace, base_force: float) -> dict[str, Any]:
+    first_steps = max(1, int(args.option_hold_steps))
+    tail_steps = max(0, int(getattr(args, "option_tail_steps", 0)))
+    forces = [float(base_force)]
+    steps = [first_steps]
+    if tail_steps > 0:
+        forces.append(float(base_force))
+        steps.append(tail_steps)
+    return {"forces": forces, "steps": steps}
+
+
 def pressure_from_raw(raw_state: Any, n_poles: int) -> float:
     raw = np.asarray(raw_state, dtype=np.float32).reshape(-1)
     n = int(n_poles)
@@ -124,22 +149,42 @@ def rollout_episode(args: argparse.Namespace, seed: int) -> dict[str, Any]:
     return {"seed": int(seed), "steps": int(args.horizon), "return": total, "success": True, "states": states}
 
 
-def counterfactual_score(args: argparse.Namespace, raw_state: Any, step: int, base_force: float, candidate_force: float) -> dict[str, Any]:
+def counterfactual_sequence_score(
+    args: argparse.Namespace,
+    raw_state: Any,
+    step: int,
+    base_force: float,
+    sequence: dict[str, Any],
+) -> dict[str, Any]:
     env = make_env(args)
     controller = make_teacher(args)
     set_env_state(env, raw_state, step)
     obs = env._get_obs()
     controller.start_episode()
-    candidate_idx = force_to_index(candidate_force, args)
     survived = 0
     terminated = False
     truncated = False
     info: dict[str, Any] = {"raw_state": raw_state}
     pressures = [pressure_from_raw(raw_state, int(args.n_poles))]
-    for _ in range(max(1, int(args.option_hold_steps))):
-        obs, _reward, terminated, truncated, info = env.step(candidate_idx)
-        survived += 1
-        pressures.append(pressure_from_raw(info.get("raw_state", raw_state), int(args.n_poles)))
+    seq_forces = [float(force) for force in sequence.get("forces", [])]
+    seq_steps = [max(1, int(steps)) for steps in sequence.get("steps", [])]
+    forced_trace: list[dict[str, Any]] = []
+    for force, hold_steps in zip(seq_forces, seq_steps):
+        force_idx = force_to_index(force, args)
+        for _ in range(hold_steps):
+            raw_before = np.asarray(info.get("raw_state", raw_state), dtype=float).copy()
+            forced_trace.append(
+                {
+                    "raw_state": raw_before.tolist(),
+                    "step": int(step + survived),
+                    "force": float(force),
+                }
+            )
+            obs, _reward, terminated, truncated, info = env.step(force_idx)
+            survived += 1
+            pressures.append(pressure_from_raw(info.get("raw_state", raw_state), int(args.n_poles)))
+            if terminated or truncated:
+                break
         if terminated or truncated:
             break
     if not (terminated or truncated):
@@ -154,21 +199,44 @@ def counterfactual_score(args: argparse.Namespace, raw_state: Any, step: int, ba
     final_raw = np.asarray(info.get("raw_state", raw_state), dtype=float)
     pressure_final = float(pressures[-1]) if pressures else 0.0
     pressure_drop = float(pressures[0] - pressure_final) if pressures else 0.0
-    force_shift = abs(force_to_index(candidate_force, args) - force_to_index(base_force, args))
+    first_force = seq_forces[0] if seq_forces else float(base_force)
+    tail_force = seq_forces[1] if len(seq_forces) > 1 else first_force
+    first_shift = abs(force_to_index(first_force, args) - force_to_index(base_force, args))
+    tail_shift = (
+        abs(force_to_index(tail_force, args) - force_to_index(base_force, args))
+        if len(seq_forces) > 1
+        else 0
+    )
     score = (
         float(survived)
         + float(args.margin_weight) * stability_margin(final_raw, int(args.n_poles))
         + float(args.pressure_drop_weight) * pressure_drop
         - float(args.pressure_final_weight) * pressure_final
-        - float(args.shift_penalty) * float(force_shift)
+        - float(args.shift_penalty) * float(first_shift)
+        - float(getattr(args, "tail_shift_penalty", 0.0)) * float(tail_shift)
     )
     return {
-        "force": float(candidate_force),
+        "force": float(first_force),
+        "tail_force": float(tail_force),
+        "forces": [float(force) for force in seq_forces],
+        "force_steps": [int(steps) for steps in seq_steps],
+        "forced_steps": int(sum(seq_steps)),
+        "forced_trace": forced_trace,
         "survived": int(survived),
         "pressure_final": pressure_final,
         "pressure_drop": pressure_drop,
         "score": float(score),
     }
+
+
+def counterfactual_score(
+    args: argparse.Namespace, raw_state: Any, step: int, base_force: float, candidate_force: float
+) -> dict[str, Any]:
+    options = [
+        counterfactual_sequence_score(args, raw_state, step, base_force, sequence)
+        for sequence in candidate_force_sequences(args, candidate_force)
+    ]
+    return max(options, key=lambda item: float(item["score"]))
 
 
 def selected_counterfactual_states(args: argparse.Namespace, episode: dict[str, Any]) -> list[dict[str, Any]]:
@@ -221,6 +289,36 @@ def append_pair_rows(
         rows["steps"].append(int(step))
         rows["sources"].append(str(source))
         rows["pressures"].append(float(pressure))
+
+
+def append_option_trace_rows(
+    args: argparse.Namespace,
+    terminal: SharedSubchainTerminal,
+    rows: dict[str, list[Any]],
+    option: dict[str, Any],
+    confidence: float,
+    weight: float,
+    seed: int,
+) -> None:
+    stride = max(1, int(getattr(args, "option_trace_stride", 1)))
+    trace = list(option.get("forced_trace", []))
+    if not bool(getattr(args, "append_option_trace", True)) or not trace:
+        return
+    max_rows = max(1, int(getattr(args, "max_option_trace_states", 12)))
+    sampled = trace[::stride][:max_rows]
+    for item in sampled:
+        append_pair_rows(
+            args,
+            terminal,
+            rows,
+            item["raw_state"],
+            float(item["force"]),
+            confidence=confidence,
+            weight=weight,
+            seed=seed,
+            step=int(item["step"]),
+            source="counterfactual_recovery_option",
+        )
 
 
 def collect_teacher_dataset(args: argparse.Namespace, terminal: SharedSubchainTerminal) -> dict[str, np.ndarray]:
@@ -279,7 +377,9 @@ def collect_counterfactual_dataset(args: argparse.Namespace, terminal: SharedSub
                 )
                 continue
             options = [counterfactual_score(args, raw, int(state["step"]), base_force, force) for force in candidate_forces]
-            center = min(options, key=lambda item: abs(float(item["force"]) - base_force))
+            center = counterfactual_sequence_score(
+                args, raw, int(state["step"]), base_force, baseline_force_sequence(args, base_force)
+            )
             best = max(options, key=lambda item: float(item["score"]))
             score_gap = float(best["score"] - center["score"])
             if score_gap >= float(args.min_score_gap):
@@ -304,6 +404,8 @@ def collect_counterfactual_dataset(args: argparse.Namespace, terminal: SharedSub
                 step=int(state["step"]),
                 source=source,
             )
+            if source == "counterfactual_recovery":
+                append_option_trace_rows(args, terminal, rows, best, confidence, weight, seed)
     data = finalize_dataset(rows)
     data["episode_summaries"] = np.asarray([json.dumps(item) for item in episodes])
     return data
@@ -459,6 +561,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "shared_subchain_terminal": True,
             "supervised_teacher_distillation": str(args.label_mode) == "teacher_force",
             "counterfactual_recovery_labels": str(args.label_mode) == "counterfactual_recovery",
+            "long_option_counterfactuals": str(args.label_mode) == "counterfactual_recovery"
+            and int(getattr(args, "option_tail_steps", 0)) > 0,
             "policy_terminal": args.teacher_mode == "recon_policy_terminal",
             "gain_mutation": False,
         },
@@ -494,12 +598,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--success-preserve-stride", type=int, default=0)
     parser.add_argument("--max-success-preserve-states", type=int, default=8)
     parser.add_argument("--option-hold-steps", type=int, default=2)
+    parser.add_argument("--option-tail-steps", type=int, default=0)
+    parser.add_argument("--append-option-trace", action="store_true", default=True)
+    parser.add_argument("--no-append-option-trace", dest="append_option_trace", action="store_false")
+    parser.add_argument("--option-trace-stride", type=int, default=4)
+    parser.add_argument("--max-option-trace-states", type=int, default=12)
     parser.add_argument("--probe-horizon", type=int, default=100)
     parser.add_argument("--min-score-gap", type=float, default=0.05)
     parser.add_argument("--margin-weight", type=float, default=1.0)
     parser.add_argument("--pressure-drop-weight", type=float, default=2.0)
     parser.add_argument("--pressure-final-weight", type=float, default=0.25)
     parser.add_argument("--shift-penalty", type=float, default=0.05)
+    parser.add_argument("--tail-shift-penalty", type=float, default=0.02)
     parser.add_argument("--confidence-score-scale", type=float, default=4.0)
     parser.add_argument("--recovery-weight", type=float, default=3.0)
     parser.add_argument("--preserve-weight", type=float, default=1.0)
