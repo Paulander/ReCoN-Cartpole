@@ -1089,6 +1089,67 @@ def test_mingru_action_gate_collect_seed_values_reads_txt_and_json(tmp_path):
     assert mingru_gate.collect_seed_values(args) == [20, 21]
 
 
+def test_mingru_action_gate_decision_respects_apply_probability():
+    mingru_gate = _load_script("train_mingru_action_gate")
+    probs = mingru_gate.np.asarray([0.10, 0.05, 0.80, 0.03, 0.02, 0.0], dtype=float)
+
+    action, allowed = mingru_gate.gate_decision_from_probs(
+        probs,
+        base_action=0,
+        gate_confidence=0.5,
+        gate_margin=0.2,
+        gate_apply_threshold=0.6,
+        apply_probability=0.4,
+    )
+    allowed_action, allowed_flag = mingru_gate.gate_decision_from_probs(
+        probs,
+        base_action=0,
+        gate_confidence=0.5,
+        gate_margin=0.2,
+        gate_apply_threshold=0.6,
+        apply_probability=0.8,
+    )
+
+    assert action == 0
+    assert allowed is False
+    assert allowed_action == 1
+    assert allowed_flag is True
+
+
+def test_mingru_action_gate_probability_trace_sweep_counts_overrides():
+    mingru_gate = _load_script("train_mingru_action_gate")
+    trace = {
+        "episodes": [
+            {
+                "steps": 2,
+                "trace": [
+                    {"base_action": 0, "probs": [0.10, 0.05, 0.80, 0.03, 0.02, 0.0], "apply_probability": 0.8},
+                    {"base_action": 1, "probs": [0.60, 0.10, 0.20, 0.05, 0.03, 0.02], "apply_probability": 0.9},
+                ],
+            },
+            {
+                "steps": 1,
+                "trace": [
+                    {"base_action": 2, "probs": [0.10, 0.05, 0.80, 0.03, 0.02, 0.0], "apply_probability": 0.2},
+                ],
+            },
+        ]
+    }
+
+    rows = mingru_gate.sweep_probability_trace(
+        trace,
+        [
+            {"gate_confidence": 0.5, "gate_margin": 0.2, "gate_apply_threshold": 0.6},
+            {"gate_confidence": 0.5, "gate_margin": 0.2, "gate_apply_threshold": 0.1},
+        ],
+    )
+
+    assert rows[0]["override_count"] == 1
+    assert rows[0]["override_episodes"] == 1
+    assert rows[1]["override_count"] == 2
+    assert rows[1]["override_episodes"] == 2
+
+
 def test_mingru_action_gate_apply_label_can_be_stricter_than_action_label(monkeypatch):
     mingru_gate = _load_script("train_mingru_action_gate")
 

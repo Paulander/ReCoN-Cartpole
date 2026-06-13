@@ -461,6 +461,127 @@ def load_gate(path: Path) -> tuple[Any, dict[str, Any]]:
         apply_model.eval()
     return (model, apply_model) if apply_model is not None else model, meta
 
+
+def gate_decision_from_probs(
+    probs: np.ndarray,
+    base_action: int,
+    gate_confidence: float,
+    gate_margin: float,
+    gate_apply_threshold: float,
+    apply_probability: float | None = None,
+) -> tuple[int, bool]:
+    cls = int(np.argmax(probs))
+    if cls <= 0:
+        return int(base_action), False
+    confidence = float(probs[cls])
+    margin = confidence - float(probs[0])
+    apply_allowed = apply_probability is None or float(apply_probability) >= float(gate_apply_threshold)
+    candidate = int(cls - 1)
+    should_override = (
+        candidate != int(base_action)
+        and confidence >= float(gate_confidence)
+        and margin >= float(gate_margin)
+        and apply_allowed
+    )
+    return (candidate if should_override else int(base_action)), bool(should_override)
+
+
+def record_gate_probability_trace(args: argparse.Namespace, seeds: list[int], gate_path: Path) -> dict[str, Any]:
+    import torch
+
+    loaded, _meta = load_gate(gate_path)
+    if isinstance(loaded, tuple):
+        model, apply_model = loaded
+    else:
+        model, apply_model = loaded, None
+    episodes: list[dict[str, Any]] = []
+    for seed in seeds:
+        env = make_env(args)
+        controller = make_controller(args)
+        obs, info = env.reset(seed=int(seed))
+        controller.start_episode()
+        total = 0.0
+        steps: list[dict[str, Any]] = []
+        final_raw: Any = info.get("raw_state", [])
+        for step in range(int(args.horizon)):
+            raw_before = np.asarray(info["raw_state"], dtype=float).copy()
+            action, diagnostics = controller.act(obs, raw_before)
+            base_action = int(action)
+            force = float(diagnostics.get("force", action_force(base_action, args)))
+            feat = gate_features(raw_before, base_action, force, diagnostics, step, args)
+            feat_tensor = torch.tensor(feat, dtype=torch.float32).unsqueeze(0)
+            with torch.no_grad():
+                probs = torch.softmax(model(feat_tensor), dim=1).cpu().numpy()[0]
+                apply_probability = None
+                if apply_model is not None:
+                    apply_probability = float(torch.sigmoid(apply_model(feat_tensor)).cpu().numpy().reshape(-1)[0])
+            steps.append(
+                {
+                    "step": int(step),
+                    "base_action": int(base_action),
+                    "probs": [float(value) for value in probs],
+                    "apply_probability": apply_probability,
+                }
+            )
+            obs, reward, terminated, truncated, info = env.step(base_action)
+            total += float(reward)
+            final_raw = info.get("raw_state", final_raw)
+            if terminated or truncated:
+                step_count = step + 1
+                break
+        else:
+            step_count = int(args.horizon)
+        episodes.append(
+            {
+                "seed": int(seed),
+                "steps": int(step_count),
+                "return": float(total),
+                "success": int(step_count) >= int(args.horizon),
+                "failure": "success" if int(step_count) >= int(args.horizon) else failure_class(final_raw, args),
+                "trace": steps,
+            }
+        )
+    return {"episodes": episodes, "seeds": [int(seed) for seed in seeds], "gate_path": str(gate_path), "horizon": int(args.horizon)}
+
+
+def sweep_probability_trace(trace: dict[str, Any], configs: list[dict[str, float]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    total_steps = sum(len(ep.get("trace", [])) for ep in trace.get("episodes", []))
+    base_steps = [float(ep.get("steps", 0)) for ep in trace.get("episodes", [])]
+    horizon = int(trace.get("horizon", max(base_steps) if base_steps else 0))
+    base_summary = summarize_steps(base_steps, horizon) if base_steps else {}
+    for config in configs:
+        overrides = 0
+        override_episodes = 0
+        for episode in trace.get("episodes", []):
+            episode_overrides = 0
+            for item in episode.get("trace", []):
+                _action, should_override = gate_decision_from_probs(
+                    np.asarray(item["probs"], dtype=float),
+                    int(item["base_action"]),
+                    float(config.get("gate_confidence", 0.75)),
+                    float(config.get("gate_margin", 0.0)),
+                    float(config.get("gate_apply_threshold", 0.5)),
+                    item.get("apply_probability"),
+                )
+                if should_override:
+                    overrides += 1
+                    episode_overrides += 1
+            if episode_overrides:
+                override_episodes += 1
+        rows.append(
+            {
+                **config,
+                "override_count": int(overrides),
+                "override_rate": float(overrides / total_steps) if total_steps else 0.0,
+                "override_episodes": int(override_episodes),
+                "episodes": len(trace.get("episodes", [])),
+                "base_success_rate": float(base_summary.get("success_rate", 0.0)),
+                "base_mean_survival": float(base_summary.get("mean_survival", 0.0)),
+            }
+        )
+    return rows
+
 def evaluate(args: argparse.Namespace, seeds: list[int], gate_path: Path | None = None) -> dict[str, Any]:
     import torch
 
@@ -499,20 +620,21 @@ def evaluate(args: argparse.Namespace, seeds: list[int], gate_path: Path | None 
                     apply_probability = None
                     if apply_model is not None:
                         apply_probability = float(torch.sigmoid(apply_model(feat_tensor)).cpu().numpy().reshape(-1)[0])
-                cls = int(np.argmax(probs))
-                confidence = float(probs[cls])
                 checked += 1
-                noop_confidence = float(probs[0])
-                margin = confidence - noop_confidence
-                apply_allowed = apply_probability is None or apply_probability >= float(args.gate_apply_threshold)
-                if cls > 0 and confidence >= float(args.gate_confidence) and margin >= float(args.gate_margin) and apply_allowed:
-                    candidate = cls - 1
-                    if candidate != base_action:
-                        final_action = candidate
-                        overrides += 1
-                        episode_overrides += 1
-                        if controller.mingru_terminal is not None:
-                            controller.mingru_terminal.prev_force = action_force(final_action, args)
+                candidate, should_override = gate_decision_from_probs(
+                    probs,
+                    base_action,
+                    float(args.gate_confidence),
+                    float(args.gate_margin),
+                    float(args.gate_apply_threshold),
+                    apply_probability,
+                )
+                if should_override:
+                    final_action = candidate
+                    overrides += 1
+                    episode_overrides += 1
+                    if controller.mingru_terminal is not None:
+                        controller.mingru_terminal.prev_force = action_force(final_action, args)
             obs, reward, terminated, truncated, info = env.step(int(final_action))
             total += float(reward)
             final_raw = info.get("raw_state", final_raw)

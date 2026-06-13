@@ -1177,3 +1177,18 @@ Apply-threshold sweep on the relaxed checkpoint showed no held-out lift. The bes
 
 Interpretation: the two-head gate is safer and better instrumented, but the current 10-hard-seed dataset has only one strong apply-positive row. This makes the apply model either abstain or over-apply depending on threshold. Do not scale this action-gate formulation as the next solve attempt. If revisiting it, first broaden the counterfactual label pool and train apply labels on explicit harm/benefit calibration or record action probabilities once per rollout so threshold sweeps can be done offline. The current stronger direction remains using counterfactual option traces as auxiliary recurrent-policy data or changing the recurrent/subchain architecture, not deploying a per-tick override gate.
 
+## Offline Action-Gate Threshold Sweep Tooling - 2026-06-13
+
+Added offline threshold-sweep support to `scripts/train_mingru_action_gate.py`. A new probability-trace path records base-policy rollouts once, storing action probabilities and optional apply probabilities while replaying the unmodified controller. `sweep_probability_trace(...)` can then evaluate many `gate_confidence`, `gate_margin`, and `gate_apply_threshold` combinations without rerunning the simulator for each threshold. Live closed-loop evaluation is still required for final claims, but this removes most wasted rollout time when filtering obviously over-active gate settings.
+
+Focused verification:
+
+- `uv run ruff check scripts/train_mingru_action_gate.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs tests/test_policy_terminal_training.py::test_mingru_action_gate_decision_respects_apply_probability tests/test_policy_terminal_training.py::test_mingru_action_gate_probability_trace_sweep_counts_overrides tests/test_policy_terminal_training.py::test_mingru_action_gate_train_gate_can_emit_apply_head -q -s` -> 4 passed.
+
+Probe artifact: `reports/smoke_mingru_action_gate_applyhead_relaxed_20260613/offline_threshold_sweep.json`
+
+The existing relaxed apply-head checkpoint was replayed once on the same 20 held-out smoke seeds, then 120 threshold combinations were swept offline. Base success in the trace was `0.650`. The smallest nonzero override setting changed only 1 tick across the full trace; the most permissive tested setting would have changed 2348 ticks across 17/20 episodes. This is calibration evidence only, not closed-loop performance evidence.
+
+Interpretation: this confirms the current apply-head gate has a narrow abstain-or-overapply profile. Future action-gate work should first broaden or improve the label pool, then use offline threshold sweeps to choose a tiny number of live closed-loop candidates. Do not spend repeated live rollouts on dense threshold grids.
+
