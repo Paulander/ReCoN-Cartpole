@@ -37,6 +37,42 @@ def make_env(args: argparse.Namespace) -> CartPoleNEnv:
     )
 
 
+def set_env_state(env: CartPoleNEnv, raw_state: Any, step: int) -> None:
+    env.state = np.asarray(raw_state, dtype=float).copy()
+    env.steps = int(step)
+
+
+def force_values(args: argparse.Namespace) -> np.ndarray:
+    return np.linspace(-float(args.force_mag), float(args.force_mag), int(args.discrete_action_bins))
+
+
+def force_to_index(force: float, args: argparse.Namespace) -> int:
+    values = force_values(args)
+    return int(np.argmin(np.abs(values - float(force))))
+
+
+def pressure_from_raw(raw_state: Any, n_poles: int) -> float:
+    raw = np.asarray(raw_state, dtype=np.float32).reshape(-1)
+    n = int(n_poles)
+    if raw.size < 2 + 2 * n:
+        return 0.0
+    cart = abs(float(raw[0])) / 2.4
+    angle = float(np.max(np.abs(raw[2 : 2 + n]))) / 0.20943951023931953
+    velocity = float(np.max(np.abs(raw[2 + n : 2 + 2 * n]))) / 5.0
+    return float(np.clip(0.35 * cart + 0.45 * angle + 0.20 * velocity, 0.0, 2.0))
+
+
+def stability_margin(raw_state: Any, n_poles: int) -> float:
+    raw = np.asarray(raw_state, dtype=np.float32).reshape(-1)
+    n = int(n_poles)
+    if raw.size < 2 + 2 * n:
+        return -10.0
+    cart = abs(float(raw[0])) / 2.4
+    angle = float(np.max(np.abs(raw[2 : 2 + n]))) / 0.20943951023931953
+    velocity = float(np.mean(np.abs(raw[2 + n : 2 + 2 * n]))) / 5.0
+    return float(1.0 - angle - 0.10 * cart - 0.03 * velocity)
+
+
 def make_teacher(args: argparse.Namespace) -> ReConCartPoleController:
     return ReConCartPoleController(
         RunnerConfig(
@@ -56,13 +92,139 @@ def make_teacher(args: argparse.Namespace) -> ReConCartPoleController:
     )
 
 
-def collect_dataset(args: argparse.Namespace, terminal: SharedSubchainTerminal) -> dict[str, np.ndarray]:
-    xs: list[np.ndarray] = []
-    force_targets: list[float] = []
-    confidence_targets: list[float] = []
-    pair_indices: list[int] = []
-    seeds: list[int] = []
-    steps: list[int] = []
+def rollout_episode(args: argparse.Namespace, seed: int) -> dict[str, Any]:
+    teacher = make_teacher(args)
+    env = make_env(args)
+    obs, info = env.reset(seed=int(seed))
+    teacher.start_episode()
+    states: list[dict[str, Any]] = []
+    total = 0.0
+    for step in range(int(args.horizon)):
+        raw_before = np.asarray(info["raw_state"], dtype=float).copy()
+        action, diagnostics = teacher.act(obs, raw_before)
+        base_force = float(diagnostics.get("force", force_values(args)[int(action)]))
+        states.append(
+            {
+                "step": int(step),
+                "raw_before": raw_before.tolist(),
+                "action": int(action),
+                "force": base_force,
+            }
+        )
+        obs, reward, terminated, truncated, info = env.step(int(action))
+        total += float(reward)
+        if terminated or truncated:
+            return {
+                "seed": int(seed),
+                "steps": int(step + 1),
+                "return": total,
+                "success": bool(truncated and step + 1 >= int(args.horizon)),
+                "states": states,
+            }
+    return {"seed": int(seed), "steps": int(args.horizon), "return": total, "success": True, "states": states}
+
+
+def counterfactual_score(args: argparse.Namespace, raw_state: Any, step: int, base_force: float, candidate_force: float) -> dict[str, Any]:
+    env = make_env(args)
+    controller = make_teacher(args)
+    set_env_state(env, raw_state, step)
+    obs = env._get_obs()
+    controller.start_episode()
+    candidate_idx = force_to_index(candidate_force, args)
+    survived = 0
+    terminated = False
+    truncated = False
+    info: dict[str, Any] = {"raw_state": raw_state}
+    pressures = [pressure_from_raw(raw_state, int(args.n_poles))]
+    for _ in range(max(1, int(args.option_hold_steps))):
+        obs, _reward, terminated, truncated, info = env.step(candidate_idx)
+        survived += 1
+        pressures.append(pressure_from_raw(info.get("raw_state", raw_state), int(args.n_poles)))
+        if terminated or truncated:
+            break
+    if not (terminated or truncated):
+        for _ in range(max(1, int(args.probe_horizon)) - survived):
+            raw = np.asarray(info["raw_state"], dtype=float).copy()
+            action, _diagnostics = controller.act(obs, raw)
+            obs, _reward, terminated, truncated, info = env.step(int(action))
+            survived += 1
+            pressures.append(pressure_from_raw(info.get("raw_state", raw_state), int(args.n_poles)))
+            if terminated or truncated:
+                break
+    final_raw = np.asarray(info.get("raw_state", raw_state), dtype=float)
+    pressure_final = float(pressures[-1]) if pressures else 0.0
+    pressure_drop = float(pressures[0] - pressure_final) if pressures else 0.0
+    force_shift = abs(force_to_index(candidate_force, args) - force_to_index(base_force, args))
+    score = (
+        float(survived)
+        + float(args.margin_weight) * stability_margin(final_raw, int(args.n_poles))
+        + float(args.pressure_drop_weight) * pressure_drop
+        - float(args.pressure_final_weight) * pressure_final
+        - float(args.shift_penalty) * float(force_shift)
+    )
+    return {
+        "force": float(candidate_force),
+        "survived": int(survived),
+        "pressure_final": pressure_final,
+        "pressure_drop": pressure_drop,
+        "score": float(score),
+    }
+
+
+def selected_counterfactual_states(args: argparse.Namespace, episode: dict[str, Any]) -> list[dict[str, Any]]:
+    states = list(episode.get("states", []))
+    if not states:
+        return []
+    if bool(episode.get("success", False)):
+        stride = int(getattr(args, "success_preserve_stride", 0))
+        if stride <= 0:
+            return []
+        return [dict(state, preserve_success=True) for state in states[::stride]][-int(args.max_success_preserve_states) :]
+    selected: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for offset in [int(item) for item in args.failure_offsets]:
+        pos = len(states) - 1 - offset
+        if 0 <= pos < len(states):
+            state = dict(states[pos])
+            if int(state["step"]) in seen:
+                continue
+            seen.add(int(state["step"]))
+            state["failure_offset"] = int(offset)
+            state["preserve_success"] = False
+            selected.append(state)
+    if len(selected) > int(args.max_failure_states):
+        selected = selected[-int(args.max_failure_states) :]
+    return selected
+
+
+def append_pair_rows(
+    args: argparse.Namespace,
+    terminal: SharedSubchainTerminal,
+    rows: dict[str, list[Any]],
+    raw_state: Any,
+    target_force: float,
+    confidence: float,
+    weight: float,
+    seed: int,
+    step: int,
+    source: str,
+) -> None:
+    features = features_from_state(raw_state, raw_state, args.n_poles)
+    for pair in range(max(0, len(features.poles) - 1)):
+        vec, pressure = terminal.pair_feature_vector(features, pair)
+        rows["x"].append(vec)
+        rows["force_targets"].append(float(target_force) / max(float(args.force_mag), 1e-9))
+        rows["confidence_targets"].append(float(np.clip(confidence, 0.0, 1.0)))
+        rows["sample_weights"].append(float(max(0.0, weight)))
+        rows["pair_indices"].append(int(pair))
+        rows["seeds"].append(int(seed))
+        rows["steps"].append(int(step))
+        rows["sources"].append(str(source))
+        rows["pressures"].append(float(pressure))
+
+
+def collect_teacher_dataset(args: argparse.Namespace, terminal: SharedSubchainTerminal) -> dict[str, np.ndarray]:
+    rows: dict[str, list[Any]] = {key: [] for key in ["x", "force_targets", "confidence_targets", "sample_weights", "pair_indices", "seeds", "steps", "sources", "pressures"]}
     teacher = make_teacher(args)
     env = make_env(args)
     for ep in range(int(args.episodes)):
@@ -76,26 +238,99 @@ def collect_dataset(args: argparse.Namespace, terminal: SharedSubchainTerminal) 
             features = features_from_state(obs, raw, args.n_poles)
             for pair in range(max(0, len(features.poles) - 1)):
                 vec, pressure = terminal.pair_feature_vector(features, pair)
-                xs.append(vec)
-                force_targets.append(force / max(float(args.force_mag), 1e-9))
-                confidence_targets.append(float(min(1.0, max(0.0, pressure))))
-                pair_indices.append(pair)
-                seeds.append(seed)
-                steps.append(step)
+                rows["x"].append(vec)
+                rows["force_targets"].append(force / max(float(args.force_mag), 1e-9))
+                rows["confidence_targets"].append(float(min(1.0, max(0.0, pressure))))
+                rows["sample_weights"].append(1.0)
+                rows["pair_indices"].append(pair)
+                rows["seeds"].append(seed)
+                rows["steps"].append(step)
+                rows["sources"].append("teacher")
+                rows["pressures"].append(float(pressure))
             obs, _reward, terminated, truncated, info = env.step(int(action))
             if terminated or truncated:
                 break
-    if not xs:
+    return finalize_dataset(rows)
+
+
+def collect_counterfactual_dataset(args: argparse.Namespace, terminal: SharedSubchainTerminal) -> dict[str, np.ndarray]:
+    rows: dict[str, list[Any]] = {key: [] for key in ["x", "force_targets", "confidence_targets", "sample_weights", "pair_indices", "seeds", "steps", "sources", "pressures"]}
+    episodes: list[dict[str, Any]] = []
+    candidate_forces = force_values(args)
+    for ep in range(int(args.episodes)):
+        seed = int(args.seed_start) + ep
+        episode = rollout_episode(args, seed)
+        episodes.append({key: episode[key] for key in ("seed", "steps", "return", "success")})
+        for state in selected_counterfactual_states(args, episode):
+            raw = state["raw_before"]
+            base_force = float(state["force"])
+            if bool(state.get("preserve_success", False)):
+                append_pair_rows(
+                    args,
+                    terminal,
+                    rows,
+                    raw,
+                    base_force,
+                    confidence=float(args.preserve_confidence),
+                    weight=float(args.preserve_weight),
+                    seed=seed,
+                    step=int(state["step"]),
+                    source="preserve_success",
+                )
+                continue
+            options = [counterfactual_score(args, raw, int(state["step"]), base_force, force) for force in candidate_forces]
+            center = min(options, key=lambda item: abs(float(item["force"]) - base_force))
+            best = max(options, key=lambda item: float(item["score"]))
+            score_gap = float(best["score"] - center["score"])
+            if score_gap >= float(args.min_score_gap):
+                target_force = float(best["force"])
+                confidence = min(1.0, max(0.0, score_gap / max(float(args.confidence_score_scale), 1e-9)))
+                weight = float(args.recovery_weight) * max(0.1, confidence)
+                source = "counterfactual_recovery"
+            else:
+                target_force = base_force
+                confidence = float(args.preserve_confidence)
+                weight = float(args.weak_preserve_weight)
+                source = "counterfactual_no_better"
+            append_pair_rows(
+                args,
+                terminal,
+                rows,
+                raw,
+                target_force,
+                confidence=confidence,
+                weight=weight,
+                seed=seed,
+                step=int(state["step"]),
+                source=source,
+            )
+    data = finalize_dataset(rows)
+    data["episode_summaries"] = np.asarray([json.dumps(item) for item in episodes])
+    return data
+
+
+def finalize_dataset(rows: dict[str, list[Any]]) -> dict[str, np.ndarray]:
+    if not rows["x"]:
         raise ValueError("no subchain pair samples collected")
     return {
-        "x": np.stack(xs).astype(np.float32),
-        "force_targets": np.asarray(force_targets, dtype=np.float32),
-        "confidence_targets": np.asarray(confidence_targets, dtype=np.float32),
-        "pair_indices": np.asarray(pair_indices, dtype=np.int64),
-        "seeds": np.asarray(seeds, dtype=np.int64),
-        "steps": np.asarray(steps, dtype=np.int64),
+        "x": np.stack(rows["x"]).astype(np.float32),
+        "force_targets": np.asarray(rows["force_targets"], dtype=np.float32),
+        "confidence_targets": np.asarray(rows["confidence_targets"], dtype=np.float32),
+        "sample_weights": np.asarray(rows["sample_weights"], dtype=np.float32),
+        "pair_indices": np.asarray(rows["pair_indices"], dtype=np.int64),
+        "seeds": np.asarray(rows["seeds"], dtype=np.int64),
+        "steps": np.asarray(rows["steps"], dtype=np.int64),
+        "sources": np.asarray(rows["sources"]),
+        "pressures": np.asarray(rows["pressures"], dtype=np.float32),
     }
 
+
+def collect_dataset(args: argparse.Namespace, terminal: SharedSubchainTerminal) -> dict[str, np.ndarray]:
+    if str(args.label_mode) == "teacher_force":
+        return collect_teacher_dataset(args, terminal)
+    if str(args.label_mode) == "counterfactual_recovery":
+        return collect_counterfactual_dataset(args, terminal)
+    raise ValueError(f"unsupported label mode: {args.label_mode}")
 
 def train_model(args: argparse.Namespace, data: dict[str, np.ndarray], terminal: SharedSubchainTerminal):
     try:
@@ -111,6 +346,8 @@ def train_model(args: argparse.Namespace, data: dict[str, np.ndarray], terminal:
     x = torch.as_tensor(data["x"], dtype=torch.float32, device=device)
     force_target = torch.as_tensor(data["force_targets"], dtype=torch.float32, device=device)
     confidence_target = torch.as_tensor(data["confidence_targets"], dtype=torch.float32, device=device)
+    sample_weight = torch.as_tensor(data.get("sample_weights", np.ones(data["force_targets"].shape[0], dtype=np.float32)), dtype=torch.float32, device=device)
+    sample_weight = sample_weight / torch.clamp(sample_weight.mean(), min=1e-6)
     indices = np.arange(x.shape[0])
     history: list[dict[str, float]] = []
     for epoch in range(int(args.epochs)):
@@ -124,8 +361,9 @@ def train_model(args: argparse.Namespace, data: dict[str, np.ndarray], terminal:
             out = model(xb)
             pred_force = torch.tanh(out[:, 0])
             pred_conf = torch.sigmoid(out[:, 1])
-            force_loss = F.mse_loss(pred_force, force_target[idx])
-            confidence_loss = F.binary_cross_entropy(pred_conf, confidence_target[idx])
+            weight = sample_weight[idx]
+            force_loss = torch.mean(F.mse_loss(pred_force, force_target[idx], reduction="none") * weight)
+            confidence_loss = torch.mean(F.binary_cross_entropy(pred_conf, confidence_target[idx], reduction="none") * weight)
             loss = force_loss + float(args.confidence_loss_weight) * confidence_loss
             optimizer.zero_grad()
             loss.backward()
@@ -211,6 +449,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "status": "completed",
         "checkpoint_path": str(checkpoint),
         "samples": int(data["x"].shape[0]),
+        "source_counts": {str(item): int(np.sum(data.get("sources", np.asarray([])) == item)) for item in np.unique(data.get("sources", np.asarray([])))},
         "pairs": int(max(0, args.n_poles - 1)),
         "history": history,
         "base_eval": base_eval,
@@ -218,7 +457,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "config": vars(args),
         "mechanisms": {
             "shared_subchain_terminal": True,
-            "supervised_teacher_distillation": True,
+            "supervised_teacher_distillation": str(args.label_mode) == "teacher_force",
+            "counterfactual_recovery_labels": str(args.label_mode) == "counterfactual_recovery",
             "policy_terminal": args.teacher_mode == "recon_policy_terminal",
             "gain_mutation": False,
         },
@@ -231,6 +471,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train a shared learned adjacent-subchain pair terminal.")
     parser.add_argument("--out", default="reports/subchain_pair_terminal")
+    parser.add_argument("--label-mode", choices=["teacher_force", "counterfactual_recovery"], default="teacher_force")
     parser.add_argument("--teacher-mode", choices=["static_recon", "recon_policy_terminal"], default="recon_policy_terminal")
     parser.add_argument("--policy-terminal-path", default="")
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
@@ -248,6 +489,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--initial-angle-range", type=float, default=0.05)
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
+    parser.add_argument("--failure-offsets", type=int, nargs="*", default=[0, 2, 5, 10, 20, 40])
+    parser.add_argument("--max-failure-states", type=int, default=8)
+    parser.add_argument("--success-preserve-stride", type=int, default=0)
+    parser.add_argument("--max-success-preserve-states", type=int, default=8)
+    parser.add_argument("--option-hold-steps", type=int, default=2)
+    parser.add_argument("--probe-horizon", type=int, default=100)
+    parser.add_argument("--min-score-gap", type=float, default=0.05)
+    parser.add_argument("--margin-weight", type=float, default=1.0)
+    parser.add_argument("--pressure-drop-weight", type=float, default=2.0)
+    parser.add_argument("--pressure-final-weight", type=float, default=0.25)
+    parser.add_argument("--shift-penalty", type=float, default=0.05)
+    parser.add_argument("--confidence-score-scale", type=float, default=4.0)
+    parser.add_argument("--recovery-weight", type=float, default=3.0)
+    parser.add_argument("--preserve-weight", type=float, default=1.0)
+    parser.add_argument("--weak-preserve-weight", type=float, default=0.25)
+    parser.add_argument("--preserve-confidence", type=float, default=0.10)
     parser.add_argument("--hidden-size", type=int, default=32)
     parser.add_argument("--no-pair-position", action="store_true")
     parser.add_argument("--theta-scale", type=float, default=0.21)

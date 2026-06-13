@@ -83,7 +83,7 @@ The ladder does not make solved claims. It reports active mechanisms and separat
 
 For clipped on-policy fine-tuning of a trained minGRU terminal, use `scripts/train_mingru_ppo.py`. It collects rollouts with stored old log-probs, applies PPO clipped minibatch updates with optional frozen-reference KL preservation, and evaluates pure minGRU versus the same checkpoint routed through ReCoN on held-out seeds.
 
-For explicit compositional subchain experiments, `recon_learned_subchain_terminal` applies one shared learned adjacent-pair terminal to every pole pair and aggregates its local votes inside ReCoN proposal blending. `scripts/train_subchain_pair_terminal.py` trains that shared pair module by supervised teacher distillation and evaluates it as a normal ReCoN controller augmentation.
+For explicit compositional subchain experiments, `recon_learned_subchain_terminal` applies one shared learned adjacent-pair terminal to every pole pair and aggregates its local votes inside ReCoN proposal blending. `scripts/train_subchain_pair_terminal.py` trains that shared pair module by supervised teacher distillation (`--label-mode teacher_force`) or local counterfactual recovery labels (`--label-mode counterfactual_recovery`) and evaluates it as a normal ReCoN controller augmentation.
 
 For model selection across train seeds:
 

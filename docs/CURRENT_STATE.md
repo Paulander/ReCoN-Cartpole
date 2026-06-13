@@ -593,3 +593,24 @@ Setup: distilled the frozen survival PPO teacher (`reports/n4_survival_ppo_sweep
 
 Interpretation: the structural path is implemented and traceable, and the first conservative distillation probe did not damage the PPO base on this small held-out slice. It also did not add lift; simple teacher-force distillation appears mostly action-neutral at low blend. This is not a solve claim because the evaluation is only 40 episodes and reproduces the base on the same slice. The next useful experiment is not more plain distillation, but training the pair terminal on counterfactual/local recovery labels or residual advantages so pair votes can differ from the global teacher in the failure tail.
 
+## Counterfactual Shared Subchain Pair Labels - 2026-06-13
+
+Extended `scripts/train_subchain_pair_terminal.py` with `--label-mode counterfactual_recovery`. The mode rolls out the frozen teacher, samples near-failure windows plus optional success-preservation windows, probes all 5 discrete forces for a short local option, and trains the shared adjacent-pair terminal on either a better local recovery force or a preserve/no-op target. Training rows now carry sample weights and source labels, and reports separate teacher distillation from counterfactual recovery labels in their active mechanisms.
+
+Verification and smoke:
+
+- `uv run ruff check scripts/train_subchain_pair_terminal.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs -q -s` -> passed.
+- `reports/smoke_subchain_pair_counterfactual_20260613` completed a short low-horizon integration smoke.
+
+Bounded N=4 probe: `reports/n4_subchain_pair_counterfactual_probe_20260613_seed8500k`
+
+Setup: frozen survival PPO teacher (`reports/n4_survival_ppo_sweep_20260612_seed2700k/candidate_01/checkpoint_010000.zip`), 24 current-distribution collection episodes, near-failure offsets `[0, 2, 5, 10, 20, 40, 80]`, conservative blend `0.12`, and held-out starts `1500000` and `1600000` with 20 episodes per block.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| frozen PPO ReCoN base | 485.6 | 443.7 | 0.700 | 40 |
+| base + counterfactual shared subchain terminal | 485.6 | 443.7 | 0.700 | 40 |
+
+Dataset source counts were `counterfactual_no_better: 189` and `preserve_success: 135`; there were no `counterfactual_recovery` rows under this probe. Interpretation: the counterfactual label plumbing works and remains claim-disciplined, but this specific short-horizon local force search did not discover better-than-base recovery actions. It is neutral evidence, not a solve. The next performance move should therefore be either a stronger local option search or another PPO continuation slice, not more identical subchain distillation.
+
