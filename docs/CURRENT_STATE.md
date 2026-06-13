@@ -1284,3 +1284,23 @@ Partial sweep: `reports/n4_ppo_lowlr_tail_stage2_20260613_seed9150k`
 
 Interpretation: this tiny-update PPO corner mostly preserves the incumbent. Candidate 2 promoted a trained checkpoint and nudged p10 by `+0.9`, but the binary held-out success stayed fixed at `0.6875`. I stopped the remaining near-duplicate candidates rather than spend more time confirming the same plateau. This points away from more ultra-low-LR PPO micro-sweeps as the next best solve attempt.
 
+## Current-Best Recovery-Window Residual Variants - 2026-06-13
+
+Tested recovery-window residual PPO against the current best feedforward PPO terminal (`reports/policy_terminal_n4_worker_seeded_combined_p0125_lr25e6_seed1520k/checkpoint_025000.zip`), rather than the older survival-sweep checkpoint. Both variants used normal ReCoN residual-terminal integration for evaluation and the held-out starts `1900000`, `2000000`, `2100000`, and `2200000`, 20 episodes each.
+
+Strict/narrow residual: `reports/n4_recovery_window_residual_currentbest_narrow_20260613_seed9160`
+
+Setup: 3 residual action bins (`-1/0/+1` action-index shift), gate threshold `0.35`, high low-risk/preservation penalties, 1018 recovery-window training rows (`290` recovery, `728` preserve-success), 16k PPO timesteps.
+
+Loose/narrow residual: `reports/n4_recovery_window_residual_currentbest_loose_20260613_seed9161`
+
+Setup: same 3 residual action bins, lower gate threshold `0.20`, fewer preservation windows and lower penalties, stronger recovery pressure/window-success rewards, 563 training rows (`290` recovery, `273` preserve-success), 16k PPO timesteps.
+
+| variant | windows | recovery rows | preserve rows | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| frozen ReCoN base | n/a | n/a | n/a | 487.7 | 442.9 | 417.1 | 0.6875 | 0.000 |
+| strict residual | 1018 | 290 | 728 | 487.7 | 442.9 | 417.1 | 0.6875 | 0.000 |
+| loose residual | 563 | 290 | 273 | 487.7 | 442.9 | 416.6 | 0.6875 | 0.390 |
+
+Interpretation: this confirms the current learned residual family on the current-best checkpoint is trapped between abstain and small harm. The strict variant learned to do nothing, which is safe but useless. The loose variant produced nonzero residual shifts, but did not flip any held-out failures into successes and slightly hurt cvar/mean. More recovery-window PPO with the same feature/action setup is unlikely to crack N=4. A better residual direction would need a more explicit trigger/benefit classifier or option-level recovery policy, not per-step PPO residual shifts from short recovery-window resets.
+
