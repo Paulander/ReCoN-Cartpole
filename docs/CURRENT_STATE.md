@@ -614,3 +614,18 @@ Setup: frozen survival PPO teacher (`reports/n4_survival_ppo_sweep_20260612_seed
 
 Dataset source counts were `counterfactual_no_better: 189` and `preserve_success: 135`; there were no `counterfactual_recovery` rows under this probe. Interpretation: the counterfactual label plumbing works and remains claim-disciplined, but this specific short-horizon local force search did not discover better-than-base recovery actions. It is neutral evidence, not a solve. The next performance move should therefore be either a stronger local option search or another PPO continuation slice, not more identical subchain distillation.
 
+## Targeted PPO Continuation Slice - 2026-06-13
+
+Ran a 4-candidate continuation sweep from the current best 5-bin survival PPO terminal (`reports/n4_survival_ppo_sweep_20260612_seed2700k/candidate_01/checkpoint_010000.zip`). The slice kept the current setup fixed (`N=4`, `serial_lagrange`, `dt=0.0005`, 5 discrete action bins, force noise `0.02`, hard-select ReCoN policy terminal) and tested tiny PPO continuation updates around the incumbent: LR `2.5e-7`, clip `0.002/0.004`, one epoch, late-survival bonus `0.005/0.01`, 20k max continuation steps per candidate. Validation used the mixed held-out starts `900000`, `930000`, `970000`, `1010000`, `1040000`, `1070000`, `1140000`, and `1300000`; final eval used starts `1500000` and `1600000` with 60 episodes each.
+
+Run: `reports/n4_ppo_targeted_continue_20260613_seed8800k`
+
+| candidate | LR | clip | late bonus | best validation success | final mean | final p10 | final cvar | final success |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 2.5e-7 | 0.002 | 0.005 | 0.6833 | 483.3 | 441.9 | 411.8 | 0.6917 |
+| 1 | 2.5e-7 | 0.002 | 0.010 | 0.6833 | 483.5 | 441.9 | 411.8 | 0.6917 |
+| 2 | 2.5e-7 | 0.004 | 0.005 | 0.6833 | 483.4 | 441.9 | 411.8 | 0.6917 |
+| 3 | 2.5e-7 | 0.004 | 0.010 | 0.6833 | 483.4 | 441.9 | 411.8 | 0.6917 |
+
+Interpretation: this sweep did not solve N=4 and did not beat the incumbent final success. All four candidates could trade validation up from `0.6750` to `0.6833`, but final held-out success remained `0.6917` with unchanged p10/cvar. This is useful negative evidence: the current 5-bin feedforward PPO terminal is not failing because the last continuation LR/clip/late-bonus setting is slightly off. The next attempt should change structure or information, for example a stronger learned local/subchain option search, a residual trained from longer counterfactual options, or a recurrent/cached-teacher curriculum that adds useful state memory without perturbing solved seeds.
+
