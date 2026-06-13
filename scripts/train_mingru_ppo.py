@@ -53,6 +53,14 @@ def normalize(values: np.ndarray, enabled: bool = True) -> np.ndarray:
     return ((values - float(np.mean(values))) / (float(np.std(values)) + 1e-6)).astype(np.float32)
 
 
+def heldout_score(summary: dict[str, Any]) -> float:
+    return (
+        1000.0 * float(summary.get("success_rate", 0.0))
+        + float(summary.get("p10_survival", 0.0))
+        + 0.10 * float(summary.get("mean_survival", 0.0))
+    )
+
+
 def collect_rollouts(args: argparse.Namespace, terminal: Any, device: Any, seeds: list[int]) -> RolloutBatch:
     import torch
 
@@ -281,13 +289,32 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     seeds_eval = eval_seeds(args)
     pure = evaluate_pure_mingru(str(checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
     recon = evaluate_recon_mingru(str(checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
+    if bool(args.compare_start_checkpoint):
+        start_pure = evaluate_pure_mingru(str(args.checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
+        start_recon = evaluate_recon_mingru(str(args.checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
+    else:
+        start_pure = {}
+        start_recon = {}
+    candidate_score = heldout_score(recon)
+    incumbent_score = heldout_score(start_recon) if start_recon else float("-inf")
+    promoted = bool(candidate_score > incumbent_score + float(args.min_promotion_delta))
     report = {
         "status": "completed",
         "checkpoint_path": str(checkpoint_path),
         "start_checkpoint_path": str(args.checkpoint_path),
+        "best_checkpoint_path": str(checkpoint_path if promoted or not start_recon else args.checkpoint_path),
+        "promoted": promoted,
+        "promotion": {
+            "metric": "1000*success_rate + p10_survival + 0.1*mean_survival",
+            "candidate_score": candidate_score,
+            "incumbent_score": incumbent_score,
+            "min_promotion_delta": float(args.min_promotion_delta),
+        },
         "train_seed_count": len(all_seeds),
         "seed_list": str(getattr(args, "seed_list", "") or ""),
         "history": history,
+        "start_pure_mingru_policy": start_pure,
+        "start_recon_mingru_terminal": start_recon,
         "pure_mingru_policy": pure,
         "recon_mingru_terminal": recon,
         "eval_seeds": seeds_eval,
@@ -361,6 +388,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--progress", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--final-seed-starts", type=int, nargs="+", default=[1_900_000, 2_000_000, 2_100_000, 2_200_000])
     parser.add_argument("--final-eval-episodes", type=int, default=20)
+    parser.add_argument("--compare-start-checkpoint", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--min-promotion-delta", type=float, default=0.0)
     return parser
 
 
@@ -371,6 +400,8 @@ def main() -> None:
             {
                 "out": report["config"]["out"],
                 "checkpoint_path": report["checkpoint_path"],
+                "best_checkpoint_path": report.get("best_checkpoint_path", report["checkpoint_path"]),
+                "promoted": report.get("promoted", False),
                 "success": report["recon_mingru_terminal"].get("success_rate", 0.0),
             },
             indent=2,

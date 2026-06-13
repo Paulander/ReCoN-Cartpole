@@ -1328,3 +1328,22 @@ Held-out eval used starts `1900000`, `2000000`, `2100000`, and `2200000`, 20 epi
 
 Interpretation: this broader curriculum/behavior-policy DAgger pass regressed success. It collected a large, well-formed curriculum dataset (`105012` samples), but teacher-imitation over the mixed curriculum appears to pull the checkpoint away from the narrow option-aux improvements. This is useful negative evidence for the current supervised recurrent recipe. The next recurrent improvement likely needs either better candidate selection/model selection before accepting a curriculum checkpoint, a loss that explicitly protects the held-out-tail action distribution, or an on-policy objective with a much stronger preservation/early-stop gate rather than full-dataset imitation.
 
+## Protected minGRU PPO From Fresh Option-Aux - 2026-06-13
+
+Added incumbent comparison/promotion reporting to `scripts/train_mingru_ppo.py`. The runner now evaluates the starting checkpoint and the PPO-updated candidate on the same held-out seeds, reports a promotion score (`1000*success_rate + p10_survival + 0.1*mean_survival`), and records `best_checkpoint_path` so regressions are explicit rather than silently accepted.
+
+Protected PPO run: `reports/n4_mingru_ppo_protected_freshaux_20260613_seed9170k`
+
+Setup: started from `reports/n4_mingru_dagger9_fresh_option_aux_20260613_seed9131k/supervised_mingru/mingru_terminal.pt`, trained 3 PPO iterations of 16 episodes on hard-tail seeds from `reports/n4_mingru_fresh_option_aux_hardseed_mine_20260613_seed9140k/hard_seeds.txt`, with tiny LR `5e-7`, clip `0.02`, target KL `0.005`, and strong reference KL `0.2`. Held-out eval used starts `1900000`, `2000000`, `2100000`, and `2200000`, 20 episodes each.
+
+| evaluator | mean | p10 | success |
+|---|---:|---:|---:|
+| start pure minGRU | 486.7 | 451.9 | 0.6875 |
+| candidate pure minGRU | 486.8 | 451.9 | 0.6875 |
+| start ReCoN minGRU | 487.1 | 443.8 | 0.6875 |
+| candidate ReCoN minGRU | 487.1 | 443.8 | 0.6875 |
+
+Promotion result: candidate score `1180.0125`, incumbent score `1180.01375`, `promoted=false`; best checkpoint remains the starting fresh option-aux checkpoint.
+
+Interpretation: protected PPO was stable and did not cause the larger regressions seen in earlier recurrent PPO/on-policy attempts, but it also did not move the binary success count. The promotion guard is now useful infrastructure for further recurrent experiments: future runs can try stronger updates without accidentally replacing a near-equal or worse incumbent.
+
