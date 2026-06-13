@@ -1152,3 +1152,28 @@ Confidence and no-op-margin sweeps showed the current gate is not yet useful as 
 
 Interpretation: sustained hard-seed counterfactual probes can now produce actionable labels for pole_1/pole_2 tail failures, which is real learning-signal progress. However, the first classifier is poorly calibrated and does not improve held-out N=4. Do not scale this exact gate as a solve attempt. The next useful variant would train an explicit apply/harm head from counterfactual benefit versus no-op negatives, or reuse the positive hard-seed option traces as auxiliary data for a primary recurrent policy rather than deploying a broad per-tick override gate.
 
+## minGRU Action-Gate Apply-Head Follow-Up - 2026-06-13
+
+Upgraded `scripts/train_mingru_action_gate.py` to separate action recommendation from intervention permission. New checkpoints can include an `apply_state_dict` alongside the action classifier; old single-head checkpoints remain loadable. Rows now record `apply_label`, and CLI knobs such as `--apply-min-score-gap`, `--apply-min-survival-gain`, `--gate-apply-threshold`, and `--train-apply-gate` control stricter intervention learning.
+
+Focused verification:
+
+- `uv run ruff check scripts/train_mingru_action_gate.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs tests/test_policy_terminal_training.py::test_mingru_action_gate_collect_seed_values_reads_txt_and_json tests/test_policy_terminal_training.py::test_mingru_action_gate_apply_label_can_be_stricter_than_action_label tests/test_policy_terminal_training.py::test_mingru_action_gate_train_gate_can_emit_apply_head -q -s` -> 4 passed.
+
+Strict apply-head smoke: `reports/smoke_mingru_action_gate_applyhead_20260613`
+
+| rows | action positives | apply positives | base success | gated success | overrides |
+|---:|---:|---:|---:|---:|---:|
+| 50 | 9 | 1 | 0.650 | 0.650 | 0 |
+
+Relaxed apply-head smoke: `reports/smoke_mingru_action_gate_applyhead_relaxed_20260613`
+
+| rows | action positives | apply positives | base success | gated success | overrides |
+|---:|---:|---:|---:|---:|---:|
+| 50 | 9 | 1 | 0.650 | 0.650 | 0 |
+
+Apply-threshold sweep on the relaxed checkpoint showed no held-out lift. The best rows matched the base at `0.650` success; lower apply thresholds introduced hundreds to thousands of overrides and degraded success to `0.55` or `0.60` in the smoke block.
+
+Interpretation: the two-head gate is safer and better instrumented, but the current 10-hard-seed dataset has only one strong apply-positive row. This makes the apply model either abstain or over-apply depending on threshold. Do not scale this action-gate formulation as the next solve attempt. If revisiting it, first broaden the counterfactual label pool and train apply labels on explicit harm/benefit calibration or record action probabilities once per rollout so threshold sweeps can be done offline. The current stronger direction remains using counterfactual option traces as auxiliary recurrent-policy data or changing the recurrent/subchain architecture, not deploying a per-tick override gate.
+

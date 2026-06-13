@@ -1089,6 +1089,79 @@ def test_mingru_action_gate_collect_seed_values_reads_txt_and_json(tmp_path):
     assert mingru_gate.collect_seed_values(args) == [20, 21]
 
 
+def test_mingru_action_gate_apply_label_can_be_stricter_than_action_label(monkeypatch):
+    mingru_gate = _load_script("train_mingru_action_gate")
+
+    def fake_score(_args, _seed, _target_step, first_action):
+        options = {
+            0: {"survived": 8, "margin": -0.2, "score": 7.8},
+            1: {"survived": 9, "margin": -0.1, "score": 8.9},
+            2: {"survived": 10, "margin": 0.0, "score": 10.0},
+            3: {"survived": 11, "margin": 0.1, "score": 11.2},
+            4: {"survived": 8, "margin": -0.3, "score": 7.7},
+        }
+        item = dict(options[int(first_action)])
+        item["action"] = int(first_action)
+        return item
+
+    monkeypatch.setattr(mingru_gate, "counterfactual_score", fake_score)
+    monkeypatch.setattr(mingru_gate, "gate_features", lambda *_args, **_kwargs: mingru_gate.np.zeros(3, dtype=mingru_gate.np.float32))
+    args = SimpleNamespace(
+        discrete_action_bins=5,
+        score_tolerance=1e-6,
+        min_score_gap=0.1,
+        apply_min_score_gap=0.1,
+        apply_min_survival_gain=2,
+        apply_min_margin_gain=0.0,
+    )
+    state = {"seed": 1, "step": 100, "action": 2, "force": 0.0, "raw_before": [0.0], "diagnostics": {}}
+
+    gated = mingru_gate.label_state(args, state)
+    args.apply_min_survival_gain = 1
+    allowed = mingru_gate.label_state(args, state)
+
+    assert gated["label"] == 4
+    assert gated["target_survival_gain"] == 1
+    assert gated["apply_label"] == 0
+    assert allowed["apply_label"] == 1
+
+
+def test_mingru_action_gate_train_gate_can_emit_apply_head(tmp_path):
+    import torch
+
+    mingru_gate = _load_script("train_mingru_action_gate")
+    rows = [
+        {"feature": [0.0, 0.0], "label": 0, "apply_label": 0},
+        {"feature": [1.0, 0.0], "label": 0, "apply_label": 0},
+        {"feature": [0.0, 1.0], "label": 3, "apply_label": 1},
+    ]
+    args = SimpleNamespace(
+        discrete_action_bins=5,
+        hidden_size_gate=4,
+        max_class_weight=8.0,
+        no_override_weight=1.0,
+        learning_rate=1e-3,
+        train_seed=7,
+        epochs=1,
+        batch_size=2,
+        train_apply_gate=True,
+        apply_epochs=1,
+        apply_positive_weight=1.0,
+        max_apply_positive_weight=4.0,
+        gate_apply_threshold=0.5,
+    )
+
+    model, meta = mingru_gate.train_gate(rows, args)
+    path = tmp_path / "gate.pt"
+    mingru_gate.save_gate(model, meta, path)
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+
+    assert meta["apply_gate_enabled"] is True
+    assert meta["apply_label_counts"] == {"0": 2, "1": 1}
+    assert meta["format"] == "mingru_action_gate_v2"
+    assert "apply_state_dict" in payload
+
+
 def test_counterfactual_gate_noop_eval_resets_override_counts():
     counterfactual_gate = _load_script("train_counterfactual_action_gate")
     base = {"mean_survival": 500.0, "override_count": 9, "checked_steps": 100, "override_rate": 0.09}

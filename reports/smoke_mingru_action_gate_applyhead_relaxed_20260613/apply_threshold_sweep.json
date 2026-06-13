@@ -1,0 +1,122 @@
+[
+  {
+    "confidence": 0.55,
+    "margin": 0.3,
+    "apply_threshold": 0.2,
+    "mean": 461.65,
+    "p10": 395.5,
+    "success": 0.55,
+    "overrides": 1724,
+    "override_rate": 0.18672154229394564
+  },
+  {
+    "confidence": 0.55,
+    "margin": 0.3,
+    "apply_threshold": 0.4,
+    "mean": 468.75,
+    "p10": 395.5,
+    "success": 0.6,
+    "overrides": 908,
+    "override_rate": 0.09685333333333333
+  },
+  {
+    "confidence": 0.55,
+    "margin": 0.3,
+    "apply_threshold": 0.6,
+    "mean": 484.45,
+    "p10": 432.2,
+    "success": 0.65,
+    "overrides": 0,
+    "override_rate": 0.0
+  },
+  {
+    "confidence": 0.55,
+    "margin": 0.3,
+    "apply_threshold": 0.8,
+    "mean": 484.45,
+    "p10": 432.2,
+    "success": 0.65,
+    "overrides": 0,
+    "override_rate": 0.0
+  },
+  {
+    "confidence": 0.6,
+    "margin": 0.5,
+    "apply_threshold": 0.2,
+    "mean": 483.9,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 470,
+    "override_rate": 0.04856375284149618
+  },
+  {
+    "confidence": 0.6,
+    "margin": 0.5,
+    "apply_threshold": 0.4,
+    "mean": 483.75,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 294,
+    "override_rate": 0.030387596899224805
+  },
+  {
+    "confidence": 0.6,
+    "margin": 0.5,
+    "apply_threshold": 0.6,
+    "mean": 484.45,
+    "p10": 432.2,
+    "success": 0.65,
+    "overrides": 0,
+    "override_rate": 0.0
+  },
+  {
+    "confidence": 0.6,
+    "margin": 0.5,
+    "apply_threshold": 0.8,
+    "mean": 484.45,
+    "p10": 432.2,
+    "success": 0.65,
+    "overrides": 0,
+    "override_rate": 0.0
+  },
+  {
+    "confidence": 0.75,
+    "margin": 0.3,
+    "apply_threshold": 0.2,
+    "mean": 484.15,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 358,
+    "override_rate": 0.03697201280594857
+  },
+  {
+    "confidence": 0.75,
+    "margin": 0.3,
+    "apply_threshold": 0.4,
+    "mean": 484.05,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 262,
+    "override_rate": 0.027063319904968495
+  },
+  {
+    "confidence": 0.75,
+    "margin": 0.3,
+    "apply_threshold": 0.6,
+    "mean": 484.45,
+    "p10": 432.2,
+    "success": 0.65,
+    "overrides": 0,
+    "override_rate": 0.0
+  },
+  {
+    "confidence": 0.75,
+    "margin": 0.3,
+    "apply_threshold": 0.8,
+    "mean": 484.45,
+    "p10": 432.2,
+    "success": 0.65,
+    "overrides": 0,
+    "override_rate": 0.0
+  }
+]

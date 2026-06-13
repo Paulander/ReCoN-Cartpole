@@ -222,28 +222,54 @@ def counterfactual_score(args: argparse.Namespace, seed: int, target_step: int, 
     }
 
 
+def _gate_threshold(args: argparse.Namespace, name: str, default: float | int) -> float | int:
+    value = getattr(args, name, None)
+    return default if value is None else value
+
+
 def label_state(args: argparse.Namespace, state: dict[str, Any]) -> dict[str, Any]:
     chosen = int(state["action"])
     options = [counterfactual_score(args, int(state["seed"]), int(state["step"]), action) for action in range(int(args.discrete_action_bins))]
     scores = [float(item["score"]) for item in options]
     survivals = [int(item["survived"]) for item in options]
+    margins = [float(item["margin"]) for item in options]
     best_score = max(scores)
     chosen_score = scores[chosen]
+    chosen_survival = survivals[chosen]
+    chosen_margin = margins[chosen]
     best_actions = [idx for idx, value in enumerate(scores) if abs(value - best_score) <= float(args.score_tolerance)]
     label = 0
     if (best_score - chosen_score) >= float(args.min_score_gap) and chosen not in best_actions:
         label = int(best_actions[0]) + 1
+    target_action = chosen if label == 0 else label - 1
+    target_score_gap = scores[target_action] - chosen_score
+    target_survival_gain = survivals[target_action] - chosen_survival
+    target_margin_gain = margins[target_action] - chosen_margin
+    apply_label = int(
+        label > 0
+        and target_score_gap >= float(_gate_threshold(args, "apply_min_score_gap", float(args.min_score_gap)))
+        and target_survival_gain >= int(_gate_threshold(args, "apply_min_survival_gain", 0))
+        and target_margin_gain >= float(_gate_threshold(args, "apply_min_margin_gain", 0.0))
+    )
     return {
         "feature": gate_features(state["raw_before"], chosen, float(state["force"]), state.get("diagnostics", {}), int(state["step"]), args).tolist(),
         "label": int(label),
+        "apply_label": int(apply_label),
         "seed": int(state["seed"]),
         "step": int(state["step"]),
         "chosen_action": chosen,
+        "target_action": int(target_action),
         "best_actions": best_actions,
         "scores": scores,
         "survivals": survivals,
+        "margins": margins,
         "chosen_score": float(chosen_score),
         "best_score": float(best_score),
+        "target_score_gap": float(target_score_gap),
+        "target_survival_gain": int(target_survival_gain),
+        "target_margin_gain": float(target_margin_gain),
+        "best_survival_gain": int(survivals[int(best_actions[0])] - chosen_survival) if best_actions else 0,
+        "best_margin_gain": float(margins[int(best_actions[0])] - chosen_margin) if best_actions else 0.0,
     }
 
 
@@ -280,6 +306,7 @@ def collect_dataset(args: argparse.Namespace) -> dict[str, Any]:
                         {
                             "feature": gate_features(state["raw_before"], int(state["action"]), float(state["force"]), state.get("diagnostics", {}), int(state["step"]), args).tolist(),
                             "label": 0,
+                            "apply_label": 0,
                             "seed": int(state["seed"]),
                             "step": int(state["step"]),
                             "chosen_action": int(state["action"]),
@@ -303,6 +330,7 @@ def collect_dataset(args: argparse.Namespace) -> dict[str, Any]:
             "episodes": episodes,
             "row_count": len(rows),
             "positive_count": sum(1 for row in rows if int(row.get("label", 0)) > 0),
+            "apply_positive_count": sum(1 for row in rows if int(row.get("apply_label", 0)) > 0),
         }
         (out / "partial_dataset.json").write_text(json.dumps(partial, indent=2), encoding="utf-8")
     return {"episodes": episodes, "rows": rows}
@@ -316,6 +344,7 @@ def train_gate(rows: list[dict[str, Any]], args: argparse.Namespace) -> tuple[An
         raise ValueError("no gate training rows collected")
     x = torch.tensor([row["feature"] for row in rows], dtype=torch.float32)
     y = torch.tensor([int(row["label"]) for row in rows], dtype=torch.long)
+    apply_y = torch.tensor([int(row.get("apply_label", int(int(row["label"]) > 0))) for row in rows], dtype=torch.float32).reshape(-1, 1)
     classes = int(args.discrete_action_bins) + 1
     model = nn.Sequential(
         nn.Linear(x.shape[1], int(args.hidden_size_gate)),
@@ -329,34 +358,83 @@ def train_gate(rows: list[dict[str, Any]], args: argparse.Namespace) -> tuple[An
         weights[0] = min(float(weights[0]), float(args.no_override_weight))
     opt = torch.optim.Adam(model.parameters(), lr=float(args.learning_rate))
     loss_fn = nn.CrossEntropyLoss(weight=weights)
+    rng = torch.Generator().manual_seed(int(args.train_seed))
     for _ in range(int(args.epochs)):
-        order = torch.randperm(x.shape[0])
+        order = torch.randperm(x.shape[0], generator=rng)
         for start in range(0, x.shape[0], int(args.batch_size)):
             batch = order[start : start + int(args.batch_size)]
             loss = loss_fn(model(x[batch]), y[batch])
             opt.zero_grad()
             loss.backward()
             opt.step()
+
+    apply_model = None
+    apply_accuracy = 0.0
+    apply_positive_rate = float(apply_y.mean().item()) if apply_y.numel() else 0.0
+    if bool(getattr(args, "train_apply_gate", True)):
+        apply_model = nn.Sequential(
+            nn.Linear(x.shape[1], int(args.hidden_size_gate)),
+            nn.ReLU(),
+            nn.Linear(int(args.hidden_size_gate), 1),
+        )
+        positives = torch.clamp(apply_y.sum(), min=0.0)
+        negatives = torch.clamp(torch.tensor(float(apply_y.numel())) - positives, min=0.0)
+        pos_weight_value = float(getattr(args, "apply_positive_weight", 0.0))
+        if pos_weight_value <= 0.0:
+            pos_weight_value = float((negatives / torch.clamp(positives, min=1.0)).item())
+        pos_weight = torch.tensor(
+            [max(1.0, min(float(getattr(args, "max_apply_positive_weight", 12.0)), pos_weight_value))],
+            dtype=torch.float32,
+        )
+        apply_loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        apply_opt = torch.optim.Adam(apply_model.parameters(), lr=float(args.learning_rate))
+        apply_rng = torch.Generator().manual_seed(int(args.train_seed) + 17)
+        for _ in range(int(getattr(args, "apply_epochs", args.epochs))):
+            order = torch.randperm(x.shape[0], generator=apply_rng)
+            for start in range(0, x.shape[0], int(args.batch_size)):
+                batch = order[start : start + int(args.batch_size)]
+                loss = apply_loss_fn(apply_model(x[batch]), apply_y[batch])
+                apply_opt.zero_grad()
+                loss.backward()
+                apply_opt.step()
+        with torch.no_grad():
+            apply_pred = (torch.sigmoid(apply_model(x)) >= float(args.gate_apply_threshold)).float()
+            apply_accuracy = float((apply_pred == apply_y).float().mean().item())
+
     with torch.no_grad():
         logits = model(x)
         pred = logits.argmax(dim=1)
         positive = y > 0
         recall = float((pred[positive] == y[positive]).float().mean().item()) if bool(positive.any()) else 0.0
         acc = float((pred == y).float().mean().item())
-    return model, {
+    meta = {
+        "format": "mingru_action_gate_v2" if apply_model is not None else "mingru_action_gate_v1",
         "input_size": int(x.shape[1]),
         "hidden_size": int(args.hidden_size_gate),
         "classes": classes,
         "label_counts": {str(idx): int(counts[idx].item()) for idx in range(classes)},
+        "apply_label_counts": {"0": int((apply_y == 0).sum().item()), "1": int((apply_y == 1).sum().item())},
+        "apply_gate_enabled": apply_model is not None,
+        "apply_positive_rate": apply_positive_rate,
+        "apply_accuracy": apply_accuracy,
+        "apply_threshold": float(args.gate_apply_threshold),
         "train_accuracy": acc,
         "positive_recall": recall,
     }
+    return (model, apply_model) if apply_model is not None else model, meta
 
 
 def save_gate(model: Any, meta: dict[str, Any], path: Path) -> None:
     import torch
 
-    torch.save({"state_dict": model.state_dict(), "meta": meta}, path)
+    if isinstance(model, tuple):
+        action_model, apply_model = model
+        payload = {"state_dict": action_model.state_dict(), "meta": meta}
+        if apply_model is not None:
+            payload["apply_state_dict"] = apply_model.state_dict()
+    else:
+        payload = {"state_dict": model.state_dict(), "meta": meta}
+    torch.save(payload, path)
 
 
 def load_gate(path: Path) -> tuple[Any, dict[str, Any]]:
@@ -372,15 +450,28 @@ def load_gate(path: Path) -> tuple[Any, dict[str, Any]]:
     )
     model.load_state_dict(payload["state_dict"])
     model.eval()
-    return model, meta
-
+    apply_model = None
+    if "apply_state_dict" in payload:
+        apply_model = nn.Sequential(
+            nn.Linear(int(meta["input_size"]), int(meta["hidden_size"])),
+            nn.ReLU(),
+            nn.Linear(int(meta["hidden_size"]), 1),
+        )
+        apply_model.load_state_dict(payload["apply_state_dict"])
+        apply_model.eval()
+    return (model, apply_model) if apply_model is not None else model, meta
 
 def evaluate(args: argparse.Namespace, seeds: list[int], gate_path: Path | None = None) -> dict[str, Any]:
     import torch
 
     model = None
+    apply_model = None
     if gate_path is not None:
-        model, _meta = load_gate(gate_path)
+        loaded, _meta = load_gate(gate_path)
+        if isinstance(loaded, tuple):
+            model, apply_model = loaded
+        else:
+            model = loaded
     steps: list[float] = []
     returns: list[float] = []
     overrides = 0
@@ -402,14 +493,19 @@ def evaluate(args: argparse.Namespace, seeds: list[int], gate_path: Path | None 
             if model is not None:
                 force = float(diagnostics.get("force", action_force(base_action, args)))
                 feat = gate_features(raw_before, base_action, force, diagnostics, step, args)
+                feat_tensor = torch.tensor(feat, dtype=torch.float32).unsqueeze(0)
                 with torch.no_grad():
-                    probs = torch.softmax(model(torch.tensor(feat, dtype=torch.float32).unsqueeze(0)), dim=1).numpy()[0]
+                    probs = torch.softmax(model(feat_tensor), dim=1).numpy()[0]
+                    apply_probability = None
+                    if apply_model is not None:
+                        apply_probability = float(torch.sigmoid(apply_model(feat_tensor)).cpu().numpy().reshape(-1)[0])
                 cls = int(np.argmax(probs))
                 confidence = float(probs[cls])
                 checked += 1
                 noop_confidence = float(probs[0])
                 margin = confidence - noop_confidence
-                if cls > 0 and confidence >= float(args.gate_confidence) and margin >= float(args.gate_margin):
+                apply_allowed = apply_probability is None or apply_probability >= float(args.gate_apply_threshold)
+                if cls > 0 and confidence >= float(args.gate_confidence) and margin >= float(args.gate_margin) and apply_allowed:
                     candidate = cls - 1
                     if candidate != base_action:
                         final_action = candidate
@@ -467,10 +563,17 @@ def dataset_summary(rows: list[dict[str, Any]], classes: int) -> dict[str, Any]:
         label = int(row.get("label", 0))
         counts[str(label)] = counts.get(str(label), 0) + 1
     positives = sum(value for key, value in counts.items() if key != "0")
+    apply_positives = sum(1 for row in rows if int(row.get("apply_label", 0)) > 0)
     max_gap = 0.0
     for row in rows:
         max_gap = max(max_gap, float(row.get("best_score", 0.0)) - float(row.get("chosen_score", 0.0)))
-    return {"row_count": len(rows), "positive_count": int(positives), "label_counts": counts, "max_score_gap": float(max_gap)}
+    return {
+        "row_count": len(rows),
+        "positive_count": int(positives),
+        "apply_positive_count": int(apply_positives),
+        "label_counts": counts,
+        "max_score_gap": float(max_gap),
+    }
 
 
 def write_markdown(result: dict[str, Any], path: Path) -> None:
@@ -482,11 +585,12 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Status: `{result['status']}`",
         f"Checkpoint: `{result['checkpoint_path']}`",
         f"Gate path: `{result['gate_path']}`",
-        f"Training rows: `{result['dataset']['row_count']}`, positives: `{result['dataset']['positive_count']}`",
+        f"Training rows: `{result['dataset']['row_count']}`, positives: `{result['dataset']['positive_count']}`, apply positives: `{result['dataset'].get('apply_positive_count', 0)}`",
         f"Label counts: `{result['dataset']['label_counts']}`",
         f"Failure classes: `{result['failure_classes']}`",
         f"Gate confidence: `{result['gate_confidence']}`",
         f"Gate margin: `{result['gate_margin']}`",
+        f"Gate apply threshold: `{result['gate_apply_threshold']}`",
         f"Forced action hold steps: `{result['forced_action_hold_steps']}`",
         "",
         "| evaluator | mean | p10 | cvar | success | overrides | override rate | episodes |",
@@ -528,6 +632,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "gate_path": str(gate_path) if gate_path else "",
         "gate_confidence": float(args.gate_confidence),
         "gate_margin": float(args.gate_margin),
+        "gate_apply_threshold": float(args.gate_apply_threshold),
         "forced_action_hold_steps": int(args.forced_action_hold_steps),
         "failure_classes": list(args.failure_classes),
         "dataset": {**summary, "episodes": data["episodes"], "meta": meta},
@@ -588,6 +693,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--probe-horizon", type=int, default=80)
     parser.add_argument("--forced-action-hold-steps", type=int, default=1)
     parser.add_argument("--min-score-gap", type=float, default=0.10)
+    parser.add_argument("--apply-min-score-gap", type=float, default=None)
+    parser.add_argument("--apply-min-survival-gain", type=int, default=0)
+    parser.add_argument("--apply-min-margin-gain", type=float, default=0.0)
     parser.add_argument("--margin-weight", type=float, default=1.0)
     parser.add_argument("--score-tolerance", type=float, default=1e-6)
     parser.add_argument("--counterfactual-no-noise", action="store_true")
@@ -595,10 +703,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--epochs", type=int, default=120)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
+    parser.add_argument("--train-seed", type=int, default=7)
     parser.add_argument("--max-class-weight", type=float, default=8.0)
     parser.add_argument("--no-override-weight", type=float, default=1.0)
+    parser.add_argument("--train-apply-gate", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--apply-epochs", type=int, default=120)
+    parser.add_argument("--apply-positive-weight", type=float, default=0.0)
+    parser.add_argument("--max-apply-positive-weight", type=float, default=12.0)
     parser.add_argument("--gate-confidence", type=float, default=0.75)
     parser.add_argument("--gate-margin", type=float, default=0.0)
+    parser.add_argument("--gate-apply-threshold", type=float, default=0.5)
     parser.add_argument("--eval-seed-start", type=int, default=1900000)
     parser.add_argument("--eval-seed-starts", type=int, nargs="*", default=[])
     parser.add_argument("--eval-episodes", type=int, default=20)
@@ -617,6 +731,7 @@ def main() -> None:
                 "gate_success": result["gate_eval"]["success_rate"],
                 "overrides": result["gate_eval"]["override_count"],
                 "positives": result["dataset"]["positive_count"],
+                "apply_positives": result["dataset"].get("apply_positive_count", 0),
             },
             indent=2,
         )

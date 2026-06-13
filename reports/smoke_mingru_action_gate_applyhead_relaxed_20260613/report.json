@@ -1,0 +1,463 @@
+{
+  "status": "completed",
+  "out": "reports/smoke_mingru_action_gate_applyhead_relaxed_20260613",
+  "checkpoint_path": "reports/n4_mingru_curriculum_subchain_motif_dagger9_hardtail_20260613_seed9099k/supervised_mingru/mingru_terminal.pt",
+  "gate_path": "reports/smoke_mingru_action_gate_applyhead_relaxed_20260613/mingru_action_gate.pt",
+  "gate_confidence": 0.6,
+  "gate_margin": 0.5,
+  "gate_apply_threshold": 0.7,
+  "forced_action_hold_steps": 20,
+  "failure_classes": [
+    "pole_1_angle",
+    "pole_2_angle"
+  ],
+  "dataset": {
+    "row_count": 50,
+    "positive_count": 9,
+    "apply_positive_count": 1,
+    "label_counts": {
+      "0": 41,
+      "1": 2,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 7
+    },
+    "max_score_gap": 1.000385114421107,
+    "episodes": [
+      {
+        "seed": 9098000,
+        "steps": 448,
+        "return": 447.0,
+        "success": false,
+        "failure": "pole_2_angle"
+      },
+      {
+        "seed": 9098005,
+        "steps": 430,
+        "return": 429.0,
+        "success": false,
+        "failure": "pole_1_angle"
+      },
+      {
+        "seed": 9098009,
+        "steps": 458,
+        "return": 457.0,
+        "success": false,
+        "failure": "pole_2_angle"
+      },
+      {
+        "seed": 9098012,
+        "steps": 470,
+        "return": 469.0,
+        "success": false,
+        "failure": "pole_1_angle"
+      },
+      {
+        "seed": 9098016,
+        "steps": 493,
+        "return": 492.0,
+        "success": false,
+        "failure": "pole_2_angle"
+      },
+      {
+        "seed": 9098019,
+        "steps": 480,
+        "return": 479.0,
+        "success": false,
+        "failure": "pole_2_angle"
+      },
+      {
+        "seed": 9098021,
+        "steps": 385,
+        "return": 384.0,
+        "success": false,
+        "failure": "pole_1_angle"
+      },
+      {
+        "seed": 9098024,
+        "steps": 437,
+        "return": 436.0,
+        "success": false,
+        "failure": "pole_1_angle"
+      },
+      {
+        "seed": 9098026,
+        "steps": 445,
+        "return": 444.0,
+        "success": false,
+        "failure": "pole_1_angle"
+      },
+      {
+        "seed": 9098027,
+        "steps": 410,
+        "return": 409.0,
+        "success": false,
+        "failure": "pole_1_angle"
+      }
+    ],
+    "meta": {
+      "format": "mingru_action_gate_v2",
+      "input_size": 63,
+      "hidden_size": 64,
+      "classes": 6,
+      "label_counts": {
+        "0": 41,
+        "1": 2,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 7
+      },
+      "apply_label_counts": {
+        "0": 49,
+        "1": 1
+      },
+      "apply_gate_enabled": true,
+      "apply_positive_rate": 0.019999999552965164,
+      "apply_accuracy": 0.9800000190734863,
+      "apply_threshold": 0.7,
+      "train_accuracy": 0.7200000286102295,
+      "positive_recall": 0.8888888955116272
+    }
+  },
+  "base_eval": {
+    "mean_survival": 484.45,
+    "p10_survival": 432.2,
+    "success_rate": 0.65,
+    "max_survival": 500.0,
+    "cvar_survival": 414.5,
+    "episodes": 20,
+    "returns_mean": 484.1,
+    "override_count": 0,
+    "checked_steps": 0,
+    "override_rate": 0.0,
+    "per_seed": [
+      {
+        "seed": 1900000,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 1900001,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 1900002,
+        "steps": 425,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 1900003,
+        "steps": 484,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 1900004,
+        "steps": 433,
+        "success": false,
+        "failure": "pole_1_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2000000,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2000001,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2000002,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2000003,
+        "steps": 473,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2000004,
+        "steps": 404,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2100000,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2100001,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2100002,
+        "steps": 478,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2100003,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2100004,
+        "steps": 492,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2200000,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2200001,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2200002,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2200003,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2200004,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      }
+    ]
+  },
+  "gate_eval": {
+    "mean_survival": 484.45,
+    "p10_survival": 432.2,
+    "success_rate": 0.65,
+    "max_survival": 500.0,
+    "cvar_survival": 414.5,
+    "episodes": 20,
+    "returns_mean": 484.1,
+    "override_count": 0,
+    "checked_steps": 9689,
+    "override_rate": 0.0,
+    "per_seed": [
+      {
+        "seed": 1900000,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 1900001,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 1900002,
+        "steps": 425,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 1900003,
+        "steps": 484,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 1900004,
+        "steps": 433,
+        "success": false,
+        "failure": "pole_1_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2000000,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2000001,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2000002,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2000003,
+        "steps": 473,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2000004,
+        "steps": 404,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2100000,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2100001,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2100002,
+        "steps": 478,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2100003,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2100004,
+        "steps": 492,
+        "success": false,
+        "failure": "pole_2_angle",
+        "overrides": 0
+      },
+      {
+        "seed": 2200000,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2200001,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2200002,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2200003,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      },
+      {
+        "seed": 2200004,
+        "steps": 500,
+        "success": true,
+        "failure": "success",
+        "overrides": 0
+      }
+    ]
+  },
+  "eval_seeds": [
+    1900000,
+    1900001,
+    1900002,
+    1900003,
+    1900004,
+    2000000,
+    2000001,
+    2000002,
+    2000003,
+    2000004,
+    2100000,
+    2100001,
+    2100002,
+    2100003,
+    2100004,
+    2200000,
+    2200001,
+    2200002,
+    2200003,
+    2200004
+  ],
+  "wall_clock_seconds": 377.5430751439999,
+  "mechanisms": {
+    "minGRU_terminal": true,
+    "counterfactual_action_gate": true,
+    "edge_plasticity": false,
+    "bandit_persistence": false,
+    "slow_consolidation": false,
+    "gain_mutation": false
+  }
+}
