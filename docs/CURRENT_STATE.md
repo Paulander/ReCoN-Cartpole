@@ -1192,3 +1192,23 @@ The existing relaxed apply-head checkpoint was replayed once on the same 20 held
 
 Interpretation: this confirms the current apply-head gate has a narrow abstain-or-overapply profile. Future action-gate work should first broaden or improve the label pool, then use offline threshold sweeps to choose a tiny number of live closed-loop candidates. Do not spend repeated live rollouts on dense threshold grids.
 
+## DAgger9 Option-Trace Auxiliary Follow-Up - 2026-06-13
+
+Two small recurrent follow-ups tested whether the existing long-option counterfactual policy rows help the current best DAgger9 minGRU checkpoint, rather than the older DAgger7 baseline used in the first option-trace experiments. Both used the same held-out mixed block: starts `1900000`, `2000000`, `2100000`, and `2200000`, 20 episodes each.
+
+Mixed DAgger9 + recovery-option replay: `reports/n4_mingru_dagger9_recovery_option_mix_20260613_seed9120k`
+
+Setup: merged `reports/n4_mingru_curriculum_subchain_motif_dagger9_hardtail_20260613_seed9099k/curriculum_dataset.npz` with the 81 `counterfactual_recovery` / `counterfactual_recovery_option` rows from `reports/n4_option_policy_subchain_dataset_20260613_seed9010k/option_policy_dataset.npz`, recovery rows weighted `12x`, then resumed from the DAgger9 checkpoint for 3 supervised epochs.
+
+Option-only auxiliary finetune: `reports/n4_mingru_dagger9_option_aux_20260613_seed9121k`
+
+Setup: filtered to only the 81 recovery-option rows and finetuned from DAgger9 for 20 low-LR supervised epochs.
+
+| candidate | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success |
+|---|---:|---:|---:|---:|---:|---:|
+| DAgger9 reference | 486.7 | 449.9 | 0.6875 | 487.1 | 442.9 | 0.6875 |
+| DAgger9 + recovery-option mix | 485.7 | 441.9 | 0.6875 | 486.6 | 443.8 | 0.6875 |
+| DAgger9 option-only auxiliary | 486.4 | 450.4 | 0.6875 | 487.2 | 442.9 | 0.6875 |
+
+Interpretation: option traces remain a real but weak signal. Full replay with recovery rows slightly hurts pure p10/mean and does not improve success. The option-only auxiliary finetune is less damaging and slightly improves pure p10 and ReCoN mean relative to DAgger9, but success remains `0.6875`, below the `0.70` N=4 gate. No solve claim is justified. The next useful recurrent move should generate a larger, fresher option-trace pool from DAgger9/Dagger9-option-aux failure seeds, or change the objective to predict recovery timing/gating rather than adding the old 81 option rows repeatedly.
+

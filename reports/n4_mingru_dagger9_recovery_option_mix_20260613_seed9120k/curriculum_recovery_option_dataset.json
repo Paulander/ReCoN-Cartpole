@@ -1,0 +1,47 @@
+{
+  "inputs": [
+    {
+      "path": "reports/n4_mingru_curriculum_subchain_motif_dagger9_hardtail_20260613_seed9099k/curriculum_dataset.npz",
+      "samples": 86847,
+      "weight": 1.0,
+      "source_prefix": "dagger9",
+      "episode_offset": 0,
+      "source_counts": {
+        "dagger9:teacher": 86847
+      },
+      "sample_weight_mean": 1.8308634757995605,
+      "sample_weight_max": 2.0
+    },
+    {
+      "path": "reports/n4_option_policy_subchain_dataset_20260613_seed9010k/option_policy_dataset.npz",
+      "samples": 81,
+      "weight": 12.0,
+      "source_prefix": "recovery",
+      "episode_offset": 190,
+      "source_counts": {
+        "recovery:counterfactual_recovery": 9,
+        "recovery:counterfactual_recovery_option": 72
+      },
+      "sample_weight_mean": 11.151235580444336,
+      "sample_weight_max": 19.816675186157227
+    }
+  ],
+  "include_sources": [
+    "counterfactual_recovery",
+    "counterfactual_recovery_option",
+    "teacher"
+  ],
+  "exclude_sources": [],
+  "samples": 86928,
+  "observation_shape": [
+    86928,
+    23
+  ],
+  "source_counts": {
+    "dagger9:teacher": 86847,
+    "recovery:counterfactual_recovery": 9,
+    "recovery:counterfactual_recovery_option": 72
+  },
+  "sample_weight_mean": 1.8395482301712036,
+  "sample_weight_max": 19.816675186157227
+}

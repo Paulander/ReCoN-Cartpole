@@ -1,0 +1,33 @@
+{
+  "inputs": [
+    {
+      "path": "reports/n4_option_policy_subchain_dataset_20260613_seed9010k/option_policy_dataset.npz",
+      "samples": 81,
+      "weight": 1.0,
+      "source_prefix": "recovery",
+      "episode_offset": 0,
+      "source_counts": {
+        "recovery:counterfactual_recovery": 9,
+        "recovery:counterfactual_recovery_option": 72
+      },
+      "sample_weight_mean": 0.9292696714401245,
+      "sample_weight_max": 1.6513895988464355
+    }
+  ],
+  "include_sources": [
+    "counterfactual_recovery",
+    "counterfactual_recovery_option"
+  ],
+  "exclude_sources": [],
+  "samples": 81,
+  "observation_shape": [
+    81,
+    23
+  ],
+  "source_counts": {
+    "recovery:counterfactual_recovery": 9,
+    "recovery:counterfactual_recovery_option": 72
+  },
+  "sample_weight_mean": 0.9292696714401245,
+  "sample_weight_max": 1.6513895988464355
+}
