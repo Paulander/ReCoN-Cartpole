@@ -821,3 +821,34 @@ Blend sweep on the same checkpoint and held-out seeds:
 | 1.00 | 465.2 | 394.1 | 0.450 |
 
 Interpretation: the improved labeler now finds nontrivial local option recoveries, but the learned shared-subchain terminal does not improve held-out N=4 at conservative authority and degrades once given enough blend to matter. This is useful infrastructure and negative evidence. The next performance move should not be higher subchain blend; it should either use the option-trace labels as auxiliary data for the primary recurrent/policy terminal, or return to a broader primary PPO/curriculum update. No N=4 solve claim is justified.
+
+## Sparse PPO Continuation And Hard-Tail Follow-Up - 2026-06-13
+
+Ran a bounded sparse continuation sweep from the current 5-bin survival PPO terminal (`reports/n4_survival_ppo_sweep_20260612_seed2700k/candidate_01/checkpoint_010000.zip`) using mixed-grid validation and held-out final blocks. This covered the requested PPO axes in a sparse way: learning rate, clip range, `n_steps`, `n_epochs`, GAE lambda, entropy, reported net arch rows, VecNormalize on/off, and late-survival bonus. Because this is checkpoint continuation, changing `net_arch` is recorded in config but SB3 restores the saved checkpoint architecture; architecture sweeps are only meaningful from scratch.
+
+Run: `reports/n4_ppo_sparse_mixedgrid_20260613_seed8970k`
+
+Setup: four sparse candidates, two `5000`-step chunks each, validation starts `900000`, `930000`, `970000`, `1010000`, `1040000`, `1070000`, `1140000`, and `1300000` with 8 episodes per start; final starts `1500000`, `1600000`, and `1700000` with 20 episodes per start.
+
+| idx | grid | lr | clip | steps | epochs | gae | ent | net row | VecNorm | late bonus | final mean | final p10 | final cvar | final success |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---:|---:|
+| 0 | 0 | 2.5e-7 | 0.002 | 512 | 1 | 0.95 | 0.0 | 64,64 | false | 0.005 | 484.8 | 433.8 | 418.7 | 0.683 |
+| 1 | 7 | 2.5e-7 | 0.002 | 512 | 1 | 0.95 | 0.0 | 128,128 | true | 0.020 | 484.8 | 433.8 | 418.7 | 0.683 |
+| 2 | 572 | 5e-7 | 0.002 | 1024 | 2 | 0.98 | 0.001 | 256,128 | false | 0.005 | 484.8 | 433.8 | 418.7 | 0.683 |
+| 3 | 767 | 5e-7 | 0.004 | 1024 | 2 | 0.98 | 0.001 | 256,128 | true | 0.020 | 484.8 | 433.8 | 418.7 | 0.683 |
+
+All four rows chose the `checkpoint_000000_start.zip` copy as best. No 10k continuation promoted over the incumbent. The VecNormalize rows were not useful when resuming from a non-VecNormalize checkpoint; chunk-level validation dipped before falling back to the start checkpoint.
+
+Follow-up: `reports/n4_hardtail_no_rebuild_continue_20260613_seed8990k`
+
+The first hard-tail follow-up (`reports/n4_hardtail_anchor_continue_20260613_seed8980k`) was interrupted after chunk 1 because it stalled while rebuilding a `SubprocVecEnv`; the completed chunk exactly matched the start validation and did not improve. The no-rebuild follow-up used the mined tail-seed pool from the sparse sweep, high hard-seed probability (`0.90`), LR `2e-6`, clip `0.01`, GAE `0.98`, entropy `0.001`, late-survival bonus `0.02`, and a light teacher anchor. Validation used starts `1500000`, `1600000`, and `1700000` with 15 episodes per start; final eval used starts `1900000`, `2000000`, and `2100000` with 15 episodes per start.
+
+| checkpoint | mean | p10 | cvar | success | promoted |
+|---|---:|---:|---:|---:|---|
+| start | 485.6 | 442.6 | 426.4 | 0.711 | true |
+| chunk_1 | 485.5 | 442.6 | 426.4 | 0.711 | false |
+| chunk_2 | 482.2 | 435.6 | 403.8 | 0.689 | false |
+
+Final held-out on `1900000`, `2000000`, `2100000` used the start checkpoint because no chunk promoted: pure PPO success `0.444`, ReCoN-routed policy terminal success `0.578` over 45 episodes. This is not a solve claim and shows that this final block is a tougher tail slice for the incumbent.
+
+Interpretation: small continuation updates do not move the current 5-bin policy, and stronger hard-tail replay with a light teacher anchor still degrades before it helps. The next PPO attempt should avoid VecNormalize when resuming this checkpoint and should either run a genuinely from-scratch architecture sweep or change the objective/data path, for example auxiliary training on option-trace labels or a recurrent curriculum that treats hard-tail states as on-policy distribution shift rather than repeated PPO micro-updates.
