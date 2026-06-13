@@ -881,6 +881,19 @@ def test_mingru_ppo_seed_values_defaults_to_hard_seed_list(tmp_path):
     assert mingru_ppo.seed_mix_counts(args) == (5, 0)
 
 
+def test_mingru_ppo_seed_values_can_use_mixed_fresh_starts():
+    mingru_ppo = _load_script("train_mingru_ppo")
+    args = SimpleNamespace(
+        seed_list="",
+        seed_start=9000,
+        seed_starts=[100, 200],
+        train_episodes=5,
+    )
+
+    assert mingru_ppo.mixed_fresh_seed_values(args) == [100, 200, 101, 201, 102]
+    assert mingru_ppo.seed_values(args) == [100, 200, 101, 201, 102]
+
+
 def test_mingru_ppo_seed_values_mixes_hard_and_fresh_seeds(tmp_path):
     mingru_ppo = _load_script("train_mingru_ppo")
     seeds = tmp_path / "hard.txt"
@@ -899,6 +912,27 @@ def test_mingru_ppo_seed_values_mixes_hard_and_fresh_seeds(tmp_path):
     assert sum(1 for seed in mixed if seed in {10, 20, 30}) == 3
     assert sum(1 for seed in mixed if 9000 <= seed < 9010) == 7
     assert mingru_ppo.seed_mix_counts(args) == (3, 7)
+    assert mixed == mingru_ppo.seed_values(args)
+
+
+def test_mingru_ppo_seed_values_mixes_hard_with_mixed_fresh_starts(tmp_path):
+    mingru_ppo = _load_script("train_mingru_ppo")
+    seeds = tmp_path / "hard.txt"
+    seeds.write_text("10\n20\n30\n", encoding="utf-8")
+    args = SimpleNamespace(
+        seed_list=str(seeds),
+        seed_start=9000,
+        seed_starts=[1000, 2000],
+        train_episodes=10,
+        train_seed=123,
+        hard_seed_probability=0.3,
+    )
+
+    mixed = mingru_ppo.seed_values(args)
+
+    assert len(mixed) == 10
+    assert sum(1 for seed in mixed if seed in {10, 20, 30}) == 3
+    assert sum(1 for seed in mixed if seed in {1000, 2000, 1001, 2001, 1002, 2002, 1003}) == 7
     assert mixed == mingru_ppo.seed_values(args)
 
 

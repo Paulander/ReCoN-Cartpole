@@ -88,6 +88,14 @@ def read_seed_list(path: str) -> list[int]:
     return seeds
 
 
+def mixed_fresh_seed_values(args: argparse.Namespace, count: int | None = None) -> list[int]:
+    total = int(args.train_episodes if count is None else count)
+    starts = [int(item) for item in getattr(args, "seed_starts", []) or []]
+    if not starts:
+        return [int(args.seed_start) + idx for idx in range(total)]
+    return [starts[idx % len(starts)] + idx // len(starts) for idx in range(total)]
+
+
 def seed_mix_counts(args: argparse.Namespace) -> tuple[int, int]:
     train_episodes = int(args.train_episodes)
     seed_list = str(getattr(args, "seed_list", "") or "").strip()
@@ -105,7 +113,7 @@ def seed_mix_counts(args: argparse.Namespace) -> tuple[int, int]:
 
 def seed_values(args: argparse.Namespace) -> list[int]:
     train_episodes = int(args.train_episodes)
-    fresh = [int(args.seed_start) + idx for idx in range(train_episodes)]
+    fresh = mixed_fresh_seed_values(args, train_episodes)
     seed_list = str(getattr(args, "seed_list", "") or "").strip()
     if not seed_list:
         return fresh
@@ -492,6 +500,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--passthrough-logit-margin-floor", type=float, default=0.0)
     parser.add_argument("--train-episodes", type=int, default=64)
     parser.add_argument("--seed-start", type=int, default=7_000_000)
+    parser.add_argument("--seed-starts", type=int, nargs="*", default=[])
     parser.add_argument("--seed-list", default="")
     parser.add_argument("--hard-seed-probability", type=float, default=1.0)
     parser.add_argument("--iterations", type=int, default=4)
