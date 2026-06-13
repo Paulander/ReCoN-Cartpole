@@ -807,6 +807,22 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
 
 
 
+def test_subchain_pair_terminal_collect_seed_values_reads_seed_list(tmp_path):
+    subchain_pair = _load_script("train_subchain_pair_terminal")
+    txt = tmp_path / "seeds.txt"
+    txt.write_text("101\n103\n", encoding="utf-8")
+    args = SimpleNamespace(seed_list=str(txt), seed_start=1, episodes=10)
+
+    assert subchain_pair.collect_seed_values(args) == [101, 103]
+
+    js = tmp_path / "seeds.json"
+    js.write_text(json.dumps({"hard_seeds": [{"seed": 201}, {"seed": 202}, 203]}), encoding="utf-8")
+    args.seed_list = str(js)
+    args.episodes = 2
+
+    assert subchain_pair.collect_seed_values(args) == [201, 202]
+
+
 def test_subchain_pair_counterfactual_expands_tail_options(monkeypatch):
     subchain_pair = _load_script("train_subchain_pair_terminal")
     args = SimpleNamespace(

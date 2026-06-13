@@ -443,13 +443,39 @@ def append_option_trace_rows(
         )
 
 
+
+
+def collect_seed_values(args: argparse.Namespace) -> list[int]:
+    seed_list = str(getattr(args, "seed_list", "") or "").strip()
+    if not seed_list:
+        return [int(args.seed_start) + idx for idx in range(int(args.episodes))]
+    raw = Path(seed_list).read_text(encoding="utf-8")
+    seeds: list[int] = []
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        payload = None
+    if isinstance(payload, dict):
+        for key in ("hard_seeds", "seeds", "tail_seeds"):
+            values = payload.get(key)
+            if isinstance(values, list):
+                seeds = [int(item["seed"] if isinstance(item, dict) else item) for item in values]
+                break
+    elif isinstance(payload, list):
+        seeds = [int(item["seed"] if isinstance(item, dict) else item) for item in payload]
+    if not seeds:
+        for item in raw.replace(",", "\n").splitlines():
+            value = item.strip()
+            if value:
+                seeds.append(int(value))
+    return seeds[: int(args.episodes)]
+
 def collect_teacher_dataset(args: argparse.Namespace, terminal: SharedSubchainTerminal) -> dict[str, np.ndarray]:
     rows: dict[str, list[Any]] = {key: [] for key in ["x", "force_targets", "confidence_targets", "sample_weights", "pair_indices", "seeds", "steps", "sources", "pressures"]}
     teacher = make_teacher(args)
     env = make_env(args)
-    for ep in range(int(args.episodes)):
-        seed = int(args.seed_start) + ep
-        obs, info = env.reset(seed=seed)
+    for seed in collect_seed_values(args):
+        obs, info = env.reset(seed=int(seed))
         teacher.start_episode()
         for step in range(int(args.horizon)):
             raw = info.get("raw_state")
@@ -479,9 +505,8 @@ def collect_counterfactual_dataset(args: argparse.Namespace, terminal: SharedSub
     option_episode = 0
     episodes: list[dict[str, Any]] = []
     candidate_forces = force_values(args)
-    for ep in range(int(args.episodes)):
-        seed = int(args.seed_start) + ep
-        episode = rollout_episode(args, seed)
+    for seed in collect_seed_values(args):
+        episode = rollout_episode(args, int(seed))
         episodes.append({key: episode[key] for key in ("seed", "steps", "return", "success")})
         for state in selected_counterfactual_states(args, episode):
             raw = state["raw_before"]
@@ -759,6 +784,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--horizon", type=int, default=500)
     parser.add_argument("--episodes", type=int, default=32)
     parser.add_argument("--seed-start", type=int, default=8_000_000)
+    parser.add_argument("--seed-list", default="")
     parser.add_argument("--dt", type=float, default=0.0005)
     parser.add_argument("--dynamics-mode", choices=["parallel", "serial_lagrange"], default="serial_lagrange")
     parser.add_argument("--discrete-action-bins", type=int, default=5)

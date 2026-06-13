@@ -1,0 +1,33 @@
+{
+  "inputs": [
+    {
+      "path": "reports/n4_option_policy_dagger9_hardseed_dataset_20260613_seed9130k/option_policy_dataset.npz",
+      "samples": 359,
+      "weight": 1.0,
+      "source_prefix": "fresh_recovery",
+      "episode_offset": 0,
+      "source_counts": {
+        "fresh_recovery:counterfactual_recovery": 41,
+        "fresh_recovery:counterfactual_recovery_option": 318
+      },
+      "sample_weight_mean": 1.0008705854415894,
+      "sample_weight_max": 3.0
+    }
+  ],
+  "include_sources": [
+    "counterfactual_recovery",
+    "counterfactual_recovery_option"
+  ],
+  "exclude_sources": [],
+  "samples": 359,
+  "observation_shape": [
+    359,
+    23
+  ],
+  "source_counts": {
+    "fresh_recovery:counterfactual_recovery": 41,
+    "fresh_recovery:counterfactual_recovery_option": 318
+  },
+  "sample_weight_mean": 1.0008705854415894,
+  "sample_weight_max": 3.0
+}

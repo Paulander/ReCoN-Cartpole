@@ -1,0 +1,123 @@
+{
+  "status": "completed",
+  "checkpoint_path": "reports/n4_option_policy_dagger9_hardseed_dataset_20260613_seed9130k/subchain_pair_terminal.pt",
+  "samples": 1248,
+  "option_policy_dataset": "reports/n4_option_policy_dagger9_hardseed_dataset_20260613_seed9130k/option_policy_dataset.npz",
+  "option_policy_samples": 416,
+  "option_policy_source_counts": {
+    "counterfactual_no_better": 54,
+    "counterfactual_recovery": 41,
+    "counterfactual_recovery_option": 318,
+    "preserve_success": 3
+  },
+  "source_counts": {
+    "counterfactual_no_better": 162,
+    "counterfactual_recovery": 123,
+    "counterfactual_recovery_option": 954,
+    "preserve_success": 9
+  },
+  "pairs": 3,
+  "history": [
+    {
+      "loss": 0.6395114064216614,
+      "force_loss": 0.605044444402059,
+      "confidence_loss": 0.6893390417098999
+    }
+  ],
+  "base_eval": {
+    "mean_survival": 437.0,
+    "p10_survival": 429.8,
+    "success_rate": 0.0,
+    "max_survival": 446.0,
+    "episodes": 2
+  },
+  "learned_subchain_eval": {
+    "mean_survival": 437.0,
+    "p10_survival": 429.8,
+    "success_rate": 0.0,
+    "max_survival": 446.0,
+    "episodes": 2
+  },
+  "config": {
+    "out": "reports/n4_option_policy_dagger9_hardseed_dataset_20260613_seed9130k",
+    "label_mode": "counterfactual_recovery",
+    "teacher_mode": "recon_policy_terminal",
+    "policy_terminal_path": "reports/n4_survival_ppo_sweep_20260612_seed2700k/candidate_01/checkpoint_010000.zip",
+    "policy_terminal_blend": 1.0,
+    "policy_terminal_scope": "stabilize_chain",
+    "policy_terminal_observation_mode": "normalized_raw",
+    "option_policy_observation_mode": "normalized_raw4_subchains_prev_force",
+    "selection_mode": "hard_select",
+    "n_poles": 4,
+    "horizon": 500,
+    "episodes": 20,
+    "seed_start": 8000000,
+    "seed_list": "reports/n4_mingru_dagger9_hardseed_mine_20260613_seed9098k/hard_seeds.txt",
+    "dt": 0.0005,
+    "dynamics_mode": "serial_lagrange",
+    "discrete_action_bins": 5,
+    "force_mag": 10.0,
+    "initial_angle_range": 0.05,
+    "force_noise": 0.02,
+    "link_coupling": 12.0,
+    "failure_offsets": [
+      20,
+      40,
+      80,
+      120,
+      180
+    ],
+    "max_failure_states": 5,
+    "success_preserve_stride": 100,
+    "max_success_preserve_states": 3,
+    "option_hold_steps": 20,
+    "option_tail_steps": 20,
+    "append_option_trace": true,
+    "option_trace_stride": 4,
+    "max_option_trace_states": 8,
+    "probe_horizon": 150,
+    "min_score_gap": 0.02,
+    "margin_weight": 1.0,
+    "pressure_drop_weight": 2.0,
+    "pressure_final_weight": 0.25,
+    "shift_penalty": 0.03,
+    "tail_shift_penalty": 0.01,
+    "confidence_score_scale": 4.0,
+    "recovery_weight": 3.0,
+    "preserve_weight": 1.0,
+    "weak_preserve_weight": 0.25,
+    "preserve_confidence": 0.1,
+    "hidden_size": 48,
+    "no_pair_position": false,
+    "theta_scale": 0.21,
+    "velocity_scale": 5.0,
+    "x_scale": 2.4,
+    "epochs": 1,
+    "batch_size": 512,
+    "learning_rate": 0.0008,
+    "confidence_loss_weight": 0.05,
+    "max_grad_norm": 1.0,
+    "device": "auto",
+    "train_seed": 9130,
+    "subchain_blend": 0.05,
+    "min_confidence": 0.0,
+    "min_pair_pressure": 0.02,
+    "max_force_fraction": 1.0,
+    "confidence_boost": 0.08,
+    "urgency_boost": 0.15,
+    "eval_seed_start": 1900000,
+    "eval_seed_starts": [
+      1500000
+    ],
+    "eval_episodes": 2
+  },
+  "mechanisms": {
+    "shared_subchain_terminal": true,
+    "supervised_teacher_distillation": false,
+    "counterfactual_recovery_labels": true,
+    "long_option_counterfactuals": true,
+    "policy_terminal": true,
+    "gain_mutation": false
+  },
+  "wall_clock_seconds": 390.9340271439869
+}

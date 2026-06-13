@@ -1212,3 +1212,35 @@ Setup: filtered to only the 81 recovery-option rows and finetuned from DAgger9 f
 
 Interpretation: option traces remain a real but weak signal. Full replay with recovery rows slightly hurts pure p10/mean and does not improve success. The option-only auxiliary finetune is less damaging and slightly improves pure p10 and ReCoN mean relative to DAgger9, but success remains `0.6875`, below the `0.70` N=4 gate. No solve claim is justified. The next useful recurrent move should generate a larger, fresher option-trace pool from DAgger9/Dagger9-option-aux failure seeds, or change the objective to predict recovery timing/gating rather than adding the old 81 option rows repeatedly.
 
+## Fresh DAgger9 Hard-Seed Option Traces - 2026-06-13
+
+Added `--seed-list` support to `scripts/train_subchain_pair_terminal.py` so counterfactual option-trace collection can target sparse hard-seed pools directly instead of contiguous seed ranges. This was used to generate fresh long-option policy rows from the current DAgger9 hard-seed mine.
+
+Focused verification:
+
+- `uv run ruff check scripts/train_subchain_pair_terminal.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs tests/test_policy_terminal_training.py::test_subchain_pair_terminal_collect_seed_values_reads_seed_list -q -s` -> 2 passed.
+
+Fresh option-trace dataset: `reports/n4_option_policy_dagger9_hardseed_dataset_20260613_seed9130k`
+
+Setup: 20 seeds from `reports/n4_mingru_dagger9_hardseed_mine_20260613_seed9098k/hard_seeds.txt`, same two-phase option search settings as the earlier option-trace probe. The sidecar is much denser than the old 81-row recovery-only dataset:
+
+| source | policy rows |
+|---|---:|
+| `counterfactual_recovery` | 41 |
+| `counterfactual_recovery_option` | 318 |
+| `counterfactual_no_better` | 54 |
+| `preserve_success` | 3 |
+
+Fresh option-only auxiliary finetune: `reports/n4_mingru_dagger9_fresh_option_aux_20260613_seed9131k`
+
+Setup: filtered the fresh sidecar to the 359 recovery/recovery-option rows, resumed from DAgger9, trained 12 low-LR supervised epochs, then evaluated on held-out starts `1900000`, `2000000`, `2100000`, and `2200000`, 20 episodes each.
+
+| candidate | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success |
+|---|---:|---:|---:|---:|---:|---:|
+| DAgger9 reference | 486.7 | 449.9 | 0.6875 | 487.1 | 442.9 | 0.6875 |
+| old option-only auxiliary | 486.4 | 450.4 | 0.6875 | 487.2 | 442.9 | 0.6875 |
+| fresh option-only auxiliary | 486.7 | 451.9 | 0.6875 | 487.1 | 443.8 | 0.6875 |
+
+Interpretation: fresh DAgger9 hard-seed option traces improved the density and quality of the recovery sidecar and nudged p10 upward, but still did not change the binary success count. This is progress on failure severity, not a solve. The remaining gap likely needs either more diverse fresh option traces across the held-out failure modes or an objective that explicitly optimizes recovery timing/gating rather than simple action imitation on option traces.
+
