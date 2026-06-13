@@ -131,6 +131,62 @@ def test_counterfactual_residual_collect_seed_values_reads_hard_seed_json(tmp_pa
     assert residual.collect_seed_values(args) == [10, 20]
 
 
+def test_counterfactual_residual_collect_seed_values_round_robins_mixed_starts():
+    residual = _load_script("train_counterfactual_residual_terminal")
+    args = SimpleNamespace(
+        collect_seed_list="",
+        collect_seed_start=1,
+        collect_seed_starts=[100, 200],
+        collect_episodes=5,
+    )
+
+    assert residual.collect_seed_values(args) == [100, 200, 101, 201, 102]
+
+
+def test_counterfactual_residual_success_negatives_include_high_risk_states():
+    residual = _load_script("train_counterfactual_residual_terminal")
+    states = []
+    for step in range(10):
+        raw = [0.0, 0.0, 0.01, 0.01, 0.01, 0.01, 0.0, 0.0, 0.0, 0.0]
+        if step == 5:
+            raw[2] = 0.16
+        if step == 7:
+            raw[3] = 0.18
+        states.append({"step": step, "raw_before": raw, "force": 0.0})
+    args = SimpleNamespace(
+        n_poles=4,
+        horizon=10,
+        success_negative_stride=4,
+        max_success_states=1,
+        success_risk_negative_count=2,
+        success_risk_window_start=0,
+        success_risk_window_end=9,
+        success_risk_stride=1,
+    )
+
+    selected = residual.select_success_negative_states(args, {"seed": 55, "states": states})
+
+    assert [item["step"] for item in selected] == [5, 7, 8]
+    assert sum(1 for item in selected if item["success_negative_kind"] == "risk") == 2
+    assert all(item["seed"] == 55 for item in selected)
+    assert all("recovery_pressure" in item for item in selected)
+
+
+def test_counterfactual_residual_label_summary_counts_success_negatives():
+    residual = _load_script("train_counterfactual_residual_terminal")
+    rows = [
+        {"label": 2, "score_gap": 0.0, "success_negative": True, "success_negative_kind": "stride"},
+        {"label": 2, "score_gap": 0.0, "success_negative": True, "success_negative_kind": "risk"},
+        {"label": 1, "score_gap": 0.5},
+    ]
+
+    summary = residual.label_summary(rows, classes=5)
+
+    assert summary["success_negative_count"] == 2
+    assert summary["risk_success_negative_count"] == 1
+    assert summary["non_noop_count"] == 1
+
+
 def test_policy_dataset_explicit_seeds_reads_hard_seed_json(tmp_path):
     dataset_builder = _load_script("build_policy_dataset")
     path = tmp_path / "hard_seeds.json"

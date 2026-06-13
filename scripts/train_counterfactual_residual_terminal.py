@@ -511,6 +511,9 @@ def select_failure_states(args: argparse.Namespace, episode: dict[str, Any]) -> 
 def collect_seed_values(args: argparse.Namespace) -> list[int]:
     seed_list = str(getattr(args, "collect_seed_list", "") or "").strip()
     if not seed_list:
+        starts = [int(item) for item in getattr(args, "collect_seed_starts", []) or []]
+        if starts:
+            return [starts[idx % len(starts)] + idx // len(starts) for idx in range(int(args.collect_episodes))]
         return [int(args.collect_seed_start) + idx for idx in range(int(args.collect_episodes))]
     path = Path(seed_list)
     raw = path.read_text(encoding="utf-8")
@@ -533,6 +536,47 @@ def collect_seed_values(args: argparse.Namespace) -> list[int]:
                 seeds.append(int(value))
     return seeds[: int(args.collect_episodes)]
 
+
+def select_success_negative_states(args: argparse.Namespace, episode: dict[str, Any]) -> list[dict[str, Any]]:
+    """Pick preservation negatives from solved episodes, including high-risk states."""
+    states = episode["states"]
+    selected: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    if int(args.success_negative_stride) > 0:
+        for state in states[:: int(args.success_negative_stride)][-int(args.max_success_states) :]:
+            item = dict(state)
+            item["seed"] = episode["seed"]
+            item["success_negative"] = True
+            item["success_negative_kind"] = "stride"
+            item["recovery_pressure"] = recovery_pressure(item["raw_before"], int(args.n_poles))
+            selected.append(item)
+            seen.add(int(item["step"]))
+    risk_count = int(getattr(args, "success_risk_negative_count", 0) or 0)
+    if risk_count <= 0:
+        selected.sort(key=lambda item: int(item["step"]))
+        return selected
+    start = max(0, int(getattr(args, "success_risk_window_start", 0)))
+    end = int(getattr(args, "success_risk_window_end", 0) or int(args.horizon))
+    end = min(max(start, end), len(states) - 1)
+    stride = max(1, int(getattr(args, "success_risk_stride", 5)))
+    candidates: list[dict[str, Any]] = []
+    for pos in range(start, end + 1, stride):
+        state = states[pos]
+        step = int(state["step"])
+        if step in seen:
+            continue
+        item = dict(state)
+        item["seed"] = episode["seed"]
+        item["success_negative"] = True
+        item["success_negative_kind"] = "risk"
+        item["recovery_pressure"] = recovery_pressure(item["raw_before"], int(args.n_poles))
+        candidates.append(item)
+    candidates.sort(key=lambda item: (float(item.get("recovery_pressure", 0.0)), int(item["step"])), reverse=True)
+    selected.extend(candidates[:risk_count])
+    selected.sort(key=lambda item: int(item["step"]))
+    return selected
+
+
 def collect_dataset(args: argparse.Namespace) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     episodes: list[dict[str, Any]] = []
@@ -541,14 +585,22 @@ def collect_dataset(args: argparse.Namespace) -> dict[str, Any]:
     for seed in collect_seed_values(args):
         episode = collect_episode_states(args, int(seed))
         episodes.append({key: episode[key] for key in ("seed", "steps", "return", "success")})
-        states = episode["states"]
-        selected: list[dict[str, Any]] = []
         if episode["success"]:
-            if int(args.success_negative_stride) > 0:
-                selected = states[:: int(args.success_negative_stride)][-int(args.max_success_states) :]
-                for state in selected:
-                    feature = residual_observation(args, state["raw_before"], float(state["force"]), int(state["step"]))
-                    rows.append({"feature": feature.tolist(), "label": int(args.residual_action_bins) // 2, "apply_label": 0, "seed": episode["seed"], "step": int(state["step"]), "success_negative": True})
+            selected = select_success_negative_states(args, episode)
+            for state in selected:
+                feature = residual_observation(args, state["raw_before"], float(state["force"]), int(state["step"]))
+                rows.append(
+                    {
+                        "feature": feature.tolist(),
+                        "label": int(args.residual_action_bins) // 2,
+                        "apply_label": 0,
+                        "seed": episode["seed"],
+                        "step": int(state["step"]),
+                        "success_negative": True,
+                        "success_negative_kind": state.get("success_negative_kind", "stride"),
+                        "recovery_pressure": float(state.get("recovery_pressure", 0.0)),
+                    }
+                )
         else:
             selected = select_failure_states(args, episode)
             for state in selected:
@@ -708,6 +760,8 @@ def label_summary(rows: list[dict[str, Any]], classes: int) -> dict[str, Any]:
     best_margin_gains: list[float] = []
     chosen_pressure_gains: list[float] = []
     best_pressure_gains: list[float] = []
+    success_negative_count = 0
+    risk_success_negative_count = 0
     for row in rows:
         label = int(row.get("label", 0))
         counts[str(label)] = counts.get(str(label), 0) + 1
@@ -718,6 +772,10 @@ def label_summary(rows: list[dict[str, Any]], classes: int) -> dict[str, Any]:
         best_margin_gains.append(float(row.get("best_margin_gain", 0.0)))
         chosen_pressure_gains.append(float(row.get("chosen_pressure_gain", 0.0)))
         best_pressure_gains.append(float(row.get("best_pressure_gain", 0.0)))
+        if bool(row.get("success_negative", False)):
+            success_negative_count += 1
+            if row.get("success_negative_kind") == "risk":
+                risk_success_negative_count += 1
     center = classes // 2
     return {
         "row_count": len(rows),
@@ -731,6 +789,8 @@ def label_summary(rows: list[dict[str, Any]], classes: int) -> dict[str, Any]:
         "max_best_margin_gain": max(best_margin_gains) if best_margin_gains else 0.0,
         "mean_chosen_pressure_gain": float(np.mean(chosen_pressure_gains)) if chosen_pressure_gains else 0.0,
         "max_best_pressure_gain": max(best_pressure_gains) if best_pressure_gains else 0.0,
+        "success_negative_count": success_negative_count,
+        "risk_success_negative_count": risk_success_negative_count,
     }
 
 
@@ -755,6 +815,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "eval_seeds": eval_seed_values(args),
         "option_hold_steps": int(getattr(args, "option_hold_steps", 1)),
         "failure_state_selection": {
+            "collect_seed_starts": [int(item) for item in getattr(args, "collect_seed_starts", []) or []],
             "use_failure_window": bool(getattr(args, "use_failure_window", False)),
             "failure_window_start": int(getattr(args, "failure_window_start", 0)),
             "failure_window_end": int(getattr(args, "failure_window_end", 0)),
@@ -767,6 +828,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "motif_top_k": int(getattr(args, "motif_top_k", 0)),
             "motif_rank_weight": float(getattr(args, "motif_rank_weight", 1.0)),
             "pressure_rank_weight": float(getattr(args, "pressure_rank_weight", 0.0)),
+            "success_risk_negative_count": int(getattr(args, "success_risk_negative_count", 0)),
+            "success_risk_window_start": int(getattr(args, "success_risk_window_start", 0)),
+            "success_risk_window_end": int(getattr(args, "success_risk_window_end", 0) or int(args.horizon)),
+            "success_risk_stride": int(getattr(args, "success_risk_stride", 5)),
         },
         "label_gates": {
             "min_score_gap": float(args.min_score_gap),
@@ -802,6 +867,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Residual model: `{result['residual_model_path']}`",
         f"Rows: `{ds['row_count']}`, non-noop labels: `{ds['non_noop_count']}`",
         f"Label counts: `{ds['label_counts']}`",
+        f"Success negatives: `{ds.get('success_negative_count', 0)}`, high-risk success negatives: `{ds.get('risk_success_negative_count', 0)}`",
         f"Apply gate: `{ds.get('meta', {}).get('apply_gate_enabled', False)}`, apply label counts: `{ds.get('meta', {}).get('apply_label_counts', {})}`",
         f"Option hold steps: `{result.get('option_hold_steps', 1)}`",
         f"Failure state selection: `{result.get('failure_state_selection', {})}`",
@@ -846,6 +912,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--force-noise", type=float, default=0.02)
     parser.add_argument("--link-coupling", type=float, default=12.0)
     parser.add_argument("--collect-seed-start", type=int, default=2380000)
+    parser.add_argument("--collect-seed-starts", type=int, nargs="*", default=[])
     parser.add_argument("--collect-seed-list", default="")
     parser.add_argument("--collect-episodes", type=int, default=80)
     parser.add_argument("--failure-offsets", type=int, nargs="*", default=[0, 2, 5, 10, 20, 40])
@@ -867,6 +934,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pole-velocity-scale", type=float, default=5.0)
     parser.add_argument("--success-negative-stride", type=int, default=80)
     parser.add_argument("--max-success-states", type=int, default=3)
+    parser.add_argument("--success-risk-negative-count", type=int, default=0)
+    parser.add_argument("--success-risk-window-start", type=int, default=0)
+    parser.add_argument("--success-risk-window-end", type=int, default=0)
+    parser.add_argument("--success-risk-stride", type=int, default=5)
     parser.add_argument("--probe-horizon", type=int, default=100)
     parser.add_argument("--margin-weight", type=float, default=1.0)
     parser.add_argument("--shift-penalty", type=float, default=0.02)
