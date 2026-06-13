@@ -81,6 +81,8 @@ uv run python scripts/train_recurrent_terminal_ladder.py --checkpoints reports/m
 
 The ladder does not make solved claims. It reports active mechanisms and separates terminal imitation, pure recurrent policy performance, and ReCoN-routed recurrent terminal performance. Final N=4/N=5 claims still require held-out thresholds from `docs/RECURRENT_TERMINAL_STRATEGY.md`.
 
+For clipped on-policy fine-tuning of a trained minGRU terminal, use `scripts/train_mingru_ppo.py`. It collects rollouts with stored old log-probs, applies PPO clipped minibatch updates with optional frozen-reference KL preservation, and evaluates pure minGRU versus the same checkpoint routed through ReCoN on held-out seeds.
+
 For model selection across train seeds:
 
 ```bash

@@ -543,3 +543,26 @@ A teacher-anchored continuation attempt, `reports/n4_survival_tail_teacher_ancho
 
 Current N=4 state: near-solved, not solved. The strongest 5-bin feedforward evidence remains the survival PPO checkpoint at held-out success `0.6917` on the 120-episode `1500000`/`1600000` block, below the configured `0.70` success threshold and below the broader 300-episode solve discipline. The most promising next step is structural rather than another micro-sweep: make the adjacent subchain view a shared learned terminal/module, so N=4 can be controlled compositionally as overlapping reusable N=2-style local problems plus a global ReCoN arbiter.
 
+## minGRU PPO-Style Fine-Tuning Probe - 2026-06-13
+
+Added `scripts/train_mingru_ppo.py`, a clipped PPO-style recurrent fine-tuner for minGRU terminal checkpoints. Unlike the earlier actor-critic baseline, it stores rollout sequences, actions, old log-probs, old values, discounted returns, and normalized advantages, then applies PPO clipped minibatch updates with optional frozen-reference KL preservation. The script reports active mechanisms separately and evaluates pure minGRU versus ReCoN-routed minGRU on held-out seeds.
+
+Verification and smoke:
+
+- `uv run ruff check scripts/train_mingru_ppo.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs tests/test_policy_terminal_training.py::test_mingru_ppo_clipped_policy_loss_prefers_clipped_surrogate tests/test_policy_terminal_training.py::test_mingru_ppo_normalize_can_be_disabled -q -s` -> 3 passed.
+- `reports/smoke_mingru_ppo_20260613` completed a short-horizon integration smoke.
+
+Held-out eval uses the same 80 mixed seeds from starts `1900000`, `2000000`, `2100000`, and `2200000` as the recurrent DAgger/on-policy reports.
+
+| run | start checkpoint | train seeds | update style | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success | interpretation |
+|---|---|---:|---|---:|---:|---:|---:|---:|---:|---|
+| `reports/n4_mingru_curriculum_subchain_motif_dagger5_20260612_seed4810k` | supervised baseline | DAgger | teacher-label DAgger | 487.4 | 443.8 | 0.675 | 487.4 | 443.8 | 0.675 | baseline |
+| `reports/n4_mingru_ppo_from_dagger5_20260613_seed7100k` | DAgger5 | 48 mined hard seeds | LR `2e-6`, clip `0.03`, KL `0.05` | 487.4 | 443.9 | 0.675 | 486.2 | 440.6 | 0.6625 | too conservative; wrapper dipped |
+| `reports/n4_mingru_curriculum_subchain_motif_balanced_dagger7_20260613_seed5200k` | supervised baseline | DAgger | balanced hard/success DAgger | 486.8 | 444.9 | 0.675 | 486.8 | 444.9 | 0.675 | baseline |
+| `reports/n4_mingru_ppo_from_dagger7_mixed_20260613_seed7200k` | DAgger7 | 64 fresh mixed seeds | LR `8e-6`, clip `0.08`, KL `0.005` | 486.7 | 445.0 | 0.675 | 486.4 | 442.4 | 0.6625 | sampled rollout stats improved, held-out did not |
+
+Interpretation: PPO-style recurrent fine-tuning is now implemented and working, but these first bounded runs did not crack the N=4 held-out plateau. The stronger DAgger7 run improved sampled training rollouts from 0.4375 to 0.75/0.8125 success during collection, while frozen-reference KL stayed tiny, but held-out success remained 0.675 for pure minGRU and dipped to 0.6625 through the ReCoN wrapper. This suggests the current minGRU terminal/action interface is not adding robust capacity by small on-policy updates alone.
+
+Next best move: stop spending most runtime on small updates to the same flat global recurrent terminal. The evidence now points more strongly toward explicit shared adjacent-subchain composition: train a reusable pair/local terminal over `0-1`, `1-2`, and `2-3` features and let ReCoN arbitrate/globalize those local proposals, rather than feeding subchain diagnostics into one global policy head.
+

@@ -685,6 +685,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     mingru_curriculum = _load_script("train_mingru_curriculum")
     mingru_hard_seeds = _load_script("collect_mingru_hard_seeds")
     mingru_onpolicy = _load_script("train_mingru_onpolicy")
+    mingru_ppo = _load_script("train_mingru_ppo")
 
     assert callable(dataset_builder.collect)
     assert callable(supervised.train)
@@ -706,6 +707,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(mingru_curriculum.run)
     assert callable(mingru_hard_seeds.run_collect)
     assert callable(mingru_onpolicy.run)
+    assert callable(mingru_ppo.run)
 
 
 def test_mingru_onpolicy_discounted_returns():
@@ -715,6 +717,28 @@ def test_mingru_onpolicy_discounted_returns():
 
     assert returns.tolist() == pytest.approx([2.75, 3.5, 3.0])
 
+
+
+def test_mingru_ppo_clipped_policy_loss_prefers_clipped_surrogate():
+    torch = pytest.importorskip("torch")
+    mingru_ppo = _load_script("train_mingru_ppo")
+
+    ratio = torch.tensor([1.5, 0.5], dtype=torch.float32)
+    advantages = torch.tensor([1.0, -1.0], dtype=torch.float32)
+    loss = mingru_ppo.ppo_clipped_policy_loss(ratio, advantages, 0.2)
+
+    assert float(loss) == pytest.approx(-0.2)
+
+
+def test_mingru_ppo_normalize_can_be_disabled():
+    mingru_ppo = _load_script("train_mingru_ppo")
+
+    raw = mingru_ppo.normalize([1.0, 2.0, 3.0], enabled=False)
+    normalized = mingru_ppo.normalize([1.0, 2.0, 3.0], enabled=True)
+
+    assert raw.tolist() == pytest.approx([1.0, 2.0, 3.0])
+    assert float(normalized.mean()) == pytest.approx(0.0, abs=1e-6)
+    assert float(normalized.std()) == pytest.approx(1.0, rel=1e-5)
 
 def test_action_comparison_summarizes_seed_deltas():
     action_compare = _load_script("compare_policy_actions")
