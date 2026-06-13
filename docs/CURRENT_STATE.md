@@ -512,3 +512,34 @@ Held-out eval uses the same 80 mixed seeds from starts `1900000`, `2000000`, `21
 Interpretation: this first on-policy minGRU actor-critic baseline did not crack the DAgger plateau. The pure recurrent policy barely moved, while ReCoN-wrapped performance dipped from 0.675 to 0.6625. The likely issue is that single-policy-gradient updates over sparse survival returns are too noisy and do not target the specific late `pole_1_angle` / `pole_2_angle` failure modes sharply enough.
 
 Next best move: either implement a more faithful PPO-style clipped objective with stored old log-probs and minibatch epochs, or return to the residual/on-policy specialist path where the action space is deliberately small and the objective can focus on late failures without rewriting the whole recurrent controller. No N=4 solve claim is justified from these runs.
+
+## N=4 Tail PPO/Residual Continuation Update - 2026-06-13
+
+Two additional bounded runs tested whether the current best 5-bin feedforward PPO terminal can be nudged over the N=4 held-out threshold without hardcoded action rules.
+
+Residual specialist run: `reports/n4_survival_base_residual_guarded_20260613_seed6600k`
+
+Setup: frozen base `reports/n4_survival_ppo_sweep_20260612_seed2700k/candidate_01/checkpoint_010000.zip`, `subchain_diagnostics` residual features, 3-bin residual action shifts, risk gate `0.55`, hold steps `2`, collection seeds from `2100000`, and held-out final eval on starts `1500000` and `1600000` with 60 episodes each.
+
+| evaluator | mean | p10 | cvar | success | episodes | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|---:|
+| frozen survival PPO base | 483.5 | 441.9 | 411.8 | 0.6917 | 120 | 0.000 |
+| guarded residual terminal | 483.5 | 441.9 | 411.8 | 0.6917 | 120 | 0.330 |
+
+The guarded residual changed only one held-out episode, worsening it by one tick. This is useful negative evidence: the conservative residual path is mostly inert, while earlier less guarded residual runs over-intervened and hurt success. The remaining gap does not look like a simple one-step residual rescue problem under the current features/action bins.
+
+Tiny PPO continuation run: `reports/n4_survival_tail_continue_tiny_20260613_seed6710k`
+
+Setup: resumed from the same survival PPO checkpoint, trained on the previous validation-tail seed pool with tiny PPO updates (`2500` steps x 4 chunks, LR `2.5e-7`, clip `0.002`), selected by mixed validation starts `900000`, `930000`, `970000`, `1010000`, `1040000`, `1070000`, `1140000`, and `1300000`, then final-evaluated on starts `1500000` and `1600000`.
+
+| checkpoint | validation success | validation p10 | final success | final p10 | interpretation |
+|---|---:|---:|---:|---:|---|
+| start / prior best | 0.6750 | 437.7 | 0.6917 | 441.9 | incumbent |
+| chunk 4 promoted on validation | 0.6833 | 434.9 | 0.6833 | 441.9 | validation lift did not transfer |
+
+Compared with the prior best on the same final seeds, the promoted checkpoint changed 6 episodes: 2 improved slightly and 4 worsened, including one prior success at seed `1600042` failing at 471 steps. This confirms the 5-bin feedforward PPO terminal is in a narrow plateau where tiny training changes can trade held-out successes rather than adding robust capacity.
+
+A teacher-anchored continuation attempt, `reports/n4_survival_tail_teacher_anchor_20260613_seed6720k`, was interrupted after the start validation because the current teacher-in-env implementation did not finish even one 2500-step chunk in practical loop time. Before retrying that branch, teacher actions should be cached or the run should use a cheaper dummy-env configuration.
+
+Current N=4 state: near-solved, not solved. The strongest 5-bin feedforward evidence remains the survival PPO checkpoint at held-out success `0.6917` on the 120-episode `1500000`/`1600000` block, below the configured `0.70` success threshold and below the broader 300-episode solve discipline. The most promising next step is structural rather than another micro-sweep: make the adjacent subchain view a shared learned terminal/module, so N=4 can be controlled compositionally as overlapping reusable N=2-style local problems plus a global ReCoN arbiter.
+
