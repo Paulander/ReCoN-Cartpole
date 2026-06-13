@@ -844,6 +844,35 @@ def test_mingru_ppo_seed_values_mixes_hard_and_fresh_seeds(tmp_path):
     assert mixed == mingru_ppo.seed_values(args)
 
 
+def test_mingru_ppo_scout_eval_seeds_defaults_to_final_grid():
+    mingru_ppo = _load_script("train_mingru_ppo")
+    args = SimpleNamespace(
+        scout_eval_episodes=3,
+        scout_seed_starts=[],
+        final_seed_starts=[100, 200],
+    )
+
+    assert mingru_ppo.scout_eval_seeds(args) == [100, 101, 102, 200, 201, 202]
+
+    args.scout_seed_starts = [900]
+    assert mingru_ppo.scout_eval_seeds(args) == [900, 901, 902]
+
+    args.scout_eval_episodes = 0
+    assert mingru_ppo.scout_eval_seeds(args) == []
+
+
+def test_mingru_ppo_best_scout_row_selects_highest_score():
+    mingru_ppo = _load_script("train_mingru_ppo")
+    rows = [
+        {"iteration": 1, "score": 10.0, "checkpoint_path": "a.pt"},
+        {"iteration": 2, "score": 12.5, "checkpoint_path": "b.pt"},
+        {"iteration": 3, "score": 11.0, "checkpoint_path": "c.pt"},
+    ]
+
+    assert mingru_ppo.best_scout_row(rows)["checkpoint_path"] == "b.pt"
+    assert mingru_ppo.best_scout_row([]) is None
+
+
 def test_subchain_pair_terminal_collect_seed_values_reads_seed_list(tmp_path):
     subchain_pair = _load_script("train_subchain_pair_terminal")
     txt = tmp_path / "seeds.txt"

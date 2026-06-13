@@ -132,6 +132,50 @@ def seed_values(args: argparse.Namespace) -> list[int]:
     return mixed
 
 
+def scout_eval_seeds(args: argparse.Namespace) -> list[int]:
+    episodes = int(getattr(args, "scout_eval_episodes", 0) or 0)
+    if episodes <= 0:
+        return []
+    starts = list(getattr(args, "scout_seed_starts", None) or getattr(args, "final_seed_starts", []))
+    seeds: list[int] = []
+    for start in starts:
+        seeds.extend(int(start) + idx for idx in range(episodes))
+    return seeds
+
+
+def build_ladder_args(args: argparse.Namespace) -> argparse.Namespace:
+    return argparse.Namespace(
+        n_poles=args.n_poles,
+        horizon=args.horizon,
+        dt=args.dt,
+        dynamics_mode=args.dynamics_mode,
+        discrete_action_bins=args.discrete_action_bins,
+        force_mag=args.force_mag,
+        initial_angle_range=args.initial_angle_range,
+        force_noise=args.force_noise,
+        link_coupling=args.link_coupling,
+        observation_mode=args.observation_mode,
+        include_prev_force=args.include_prev_force,
+        include_context=args.include_context,
+        include_motif_score=args.include_motif_score,
+        motif_model_path=args.motif_model_path,
+        motif_score_scale=args.motif_score_scale,
+        blend=args.blend,
+        scope=args.scope,
+        confidence_floor=args.confidence_floor,
+        passthrough_enabled=args.passthrough_enabled,
+        passthrough_confidence_floor=args.passthrough_confidence_floor,
+        passthrough_logit_margin_floor=args.passthrough_logit_margin_floor,
+        selection_mode=args.selection_mode,
+    )
+
+
+def best_scout_row(scout_history: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not scout_history:
+        return None
+    return max(scout_history, key=lambda row: float(row.get("score", float("-inf"))))
+
+
 def collect_rollouts(args: argparse.Namespace, terminal: Any, device: Any, seeds: list[int]) -> RolloutBatch:
     import torch
 
@@ -307,8 +351,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     for param in ref_terminal.model.parameters():
         param.requires_grad_(False)
 
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    ladder_args = build_ladder_args(args)
+    scout_seeds = scout_eval_seeds(args)
+
     all_seeds = seed_values(args)
     history: list[dict[str, Any]] = []
+    scout_history: list[dict[str, Any]] = []
     for iteration in range(int(args.iterations)):
         start = iteration * int(args.rollout_episodes)
         rollout_seeds = all_seeds[start : start + int(args.rollout_episodes)]
@@ -324,42 +374,41 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "sample_count": int(batch.actions.shape[0]),
             **metrics,
         }
+        if scout_seeds and (iteration + 1) % max(1, int(args.scout_every_iterations)) == 0:
+            scout_checkpoint = out / f"checkpoint_iter_{iteration + 1:03d}.pt"
+            terminal.save_checkpoint(str(scout_checkpoint))
+            scout_recon = evaluate_recon_mingru(
+                str(scout_checkpoint),
+                ladder_args,
+                scout_seeds,
+                args.hidden_size,
+                args.sequence_length,
+            )
+            scout_row = {
+                "iteration": iteration + 1,
+                "checkpoint_path": str(scout_checkpoint),
+                "score": heldout_score(scout_recon),
+                "recon_mingru_terminal": scout_recon,
+                "seed_count": len(scout_seeds),
+            }
+            scout_history.append(scout_row)
+            row["scout_score"] = scout_row["score"]
+            row["scout_success_rate"] = scout_recon.get("success_rate", 0.0)
+            row["scout_p10_survival"] = scout_recon.get("p10_survival", 0.0)
         history.append(row)
         if bool(args.progress):
             print(json.dumps(row), flush=True)
 
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
     checkpoint_path = out / "mingru_ppo.pt"
     terminal.save_checkpoint(str(checkpoint_path))
+    candidate_checkpoint_path = checkpoint_path
+    selected_scout = best_scout_row(scout_history) if bool(args.select_best_scout_checkpoint) else None
+    if selected_scout is not None:
+        candidate_checkpoint_path = Path(str(selected_scout["checkpoint_path"]))
 
-    ladder_args = argparse.Namespace(
-        n_poles=args.n_poles,
-        horizon=args.horizon,
-        dt=args.dt,
-        dynamics_mode=args.dynamics_mode,
-        discrete_action_bins=args.discrete_action_bins,
-        force_mag=args.force_mag,
-        initial_angle_range=args.initial_angle_range,
-        force_noise=args.force_noise,
-        link_coupling=args.link_coupling,
-        observation_mode=args.observation_mode,
-        include_prev_force=args.include_prev_force,
-        include_context=args.include_context,
-        include_motif_score=args.include_motif_score,
-        motif_model_path=args.motif_model_path,
-        motif_score_scale=args.motif_score_scale,
-        blend=args.blend,
-        scope=args.scope,
-        confidence_floor=args.confidence_floor,
-        passthrough_enabled=args.passthrough_enabled,
-        passthrough_confidence_floor=args.passthrough_confidence_floor,
-        passthrough_logit_margin_floor=args.passthrough_logit_margin_floor,
-        selection_mode=args.selection_mode,
-    )
     seeds_eval = eval_seeds(args)
-    pure = evaluate_pure_mingru(str(checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
-    recon = evaluate_recon_mingru(str(checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
+    pure = evaluate_pure_mingru(str(candidate_checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
+    recon = evaluate_recon_mingru(str(candidate_checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
     if bool(args.compare_start_checkpoint):
         start_pure = evaluate_pure_mingru(str(args.checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
         start_recon = evaluate_recon_mingru(str(args.checkpoint_path), ladder_args, seeds_eval, args.hidden_size, args.sequence_length)
@@ -371,9 +420,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     promoted = bool(candidate_score > incumbent_score + float(args.min_promotion_delta))
     report = {
         "status": "completed",
-        "checkpoint_path": str(checkpoint_path),
+        "checkpoint_path": str(candidate_checkpoint_path),
+        "final_checkpoint_path": str(checkpoint_path),
+        "selected_scout_checkpoint_path": str(candidate_checkpoint_path) if selected_scout is not None else "",
         "start_checkpoint_path": str(args.checkpoint_path),
-        "best_checkpoint_path": str(checkpoint_path if promoted or not start_recon else args.checkpoint_path),
+        "best_checkpoint_path": str(candidate_checkpoint_path if promoted or not start_recon else args.checkpoint_path),
         "promoted": promoted,
         "promotion": {
             "metric": "1000*success_rate + p10_survival + 0.1*mean_survival",
@@ -387,6 +438,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "hard_seed_count": seed_mix_counts(args)[0],
         "fresh_seed_count": seed_mix_counts(args)[1],
         "history": history,
+        "scout_history": scout_history,
+        "selected_scout": selected_scout or {},
+        "scout_eval_seeds": scout_seeds,
         "start_pure_mingru_policy": start_pure,
         "start_recon_mingru_terminal": start_recon,
         "pure_mingru_policy": pure,
@@ -463,6 +517,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--progress", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--final-seed-starts", type=int, nargs="+", default=[1_900_000, 2_000_000, 2_100_000, 2_200_000])
     parser.add_argument("--final-eval-episodes", type=int, default=20)
+    parser.add_argument("--scout-seed-starts", type=int, nargs="*", default=[])
+    parser.add_argument("--scout-eval-episodes", type=int, default=0)
+    parser.add_argument("--scout-every-iterations", type=int, default=1)
+    parser.add_argument("--select-best-scout-checkpoint", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--compare-start-checkpoint", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--min-promotion-delta", type=float, default=0.0)
     return parser
