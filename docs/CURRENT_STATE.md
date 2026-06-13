@@ -1124,3 +1124,31 @@ Setup: evaluated the best DAgger9 checkpoint with `selection_mode=soft_select`, 
 | ReCoN-routed minGRU soft-select | 473.2 | 402.4 | 0.5125 | 80 |
 
 Interpretation: balancing pole_1/pole_2 hard-tail seeds and lowering tail weight did not preserve the DAgger9 gain, and soft-select routing is actively harmful for the current minGRU checkpoint. The current best remains DAgger9 under hard-select routing. The next useful performance move should be a targeted pole_1/pole_2 recovery specialist or learned gate, not another generic DAgger replay or softer ReCoN routing. No N=4 solve claim is justified.
+
+## minGRU Action-Gate Specialist Smoke - 2026-06-13
+
+Added `scripts/train_mingru_action_gate.py`, a targeted recurrent-prefix counterfactual action-gate trainer for minGRU checkpoints. The gate freezes the current minGRU/ReCoN controller, samples selected failure windows, reconstructs recurrent prefixes, probes discrete candidate actions, and trains a small classifier to either abstain or override the base action. The script now supports explicit hard-seed collection files, sustained forced-action probes via `--forced-action-hold-steps`, and conservative abstention through both `--gate-confidence` and `--gate-margin`.
+
+Verification:
+
+- `uv run ruff check scripts/train_mingru_action_gate.py tests/test_policy_terminal_training.py` -> passed.
+- `uv run pytest tests/test_policy_terminal_training.py::test_recurrent_terminal_scripts_import_and_hash_configs tests/test_policy_terminal_training.py::test_mingru_action_gate_collect_seed_values_reads_txt_and_json -q -s` -> 2 passed.
+
+Initial sequential smoke: `reports/smoke_mingru_action_gate_20260613` and held-action smoke `reports/smoke_mingru_action_gate_hold20_20260613` both found zero positive labels, mostly because the small sequential collection hit only two failures and single/local action scores were nearly flat.
+
+Targeted hard-seed smoke: `reports/smoke_mingru_action_gate_hardseeds_hold20_20260613`
+
+Setup: DAgger9 minGRU checkpoint, DAgger9 mined hard seeds from `reports/n4_mingru_dagger9_hardseed_mine_20260613_seed9098k/hard_seeds.txt`, 10 collection episodes, 20-tick forced action hold, 100-tick probe horizon, held-out smoke eval on starts `1900000`, `2000000`, `2100000`, and `2200000` with 5 episodes each.
+
+| item | value |
+|---|---:|
+| rows | 50 |
+| positive labels | 9 |
+| base success | 0.650 |
+| gated success at confidence 0.80 | 0.650 |
+| gated overrides at confidence 0.80 | 0 |
+
+Confidence and no-op-margin sweeps showed the current gate is not yet useful as a deployed specialist. Lower thresholds over-apply and degrade badly; conservative thresholds abstain back to the base. Best non-harmful smoke rows matched base success `0.650` with sparse or zero overrides, while looser rows fell as low as `0.150` success.
+
+Interpretation: sustained hard-seed counterfactual probes can now produce actionable labels for pole_1/pole_2 tail failures, which is real learning-signal progress. However, the first classifier is poorly calibrated and does not improve held-out N=4. Do not scale this exact gate as a solve attempt. The next useful variant would train an explicit apply/harm head from counterfactual benefit versus no-op negatives, or reuse the positive hard-seed option traces as auxiliary data for a primary recurrent policy rather than deploying a broad per-tick override gate.
+

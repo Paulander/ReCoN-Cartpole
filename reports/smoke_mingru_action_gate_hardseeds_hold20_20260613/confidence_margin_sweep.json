@@ -1,0 +1,146 @@
+[
+  {
+    "confidence": 0.45,
+    "margin": 0.05,
+    "mean": 406.6,
+    "p10": 268.1,
+    "success": 0.4,
+    "overrides": 3378,
+    "override_rate": 0.41539596655189376
+  },
+  {
+    "confidence": 0.45,
+    "margin": 0.15,
+    "mean": 423.4,
+    "p10": 292.40000000000003,
+    "success": 0.45,
+    "overrides": 2407,
+    "override_rate": 0.2842465753424658
+  },
+  {
+    "confidence": 0.45,
+    "margin": 0.3,
+    "mean": 456.45,
+    "p10": 374.9,
+    "success": 0.55,
+    "overrides": 1839,
+    "override_rate": 0.20144594150509365
+  },
+  {
+    "confidence": 0.45,
+    "margin": 0.5,
+    "mean": 483.5,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 435,
+    "override_rate": 0.04498448810754912
+  },
+  {
+    "confidence": 0.55,
+    "margin": 0.05,
+    "mean": 442.4,
+    "p10": 322.0,
+    "success": 0.5,
+    "overrides": 2009,
+    "override_rate": 0.22705696202531644
+  },
+  {
+    "confidence": 0.55,
+    "margin": 0.15,
+    "mean": 442.4,
+    "p10": 322.0,
+    "success": 0.5,
+    "overrides": 2009,
+    "override_rate": 0.22705696202531644
+  },
+  {
+    "confidence": 0.55,
+    "margin": 0.3,
+    "mean": 456.3,
+    "p10": 373.1,
+    "success": 0.55,
+    "overrides": 1830,
+    "override_rate": 0.20052596975673898
+  },
+  {
+    "confidence": 0.55,
+    "margin": 0.5,
+    "mean": 483.5,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 435,
+    "override_rate": 0.04498448810754912
+  },
+  {
+    "confidence": 0.65,
+    "margin": 0.05,
+    "mean": 473.95,
+    "p10": 427.4,
+    "success": 0.6,
+    "overrides": 1161,
+    "override_rate": 0.12248127439603333
+  },
+  {
+    "confidence": 0.65,
+    "margin": 0.15,
+    "mean": 473.95,
+    "p10": 427.4,
+    "success": 0.6,
+    "overrides": 1161,
+    "override_rate": 0.12248127439603333
+  },
+  {
+    "confidence": 0.65,
+    "margin": 0.3,
+    "mean": 473.95,
+    "p10": 427.4,
+    "success": 0.6,
+    "overrides": 1161,
+    "override_rate": 0.12248127439603333
+  },
+  {
+    "confidence": 0.65,
+    "margin": 0.5,
+    "mean": 483.5,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 435,
+    "override_rate": 0.04498448810754912
+  },
+  {
+    "confidence": 0.75,
+    "margin": 0.05,
+    "mean": 484.15,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 344,
+    "override_rate": 0.03552617990292265
+  },
+  {
+    "confidence": 0.75,
+    "margin": 0.15,
+    "mean": 484.15,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 344,
+    "override_rate": 0.03552617990292265
+  },
+  {
+    "confidence": 0.75,
+    "margin": 0.3,
+    "mean": 484.15,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 344,
+    "override_rate": 0.03552617990292265
+  },
+  {
+    "confidence": 0.75,
+    "margin": 0.5,
+    "mean": 484.15,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 344,
+    "override_rate": 0.03552617990292265
+  }
+]

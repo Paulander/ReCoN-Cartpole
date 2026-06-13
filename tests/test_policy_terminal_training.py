@@ -1,3 +1,4 @@
+import json
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import sys
@@ -777,6 +778,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     mingru_hard_seeds = _load_script("collect_mingru_hard_seeds")
     mingru_onpolicy = _load_script("train_mingru_onpolicy")
     mingru_ppo = _load_script("train_mingru_ppo")
+    mingru_action_gate = _load_script("train_mingru_action_gate")
     subchain_pair = _load_script("train_subchain_pair_terminal")
 
     assert callable(dataset_builder.collect)
@@ -800,6 +802,7 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
     assert callable(mingru_hard_seeds.run_collect)
     assert callable(mingru_onpolicy.run)
     assert callable(mingru_ppo.run)
+    assert callable(mingru_action_gate.run)
     assert callable(subchain_pair.run)
 
 
@@ -1068,6 +1071,22 @@ def test_counterfactual_gate_summarizes_positive_labels():
     assert summary["label_counts"]["3"] == 1
     assert summary["max_survival_gap"] == 3.0
     assert summary["max_score_gap"] == 3.5
+
+
+def test_mingru_action_gate_collect_seed_values_reads_txt_and_json(tmp_path):
+    mingru_gate = _load_script("train_mingru_action_gate")
+    txt = tmp_path / "hard.txt"
+    txt.write_text("10\n12\n", encoding="utf-8")
+    args = SimpleNamespace(collect_seeds_path=str(txt), collect_seed_start=1, collect_episodes=8)
+
+    assert mingru_gate.collect_seed_values(args) == [10, 12]
+
+    js = tmp_path / "hard.json"
+    js.write_text(json.dumps({"hard_seeds": [20, 21, 22]}), encoding="utf-8")
+    args.collect_seeds_path = str(js)
+    args.collect_episodes = 2
+
+    assert mingru_gate.collect_seed_values(args) == [20, 21]
 
 
 def test_counterfactual_gate_noop_eval_resets_override_counts():

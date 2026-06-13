@@ -1,0 +1,58 @@
+[
+  {
+    "confidence": 0.2,
+    "mean": 357.95,
+    "p10": 263.6,
+    "success": 0.15,
+    "overrides": 4627,
+    "override_rate": 0.6463193183405503
+  },
+  {
+    "confidence": 0.3,
+    "mean": 357.95,
+    "p10": 263.6,
+    "success": 0.15,
+    "overrides": 4627,
+    "override_rate": 0.6463193183405503
+  },
+  {
+    "confidence": 0.4,
+    "mean": 364.85,
+    "p10": 264.5,
+    "success": 0.15,
+    "overrides": 4294,
+    "override_rate": 0.5884610113745374
+  },
+  {
+    "confidence": 0.5,
+    "mean": 426.35,
+    "p10": 292.40000000000003,
+    "success": 0.45,
+    "overrides": 2504,
+    "override_rate": 0.29365544740236893
+  },
+  {
+    "confidence": 0.6,
+    "mean": 461.85,
+    "p10": 403.5,
+    "success": 0.55,
+    "overrides": 1750,
+    "override_rate": 0.18945545090397314
+  },
+  {
+    "confidence": 0.7,
+    "mean": 482.15,
+    "p10": 431.1,
+    "success": 0.65,
+    "overrides": 741,
+    "override_rate": 0.07684330602509593
+  },
+  {
+    "confidence": 0.8,
+    "mean": 484.45,
+    "p10": 432.2,
+    "success": 0.65,
+    "overrides": 0,
+    "override_rate": 0.0
+  }
+]
