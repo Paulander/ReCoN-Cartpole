@@ -1171,6 +1171,36 @@ def test_mingru_action_gate_collect_seed_values_reads_txt_and_json(tmp_path):
     assert mingru_gate.collect_seed_values(args) == [20, 21]
 
 
+def test_mingru_action_gate_train_oversamples_positive_labels():
+    pytest.importorskip("torch")
+    mingru_gate = _load_script("train_mingru_action_gate")
+    rows = [
+        {"feature": [0.0, 0.0], "label": 0, "apply_label": 0},
+        {"feature": [1.0, 0.0], "label": 0, "apply_label": 0},
+        {"feature": [0.0, 1.0], "label": 3, "apply_label": 1},
+    ]
+    args = SimpleNamespace(
+        discrete_action_bins=5,
+        hidden_size_gate=4,
+        max_class_weight=8.0,
+        no_override_weight=1.0,
+        learning_rate=1e-3,
+        train_seed=7,
+        epochs=1,
+        batch_size=2,
+        positive_oversample_factor=4,
+        train_apply_gate=False,
+        gate_apply_threshold=0.5,
+    )
+
+    _model, meta = mingru_gate.train_gate(rows, args)
+
+    assert meta["original_row_count"] == 3
+    assert meta["expanded_row_count"] == 6
+    assert meta["positive_oversample_factor"] == 4
+    assert meta["label_counts"]["3"] == 4
+
+
 def test_mingru_action_gate_decision_respects_apply_probability():
     mingru_gate = _load_script("train_mingru_action_gate")
     probs = mingru_gate.np.asarray([0.10, 0.05, 0.80, 0.03, 0.02, 0.0], dtype=float)

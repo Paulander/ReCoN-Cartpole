@@ -342,9 +342,15 @@ def train_gate(rows: list[dict[str, Any]], args: argparse.Namespace) -> tuple[An
 
     if not rows:
         raise ValueError("no gate training rows collected")
-    x = torch.tensor([row["feature"] for row in rows], dtype=torch.float32)
-    y = torch.tensor([int(row["label"]) for row in rows], dtype=torch.long)
-    apply_y = torch.tensor([int(row.get("apply_label", int(int(row["label"]) > 0))) for row in rows], dtype=torch.float32).reshape(-1, 1)
+    factor = max(1, int(round(float(getattr(args, "positive_oversample_factor", 1.0)))))
+    train_rows = list(rows)
+    if factor > 1:
+        positive_rows = [row for row in rows if int(row.get("label", 0)) > 0]
+        for _ in range(factor - 1):
+            train_rows.extend(positive_rows)
+    x = torch.tensor([row["feature"] for row in train_rows], dtype=torch.float32)
+    y = torch.tensor([int(row["label"]) for row in train_rows], dtype=torch.long)
+    apply_y = torch.tensor([int(row.get("apply_label", int(int(row["label"]) > 0))) for row in train_rows], dtype=torch.float32).reshape(-1, 1)
     classes = int(args.discrete_action_bins) + 1
     model = nn.Sequential(
         nn.Linear(x.shape[1], int(args.hidden_size_gate)),
@@ -418,6 +424,9 @@ def train_gate(rows: list[dict[str, Any]], args: argparse.Namespace) -> tuple[An
         "apply_positive_rate": apply_positive_rate,
         "apply_accuracy": apply_accuracy,
         "apply_threshold": float(args.gate_apply_threshold),
+        "original_row_count": int(len(rows)),
+        "expanded_row_count": int(len(train_rows)),
+        "positive_oversample_factor": int(factor),
         "train_accuracy": acc,
         "positive_recall": recall,
     }
@@ -828,6 +837,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--train-seed", type=int, default=7)
     parser.add_argument("--max-class-weight", type=float, default=8.0)
     parser.add_argument("--no-override-weight", type=float, default=1.0)
+    parser.add_argument("--positive-oversample-factor", type=float, default=1.0)
     parser.add_argument("--train-apply-gate", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--apply-epochs", type=int, default=120)
     parser.add_argument("--apply-positive-weight", type=float, default=0.0)
