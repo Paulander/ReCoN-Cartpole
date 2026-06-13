@@ -768,3 +768,19 @@ Apply-threshold sweep: `reports/n4_gated_counterfactual_residual_motifmine_20260
 
 Interpretation: motif ranking improved positive-label density versus the smaller gated probe, and the apply gate prevented success degradation, but no threshold improved held-out success over the frozen PPO base. This weakens the post-hoc residual path for the current 5-bin terminal: the remaining failures are not being rescued by simple residual shifts even when counterfactual labels exist. The next better-supported direction is recurrent/on-policy curriculum or a primary policy update that uses subchain/motif state directly, rather than another residual-only pass.
 
+### Balanced-Tail minGRU PPO KL Probe
+
+Run: `reports/n4_mingru_ppo_balanced_tail_kl_20260613_seed8950k`
+
+This tested a conservative PPO-style recurrent update from the best balanced DAgger7 minGRU checkpoint (`reports/n4_mingru_curriculum_subchain_motif_balanced_dagger7_20260613_seed5200k/supervised_mingru/mingru_terminal.pt`). Training used 96 seeds from `reports/n4_mingru_dagger5_hardseed_mine_20260613_seed5200k/balanced_tail_seeds.txt`, 6 rollout/update iterations of 16 episodes, LR `3e-6`, clip `0.04`, reference KL coefficient `0.08`, late-survival bonus `0.02`, and the motif/subchain/previous-force observation mode.
+
+Rollout training stats were noisy rather than consistently improving: per-iteration success was `0.50`, `0.4375`, `0.50`, `0.5625`, `0.4375`, `0.50`, while reference KL stayed tiny (`~1e-6`). Held-out eval used the standard recurrent mixed block: starts `1900000`, `2000000`, `2100000`, `2200000`, 20 episodes each.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| DAgger7 baseline, pure/ReCoN | 486.8 | 444.9 | 0.675 | 80 |
+| PPO balanced-tail KL, pure minGRU | 486.7 | 444.9 | 0.675 | 80 |
+| PPO balanced-tail KL, ReCoN-routed minGRU | 486.4 | 442.4 | 0.6625 | 80 |
+
+Interpretation: stronger KL preservation avoided large policy drift, but did not improve the recurrent held-out plateau. As with prior minGRU PPO attempts, the pure policy remains flat and the ReCoN wrapper can dip. This reinforces the current direction: small updates to the same global recurrent terminal are unlikely to crack N=4; future learning should either change the architecture toward explicit local/subchain option composition or use a substantially different PPO setup for the primary 5-bin policy rather than another recurrent micro-update.
+
