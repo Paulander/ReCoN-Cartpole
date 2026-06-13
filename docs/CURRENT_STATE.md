@@ -852,3 +852,31 @@ The first hard-tail follow-up (`reports/n4_hardtail_anchor_continue_20260613_see
 Final held-out on `1900000`, `2000000`, `2100000` used the start checkpoint because no chunk promoted: pure PPO success `0.444`, ReCoN-routed policy terminal success `0.578` over 45 episodes. This is not a solve claim and shows that this final block is a tougher tail slice for the incumbent.
 
 Interpretation: small continuation updates do not move the current 5-bin policy, and stronger hard-tail replay with a light teacher anchor still degrades before it helps. The next PPO attempt should avoid VecNormalize when resuming this checkpoint and should either run a genuinely from-scratch architecture sweep or change the objective/data path, for example auxiliary training on option-trace labels or a recurrent curriculum that treats hard-tail states as on-policy distribution shift rather than repeated PPO micro-updates.
+
+## Option-Trace Auxiliary Recurrent Dataset - 2026-06-13
+
+The long-option shared-subchain labeler now exports a second sidecar dataset, `option_policy_dataset.npz`, in the same primary-policy format consumed by `train_mingru_supervised.py`: observations, previous force, teacher force/action labels, returns-to-go, failure flags, source tags, episode ids, step indices, and sample weights. This keeps the existing pair-terminal dataset intact while making counterfactual option traces usable by the primary recurrent policy/minGRU terminal.
+
+Implementation notes:
+
+- `scripts/train_subchain_pair_terminal.py` records `prev_force` in teacher rollouts and forced option traces.
+- Successful counterfactual options now add full-policy sidecar rows for both the initial recovery state and sampled forced option-trace states.
+- `--option-policy-observation-mode` controls sidecar observations; the recurrent-compatible probe used `normalized_raw4_subchains_prev_force`.
+- Focused verification: `uv run ruff check scripts/train_subchain_pair_terminal.py tests/test_policy_terminal_training.py` passed, and `uv run pytest tests/test_policy_terminal_training.py::test_subchain_pair_counterfactual_expands_tail_options tests/test_policy_terminal_training.py::test_subchain_option_trace_exports_primary_policy_rows -q -s` passed.
+
+Dataset probe: `reports/n4_option_policy_subchain_dataset_20260613_seed9010k`
+
+The sidecar contains 146 primary-policy rows with observation shape `(146, 23)`: `counterfactual_recovery: 9`, `counterfactual_recovery_option: 72`, `counterfactual_no_better: 26`, and `preserve_success: 39`. Action labels cover all 5 bins: `{0: 52, 1: 27, 2: 15, 3: 3, 4: 49}`.
+
+Auxiliary finetune: `reports/n4_mingru_optiontrace_aux_20260613_seed9020k`
+
+This resumed from the balanced DAgger7 minGRU checkpoint and trained conservatively on only the option-trace sidecar. Held-out eval used starts `1900000`, `2000000`, `2100000`, and `2200000` with 20 episodes per start.
+
+| evaluator | mean | p10 | success | episodes |
+|---|---:|---:|---:|---:|
+| DAgger7 pure minGRU | 486.8 | 444.9 | 0.675 | 80 |
+| DAgger7 ReCoN-routed minGRU | 486.4 | 442.4 | 0.6625 | 80 |
+| option-trace auxiliary pure minGRU | 486.4 | 446.1 | 0.675 | 80 |
+| option-trace auxiliary ReCoN-routed minGRU | 486.7 | 442.5 | 0.675 | 80 |
+
+Interpretation: this does not solve N=4, but it is the first useful sign that long-option counterfactual traces are better used as auxiliary primary-policy/recurrent data than as direct subchain actuator authority. The improvement is small: ReCoN-routed minGRU recovers from `0.6625` to `0.675` success on this block, and pure minGRU p10 improves slightly. The next stronger experiment should mix these option-trace rows with the full DAgger curriculum dataset instead of finetuning on the tiny sidecar alone.

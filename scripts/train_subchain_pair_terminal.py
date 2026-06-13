@@ -8,6 +8,8 @@ from typing import Any
 
 import numpy as np
 
+from recon_cartpole.control.actuators import action_from_force
+from recon_cartpole.control.policy_observation import policy_observation_from_state
 from recon_cartpole.control.sensors import features_from_state
 from recon_cartpole.envs.cartpole_n import CartPoleNConfig, CartPoleNEnv
 from recon_cartpole.recon.engine_runner import ReConCartPoleController, RunnerConfig
@@ -124,6 +126,7 @@ def rollout_episode(args: argparse.Namespace, seed: int) -> dict[str, Any]:
     teacher.start_episode()
     states: list[dict[str, Any]] = []
     total = 0.0
+    prev_force = 0.0
     for step in range(int(args.horizon)):
         raw_before = np.asarray(info["raw_state"], dtype=float).copy()
         action, diagnostics = teacher.act(obs, raw_before)
@@ -134,10 +137,12 @@ def rollout_episode(args: argparse.Namespace, seed: int) -> dict[str, Any]:
                 "raw_before": raw_before.tolist(),
                 "action": int(action),
                 "force": base_force,
+                "prev_force": float(prev_force),
             }
         )
         obs, reward, terminated, truncated, info = env.step(int(action))
         total += float(reward)
+        prev_force = base_force
         if terminated or truncated:
             return {
                 "seed": int(seed),
@@ -169,6 +174,7 @@ def counterfactual_sequence_score(
     seq_forces = [float(force) for force in sequence.get("forces", [])]
     seq_steps = [max(1, int(steps)) for steps in sequence.get("steps", [])]
     forced_trace: list[dict[str, Any]] = []
+    prev_force = float(base_force)
     for force, hold_steps in zip(seq_forces, seq_steps):
         force_idx = force_to_index(force, args)
         for _ in range(hold_steps):
@@ -178,9 +184,11 @@ def counterfactual_sequence_score(
                     "raw_state": raw_before.tolist(),
                     "step": int(step + survived),
                     "force": float(force),
+                    "prev_force": float(prev_force),
                 }
             )
             obs, _reward, terminated, truncated, info = env.step(force_idx)
+            prev_force = float(force)
             survived += 1
             pressures.append(pressure_from_raw(info.get("raw_state", raw_state), int(args.n_poles)))
             if terminated or truncated:
@@ -291,6 +299,120 @@ def append_pair_rows(
         rows["pressures"].append(float(pressure))
 
 
+def empty_policy_rows() -> dict[str, list[Any]]:
+    return {
+        key: []
+        for key in [
+            "observations",
+            "prev_forces",
+            "teacher_forces",
+            "teacher_actions",
+            "returns_to_go",
+            "failure_within_k",
+            "seeds",
+            "sources",
+            "rollout_sources",
+            "rollout_forces",
+            "rollout_actions",
+            "motif_scores",
+            "episodes",
+            "step_indices",
+            "sample_weights",
+        ]
+    }
+
+
+def append_policy_option_row(
+    args: argparse.Namespace,
+    rows: dict[str, list[Any]],
+    raw_state: Any,
+    target_force: float,
+    prev_force: float,
+    confidence: float,
+    weight: float,
+    seed: int,
+    episode: int,
+    step: int,
+    source: str,
+) -> None:
+    observation = policy_observation_from_state(
+        raw_state,
+        raw_state,
+        int(args.n_poles),
+        str(getattr(args, "option_policy_observation_mode", "normalized_raw4_prev_force")),
+        previous_force=float(prev_force),
+        force_mag=float(args.force_mag),
+    )
+    action = int(action_from_force(float(target_force), "discrete", float(args.force_mag), int(args.discrete_action_bins)))
+    rows["observations"].append(observation.astype(np.float32, copy=False))
+    rows["prev_forces"].append(float(prev_force))
+    rows["teacher_forces"].append(float(target_force))
+    rows["teacher_actions"].append(action)
+    rows["returns_to_go"].append(float(max(0, int(args.horizon) - int(step))))
+    rows["failure_within_k"].append(0.0 if str(source).startswith("counterfactual_recovery") else 1.0)
+    rows["seeds"].append(int(seed))
+    rows["sources"].append(str(source))
+    rows["rollout_sources"].append("counterfactual_option")
+    rows["rollout_forces"].append(float(target_force))
+    rows["rollout_actions"].append(action)
+    rows["motif_scores"].append(0.0)
+    rows["episodes"].append(int(episode))
+    rows["step_indices"].append(int(step))
+    rows["sample_weights"].append(float(max(0.0, weight) * max(0.0, confidence)))
+
+
+def append_policy_option_trace_rows(
+    args: argparse.Namespace,
+    rows: dict[str, list[Any]],
+    option: dict[str, Any],
+    confidence: float,
+    weight: float,
+    seed: int,
+    episode: int,
+) -> None:
+    stride = max(1, int(getattr(args, "option_trace_stride", 1)))
+    trace = list(option.get("forced_trace", []))
+    if not bool(getattr(args, "append_option_trace", True)) or not trace:
+        return
+    max_rows = max(1, int(getattr(args, "max_option_trace_states", 12)))
+    for item in trace[::stride][:max_rows]:
+        append_policy_option_row(
+            args,
+            rows,
+            item["raw_state"],
+            float(item["force"]),
+            float(item.get("prev_force", item["force"])),
+            confidence=confidence,
+            weight=weight,
+            seed=seed,
+            episode=episode,
+            step=int(item["step"]),
+            source="counterfactual_recovery_option",
+        )
+
+
+def finalize_policy_dataset(rows: dict[str, list[Any]]) -> dict[str, np.ndarray]:
+    if not rows["observations"]:
+        return {}
+    return {
+        "observations": np.stack(rows["observations"]).astype(np.float32),
+        "prev_forces": np.asarray(rows["prev_forces"], dtype=np.float32),
+        "teacher_forces": np.asarray(rows["teacher_forces"], dtype=np.float32),
+        "teacher_actions": np.asarray(rows["teacher_actions"], dtype=np.int64),
+        "returns_to_go": np.asarray(rows["returns_to_go"], dtype=np.float32),
+        "failure_within_k": np.asarray(rows["failure_within_k"], dtype=np.float32),
+        "seeds": np.asarray(rows["seeds"], dtype=np.int64),
+        "sources": np.asarray(rows["sources"]),
+        "rollout_sources": np.asarray(rows["rollout_sources"]),
+        "rollout_forces": np.asarray(rows["rollout_forces"], dtype=np.float32),
+        "rollout_actions": np.asarray(rows["rollout_actions"], dtype=np.int64),
+        "motif_scores": np.asarray(rows["motif_scores"], dtype=np.float32),
+        "episodes": np.asarray(rows["episodes"], dtype=np.int64),
+        "step_indices": np.asarray(rows["step_indices"], dtype=np.int64),
+        "sample_weights": np.asarray(rows["sample_weights"], dtype=np.float32),
+    }
+
+
 def append_option_trace_rows(
     args: argparse.Namespace,
     terminal: SharedSubchainTerminal,
@@ -353,6 +475,8 @@ def collect_teacher_dataset(args: argparse.Namespace, terminal: SharedSubchainTe
 
 def collect_counterfactual_dataset(args: argparse.Namespace, terminal: SharedSubchainTerminal) -> dict[str, np.ndarray]:
     rows: dict[str, list[Any]] = {key: [] for key in ["x", "force_targets", "confidence_targets", "sample_weights", "pair_indices", "seeds", "steps", "sources", "pressures"]}
+    policy_rows = empty_policy_rows()
+    option_episode = 0
     episodes: list[dict[str, Any]] = []
     candidate_forces = force_values(args)
     for ep in range(int(args.episodes)):
@@ -362,6 +486,7 @@ def collect_counterfactual_dataset(args: argparse.Namespace, terminal: SharedSub
         for state in selected_counterfactual_states(args, episode):
             raw = state["raw_before"]
             base_force = float(state["force"])
+            prev_force = float(state.get("prev_force", base_force))
             if bool(state.get("preserve_success", False)):
                 append_pair_rows(
                     args,
@@ -375,6 +500,20 @@ def collect_counterfactual_dataset(args: argparse.Namespace, terminal: SharedSub
                     step=int(state["step"]),
                     source="preserve_success",
                 )
+                append_policy_option_row(
+                    args,
+                    policy_rows,
+                    raw,
+                    base_force,
+                    prev_force,
+                    confidence=float(args.preserve_confidence),
+                    weight=float(args.preserve_weight),
+                    seed=seed,
+                    episode=option_episode,
+                    step=int(state["step"]),
+                    source="preserve_success",
+                )
+                option_episode += 1
                 continue
             options = [counterfactual_score(args, raw, int(state["step"]), base_force, force) for force in candidate_forces]
             center = counterfactual_sequence_score(
@@ -404,9 +543,27 @@ def collect_counterfactual_dataset(args: argparse.Namespace, terminal: SharedSub
                 step=int(state["step"]),
                 source=source,
             )
+            append_policy_option_row(
+                args,
+                policy_rows,
+                raw,
+                target_force,
+                prev_force,
+                confidence=confidence,
+                weight=weight,
+                seed=seed,
+                episode=option_episode,
+                step=int(state["step"]),
+                source=source,
+            )
             if source == "counterfactual_recovery":
                 append_option_trace_rows(args, terminal, rows, best, confidence, weight, seed)
+                append_policy_option_trace_rows(args, policy_rows, best, confidence, weight, seed, option_episode)
+            option_episode += 1
     data = finalize_dataset(rows)
+    policy_data = finalize_policy_dataset(policy_rows)
+    if policy_data:
+        data["option_policy_dataset"] = policy_data
     data["episode_summaries"] = np.asarray([json.dumps(item) for item in episodes])
     return data
 
@@ -540,7 +697,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     )
     terminal = SharedSubchainTerminal(args.n_poles, args.force_mag, cfg)
     data = collect_dataset(args, terminal)
+    option_policy_data = data.pop("option_policy_dataset", {})
     np.savez_compressed(out / "dataset.npz", **data)
+    option_policy_path = ""
+    if option_policy_data:
+        option_policy_path = str(out / "option_policy_dataset.npz")
+        np.savez_compressed(option_policy_path, **option_policy_data)
     model, history = train_model(args, data, terminal)
     checkpoint = out / "subchain_pair_terminal.pt"
     save_subchain_terminal_checkpoint(checkpoint, model, cfg, {"samples": int(data["x"].shape[0])})
@@ -551,6 +713,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "status": "completed",
         "checkpoint_path": str(checkpoint),
         "samples": int(data["x"].shape[0]),
+        "option_policy_dataset": option_policy_path,
+        "option_policy_samples": int(option_policy_data.get("observations", np.asarray([])).shape[0])
+        if option_policy_data
+        else 0,
+        "option_policy_source_counts": {
+            str(item): int(np.sum(option_policy_data.get("sources", np.asarray([])) == item))
+            for item in np.unique(option_policy_data.get("sources", np.asarray([])))
+        }
+        if option_policy_data
+        else {},
         "source_counts": {str(item): int(np.sum(data.get("sources", np.asarray([])) == item)) for item in np.unique(data.get("sources", np.asarray([])))},
         "pairs": int(max(0, args.n_poles - 1)),
         "history": history,
@@ -581,6 +753,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--policy-terminal-blend", type=float, default=1.0)
     parser.add_argument("--policy-terminal-scope", choices=["stabilize_chain", "selected", "all"], default="stabilize_chain")
     parser.add_argument("--policy-terminal-observation-mode", default="normalized_raw")
+    parser.add_argument("--option-policy-observation-mode", default="normalized_raw4_prev_force")
     parser.add_argument("--selection-mode", choices=["soft_select", "hard_select"], default="hard_select")
     parser.add_argument("--n-poles", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=500)

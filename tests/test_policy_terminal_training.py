@@ -804,6 +804,44 @@ def test_subchain_pair_counterfactual_expands_tail_options(monkeypatch):
     assert best["score"] == 10.0
 
 
+def test_subchain_option_trace_exports_primary_policy_rows():
+    subchain_pair = _load_script("train_subchain_pair_terminal")
+    args = SimpleNamespace(
+        n_poles=4,
+        horizon=500,
+        force_mag=10.0,
+        discrete_action_bins=5,
+        option_policy_observation_mode="normalized_raw4_prev_force",
+    )
+    rows = subchain_pair.empty_policy_rows()
+    raw = [0.1, -0.2, 0.01, -0.02, 0.03, -0.04, 0.5, -0.4, 0.3, -0.2]
+
+    subchain_pair.append_policy_option_row(
+        args,
+        rows,
+        raw,
+        target_force=10.0,
+        prev_force=-5.0,
+        confidence=0.5,
+        weight=2.0,
+        seed=123,
+        episode=7,
+        step=42,
+        source="counterfactual_recovery_option",
+    )
+    data = subchain_pair.finalize_policy_dataset(rows)
+
+    assert data["observations"].shape == (1, 11)
+    assert data["prev_forces"].tolist() == [-5.0]
+    assert data["teacher_forces"].tolist() == [10.0]
+    assert data["teacher_actions"].tolist() == [4]
+    assert data["failure_within_k"].tolist() == [0.0]
+    assert data["sample_weights"].tolist() == [1.0]
+    assert data["episodes"].tolist() == [7]
+    assert data["step_indices"].tolist() == [42]
+
+
+
 def test_mingru_onpolicy_discounted_returns():
     onpolicy = _load_script("train_mingru_onpolicy")
 
