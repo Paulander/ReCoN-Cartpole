@@ -20,7 +20,6 @@ from train_mingru_onpolicy import (  # noqa: E402
     eval_seeds,
     make_env,
     make_terminal,
-    seed_values,
     window_tensor,
 )
 from train_recurrent_terminal_ladder import evaluate_pure_mingru, evaluate_recon_mingru  # noqa: E402
@@ -59,6 +58,78 @@ def heldout_score(summary: dict[str, Any]) -> float:
         + float(summary.get("p10_survival", 0.0))
         + 0.10 * float(summary.get("mean_survival", 0.0))
     )
+
+
+def _seed_from_item(item: Any) -> int:
+    if isinstance(item, dict):
+        return int(item["seed"])
+    return int(item)
+
+
+def read_seed_list(path: str) -> list[int]:
+    raw = Path(path).read_text(encoding="utf-8")
+    seeds: list[int] = []
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        payload = None
+    if isinstance(payload, dict):
+        for key in ("hard_seeds", "seeds", "tail_seeds"):
+            if isinstance(payload.get(key), list):
+                seeds = [_seed_from_item(item) for item in payload[key]]
+                break
+    elif isinstance(payload, list):
+        seeds = [_seed_from_item(item) for item in payload]
+    if not seeds:
+        for item in raw.replace(",", "\n").splitlines():
+            value = item.strip()
+            if value:
+                seeds.append(int(value))
+    return seeds
+
+
+def seed_mix_counts(args: argparse.Namespace) -> tuple[int, int]:
+    train_episodes = int(args.train_episodes)
+    seed_list = str(getattr(args, "seed_list", "") or "").strip()
+    if not seed_list:
+        return 0, train_episodes
+    hard = read_seed_list(seed_list)
+    hard_probability = min(1.0, max(0.0, float(getattr(args, "hard_seed_probability", 1.0))))
+    if hard_probability <= 0.0 or not hard:
+        return 0, train_episodes
+    if hard_probability >= 1.0:
+        return train_episodes, 0
+    hard_count = int(round(train_episodes * hard_probability))
+    return hard_count, train_episodes - hard_count
+
+
+def seed_values(args: argparse.Namespace) -> list[int]:
+    train_episodes = int(args.train_episodes)
+    fresh = [int(args.seed_start) + idx for idx in range(train_episodes)]
+    seed_list = str(getattr(args, "seed_list", "") or "").strip()
+    if not seed_list:
+        return fresh
+
+    hard = read_seed_list(seed_list)
+    hard_count, _fresh_count = seed_mix_counts(args)
+    if hard_count <= 0 or not hard:
+        return fresh
+    if hard_count >= train_episodes:
+        return [int(hard[idx % len(hard)]) for idx in range(train_episodes)]
+
+    rng = np.random.default_rng(int(args.train_seed))
+    hard_positions = set(int(idx) for idx in rng.choice(train_episodes, size=hard_count, replace=False))
+    mixed: list[int] = []
+    hard_idx = 0
+    fresh_idx = 0
+    for idx in range(train_episodes):
+        if idx in hard_positions:
+            mixed.append(int(hard[hard_idx % len(hard)]))
+            hard_idx += 1
+        else:
+            mixed.append(int(fresh[fresh_idx]))
+            fresh_idx += 1
+    return mixed
 
 
 def collect_rollouts(args: argparse.Namespace, terminal: Any, device: Any, seeds: list[int]) -> RolloutBatch:
@@ -312,6 +383,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         },
         "train_seed_count": len(all_seeds),
         "seed_list": str(getattr(args, "seed_list", "") or ""),
+        "hard_seed_probability": float(getattr(args, "hard_seed_probability", 1.0)),
+        "hard_seed_count": seed_mix_counts(args)[0],
+        "fresh_seed_count": seed_mix_counts(args)[1],
         "history": history,
         "start_pure_mingru_policy": start_pure,
         "start_recon_mingru_terminal": start_recon,
@@ -365,6 +439,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--train-episodes", type=int, default=64)
     parser.add_argument("--seed-start", type=int, default=7_000_000)
     parser.add_argument("--seed-list", default="")
+    parser.add_argument("--hard-seed-probability", type=float, default=1.0)
     parser.add_argument("--iterations", type=int, default=4)
     parser.add_argument("--rollout-episodes", type=int, default=16)
     parser.add_argument("--ppo-epochs", type=int, default=3)

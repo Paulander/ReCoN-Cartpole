@@ -807,6 +807,43 @@ def test_recurrent_terminal_scripts_import_and_hash_configs():
 
 
 
+def test_mingru_ppo_seed_values_defaults_to_hard_seed_list(tmp_path):
+    mingru_ppo = _load_script("train_mingru_ppo")
+    seeds = tmp_path / "hard.json"
+    seeds.write_text(json.dumps({"hard_seeds": [101, {"seed": 202}]}), encoding="utf-8")
+    args = SimpleNamespace(
+        seed_list=str(seeds),
+        seed_start=7000,
+        train_episodes=5,
+        train_seed=1,
+        hard_seed_probability=1.0,
+    )
+
+    assert mingru_ppo.seed_values(args) == [101, 202, 101, 202, 101]
+    assert mingru_ppo.seed_mix_counts(args) == (5, 0)
+
+
+def test_mingru_ppo_seed_values_mixes_hard_and_fresh_seeds(tmp_path):
+    mingru_ppo = _load_script("train_mingru_ppo")
+    seeds = tmp_path / "hard.txt"
+    seeds.write_text("10\n20\n30\n", encoding="utf-8")
+    args = SimpleNamespace(
+        seed_list=str(seeds),
+        seed_start=9000,
+        train_episodes=10,
+        train_seed=123,
+        hard_seed_probability=0.3,
+    )
+
+    mixed = mingru_ppo.seed_values(args)
+
+    assert len(mixed) == 10
+    assert sum(1 for seed in mixed if seed in {10, 20, 30}) == 3
+    assert sum(1 for seed in mixed if 9000 <= seed < 9010) == 7
+    assert mingru_ppo.seed_mix_counts(args) == (3, 7)
+    assert mixed == mingru_ppo.seed_values(args)
+
+
 def test_subchain_pair_terminal_collect_seed_values_reads_seed_list(tmp_path):
     subchain_pair = _load_script("train_subchain_pair_terminal")
     txt = tmp_path / "seeds.txt"
