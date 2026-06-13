@@ -781,6 +781,7 @@ def write_markdown(result: dict[str, Any], path: Path) -> None:
         f"Residual model: `{result['residual_model_path']}`",
         f"Rows: `{ds['row_count']}`, non-noop labels: `{ds['non_noop_count']}`",
         f"Label counts: `{ds['label_counts']}`",
+        f"Apply gate: `{ds.get('meta', {}).get('apply_gate_enabled', False)}`, apply label counts: `{ds.get('meta', {}).get('apply_label_counts', {})}`",
         f"Option hold steps: `{result.get('option_hold_steps', 1)}`",
         f"Failure state selection: `{result.get('failure_state_selection', {})}`",
         f"Label gates: `{result.get('label_gates', {})}`",

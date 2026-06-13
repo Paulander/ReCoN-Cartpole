@@ -732,3 +732,39 @@ Apply-threshold sweep: `reports/n4_gated_counterfactual_residual_probe_20260613_
 
 Interpretation: the apply gate is wired correctly and can abstain back to the frozen PPO baseline, but this small gated dataset still does not improve held-out N=4. The next useful residual move is not looser gating; it is more/better positive recovery labels, likely via broader hard-seed mining, motif-ranked failure windows, or a learned apply gate trained on counterfactual harm/benefit rather than just non-noop labels.
 
+### Motif-Mined Gated Residual Probe
+
+Run: `reports/n4_gated_counterfactual_residual_motifmine_20260613_seed8940k`
+
+This expanded the gated long-option residual pass to 20 hard/near-miss collection seeds and used the learned adjacent-subchain motif prototype (`reports/n4_subchain_motif_diagnostic_20260612_seed2420k/prototype_model.json`) plus recovery pressure to rank candidate failure windows. The goal was to test whether motif-ranked windows produce denser useful residual labels while preserving solved-seed behavior.
+
+| item | value |
+|---|---:|
+| rows | 160 |
+| non-noop labels | 8 |
+| apply labels after oversampling | 32 positive / 152 negative |
+| action train accuracy | 0.875 |
+| non-noop recall | 0.750 |
+| apply accuracy | 0.957 |
+| max score gap | 0.965 |
+
+Held-out eval used starts `1500000` and `1600000` with 30 episodes per block.
+
+| evaluator | mean | p10 | cvar | success | mean abs residual delta |
+|---|---:|---:|---:|---:|---:|
+| frozen PPO ReCoN base | 486.8 | 443.7 | 425.3 | 0.7167 | 0.000 |
+| motif-mined gated residual, apply threshold 0.60 | 486.7 | 443.5 | 424.2 | 0.7167 | 0.395 |
+
+Apply-threshold sweep: `reports/n4_gated_counterfactual_residual_motifmine_20260613_seed8940k/apply_gate_sweep.json`
+
+| apply threshold | mean | p10 | cvar | success | mean abs residual delta |
+|---:|---:|---:|---:|---:|---:|
+| 0.50 | 486.7 | 443.5 | 424.3 | 0.7167 | 0.524 |
+| 0.60 | 486.7 | 443.5 | 424.2 | 0.7167 | 0.395 |
+| 0.70 | 486.8 | 443.5 | 424.7 | 0.7167 | 0.298 |
+| 0.80 | 486.7 | 443.5 | 424.5 | 0.7167 | 0.224 |
+| 0.90 | 486.7 | 443.5 | 424.2 | 0.7167 | 0.149 |
+| 0.95 | 486.8 | 443.6 | 424.8 | 0.7167 | 0.094 |
+
+Interpretation: motif ranking improved positive-label density versus the smaller gated probe, and the apply gate prevented success degradation, but no threshold improved held-out success over the frozen PPO base. This weakens the post-hoc residual path for the current 5-bin terminal: the remaining failures are not being rescued by simple residual shifts even when counterfactual labels exist. The next better-supported direction is recurrent/on-policy curriculum or a primary policy update that uses subchain/motif state directly, rather than another residual-only pass.
+
