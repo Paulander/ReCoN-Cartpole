@@ -1304,3 +1304,27 @@ Setup: same 3 residual action bins, lower gate threshold `0.20`, fewer preservat
 
 Interpretation: this confirms the current learned residual family on the current-best checkpoint is trapped between abstain and small harm. The strict variant learned to do nothing, which is safe but useless. The loose variant produced nonzero residual shifts, but did not flip any held-out failures into successes and slightly hurt cvar/mean. More recovery-window PPO with the same feature/action setup is unlikely to crack N=4. A better residual direction would need a more explicit trigger/benefit classifier or option-level recovery policy, not per-step PPO residual shifts from short recovery-window resets.
 
+## Fresh Option-Aux Behavior Curriculum DAgger12 - 2026-06-13
+
+Ran a bounded recurrent curriculum/DAgger pass using the latest fresh option-aux minGRU checkpoint as the hard-tail behavior policy and the frozen current-best ReCoN/PPO terminal as the teacher. This tests whether collecting a fresh behavior-policy hard-tail stage helps more than repeatedly finetuning on small option-trace sidecars.
+
+Run: `reports/n4_mingru_curriculum_freshaux_dagger12_20260613_seed9162k`
+
+Setup: resumed from `reports/n4_mingru_fresh_option_aux_iter2_20260613_seed9142k/supervised_mingru/mingru_terminal.pt`, same `hidden_size=128`, `sequence_length=16`, `normalized_raw4_subchains_prev_force`, previous force, and motif-score inputs. Curriculum stages were N=3 stable, N=4 low-angle/no-noise, N=4 current, then N=4 hard-tail with behavior rollout from the current minGRU and teacher labels from the frozen current-best ReCoN/PPO terminal.
+
+| stage | episodes | rollout | samples | weight |
+|---|---:|---|---:|---:|
+| N=3 stable | 20 | teacher | 10000 | 0.5 |
+| N=4 low-angle/no-noise | 40 | teacher | 20000 | 0.75 |
+| N=4 current | 80 | teacher | 39063 | 1.0 |
+| N=4 hard-tail | 80 | minGRU behavior | 35949 | 2.5 |
+
+Held-out eval used starts `1900000`, `2000000`, `2100000`, and `2200000`, 20 episodes each.
+
+| candidate | pure mean | pure p10 | pure success | ReCoN mean | ReCoN p10 | ReCoN success |
+|---|---:|---:|---:|---:|---:|---:|
+| fresh option-aux iter2 reference | 486.6 | 451.7 | 0.6875 | 487.1 | 443.8 | 0.6875 |
+| DAgger12 behavior curriculum | 487.2 | 443.9 | 0.6750 | 486.4 | 442.5 | 0.6625 |
+
+Interpretation: this broader curriculum/behavior-policy DAgger pass regressed success. It collected a large, well-formed curriculum dataset (`105012` samples), but teacher-imitation over the mixed curriculum appears to pull the checkpoint away from the narrow option-aux improvements. This is useful negative evidence for the current supervised recurrent recipe. The next recurrent improvement likely needs either better candidate selection/model selection before accepting a curriculum checkpoint, a loss that explicitly protects the held-out-tail action distribution, or an on-policy objective with a much stronger preservation/early-stop gate rather than full-dataset imitation.
+

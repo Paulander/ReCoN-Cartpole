@@ -1,0 +1,15 @@
+{
+  "name": "n3_stable",
+  "n_poles": 3,
+  "teacher": "static_recon",
+  "rollout_policy": "teacher",
+  "label_source": "teacher",
+  "episodes": 20,
+  "seed_start": 9162000,
+  "seed_list": "",
+  "initial_angle_range": 0.03,
+  "force_noise": 0.01,
+  "samples": 10000,
+  "sample_weight": 0.5,
+  "dataset": "reports/n4_mingru_curriculum_freshaux_dagger12_20260613_seed9162k/00_n3_stable/dataset.npz"
+}

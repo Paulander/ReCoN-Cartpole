@@ -1,0 +1,15 @@
+{
+  "name": "n4_low_angle_no_noise",
+  "n_poles": 4,
+  "teacher": "recon_policy_terminal",
+  "rollout_policy": "teacher",
+  "label_source": "teacher",
+  "episodes": 40,
+  "seed_start": 9163000,
+  "seed_list": "",
+  "initial_angle_range": 0.02,
+  "force_noise": 0.0,
+  "samples": 20000,
+  "sample_weight": 0.75,
+  "dataset": "reports/n4_mingru_curriculum_freshaux_dagger12_20260613_seed9162k/01_n4_low_angle_no_noise/dataset.npz"
+}
